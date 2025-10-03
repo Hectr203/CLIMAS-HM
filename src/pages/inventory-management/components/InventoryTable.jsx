@@ -1,0 +1,281 @@
+import React, { useState } from 'react';
+import Icon from '../../../components/AppIcon';
+import Button from '../../../components/ui/Button';
+
+const InventoryTable = ({ items, onViewDetails, onUpdateStock, onCreatePO }) => {
+  const [sortField, setSortField] = useState('itemCode');
+  const [sortDirection, setSortDirection] = useState('asc');
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const sortedItems = [...items]?.sort((a, b) => {
+    const aValue = a?.[sortField];
+    const bValue = b?.[sortField];
+    
+    if (typeof aValue === 'string') {
+      return sortDirection === 'asc' 
+        ? aValue?.localeCompare(bValue)
+        : bValue?.localeCompare(aValue);
+    }
+    
+    return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+  });
+
+  const getStockStatus = (current, reorderPoint) => {
+    if (current === 0) return { status: 'out-of-stock', label: 'Agotado', color: 'text-error' };
+    if (current <= reorderPoint) return { status: 'low-stock', label: 'Stock Bajo', color: 'text-warning' };
+    return { status: 'in-stock', label: 'En Stock', color: 'text-success' };
+  };
+
+  const SortIcon = ({ field }) => {
+    if (sortField !== field) return <Icon name="ArrowUpDown" size={16} className="text-muted-foreground" />;
+    return <Icon name={sortDirection === 'asc' ? 'ArrowUp' : 'ArrowDown'} size={16} className="text-foreground" />;
+  };
+
+  return (
+    <div className="bg-card rounded-lg border border-border overflow-hidden">
+      {/* Desktop Table */}
+      <div className="hidden lg:block overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-muted border-b border-border">
+            <tr>
+              <th className="text-left p-4">
+                <button
+                  onClick={() => handleSort('itemCode')}
+                  className="flex items-center space-x-2 font-medium text-sm text-foreground hover:text-primary transition-smooth"
+                >
+                  <span>Código</span>
+                  <SortIcon field="itemCode" />
+                </button>
+              </th>
+              <th className="text-left p-4">
+                <button
+                  onClick={() => handleSort('description')}
+                  className="flex items-center space-x-2 font-medium text-sm text-foreground hover:text-primary transition-smooth"
+                >
+                  <span>Descripción</span>
+                  <SortIcon field="description" />
+                </button>
+              </th>
+              <th className="text-left p-4">
+                <button
+                  onClick={() => handleSort('category')}
+                  className="flex items-center space-x-2 font-medium text-sm text-foreground hover:text-primary transition-smooth"
+                >
+                  <span>Categoría</span>
+                  <SortIcon field="category" />
+                </button>
+              </th>
+              <th className="text-left p-4">
+                <button
+                  onClick={() => handleSort('currentStock')}
+                  className="flex items-center space-x-2 font-medium text-sm text-foreground hover:text-primary transition-smooth"
+                >
+                  <span>Stock Actual</span>
+                  <SortIcon field="currentStock" />
+                </button>
+              </th>
+              <th className="text-left p-4">
+                <button
+                  onClick={() => handleSort('reservedStock')}
+                  className="flex items-center space-x-2 font-medium text-sm text-foreground hover:text-primary transition-smooth"
+                >
+                  <span>Reservado</span>
+                  <SortIcon field="reservedStock" />
+                </button>
+              </th>
+              <th className="text-left p-4">
+                <button
+                  onClick={() => handleSort('reorderPoint')}
+                  className="flex items-center space-x-2 font-medium text-sm text-foreground hover:text-primary transition-smooth"
+                >
+                  <span>Punto Reorden</span>
+                  <SortIcon field="reorderPoint" />
+                </button>
+              </th>
+              <th className="text-left p-4">
+                <span className="font-medium text-sm text-foreground">Proveedor</span>
+              </th>
+              <th className="text-left p-4">
+                <span className="font-medium text-sm text-foreground">Estado</span>
+              </th>
+              <th className="text-right p-4">
+                <span className="font-medium text-sm text-foreground">Acciones</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedItems?.map((item) => {
+              const stockStatus = getStockStatus(item?.currentStock, item?.reorderPoint);
+              return (
+                <tr key={item?.id} className="border-b border-border hover:bg-muted/50 transition-smooth">
+                  <td className="p-4">
+                    <span className="font-mono text-sm text-foreground">{item?.itemCode}</span>
+                  </td>
+                  <td className="p-4">
+                    <div>
+                      <div className="font-medium text-sm text-foreground">{item?.description}</div>
+                      <div className="text-xs text-muted-foreground">{item?.specifications}</div>
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-secondary/10 text-secondary">
+                      {item?.category}
+                    </span>
+                  </td>
+                  <td className="p-4">
+                    <span className="font-medium text-sm text-foreground">{item?.currentStock} {item?.unit}</span>
+                  </td>
+                  <td className="p-4">
+                    <span className="text-sm text-muted-foreground">{item?.reservedStock} {item?.unit}</span>
+                  </td>
+                  <td className="p-4">
+                    <span className="text-sm text-muted-foreground">{item?.reorderPoint} {item?.unit}</span>
+                  </td>
+                  <td className="p-4">
+                    <div>
+                      <div className="text-sm font-medium text-foreground">{item?.supplier?.name}</div>
+                      <div className="text-xs text-muted-foreground">{item?.supplier?.contact}</div>
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <span className={`inline-flex items-center space-x-1 text-xs font-medium ${stockStatus?.color}`}>
+                      <div className={`w-2 h-2 rounded-full ${
+                        stockStatus?.status === 'out-of-stock' ? 'bg-error' :
+                        stockStatus?.status === 'low-stock' ? 'bg-warning' : 'bg-success'
+                      }`} />
+                      <span>{stockStatus?.label}</span>
+                    </span>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex items-center justify-end space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onViewDetails(item)}
+                        iconName="Eye"
+                        iconSize={16}
+                      >
+                        Ver
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onUpdateStock(item)}
+                        iconName="Edit"
+                        iconSize={16}
+                      >
+                        Actualizar
+                      </Button>
+                      {stockStatus?.status !== 'in-stock' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onCreatePO(item)}
+                          iconName="ShoppingCart"
+                          iconSize={16}
+                        >
+                          Ordenar
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {/* Mobile Cards */}
+      <div className="lg:hidden space-y-4 p-4">
+        {sortedItems?.map((item) => {
+          const stockStatus = getStockStatus(item?.currentStock, item?.reorderPoint);
+          return (
+            <div key={item?.id} className="bg-background border border-border rounded-lg p-4">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1">
+                  <div className="font-mono text-sm text-muted-foreground mb-1">{item?.itemCode}</div>
+                  <div className="font-medium text-foreground mb-1">{item?.description}</div>
+                  <div className="text-xs text-muted-foreground">{item?.specifications}</div>
+                </div>
+                <span className={`inline-flex items-center space-x-1 text-xs font-medium ${stockStatus?.color}`}>
+                  <div className={`w-2 h-2 rounded-full ${
+                    stockStatus?.status === 'out-of-stock' ? 'bg-error' :
+                    stockStatus?.status === 'low-stock' ? 'bg-warning' : 'bg-success'
+                  }`} />
+                  <span>{stockStatus?.label}</span>
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <div className="text-xs text-muted-foreground">Stock Actual</div>
+                  <div className="font-medium text-sm text-foreground">{item?.currentStock} {item?.unit}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Reservado</div>
+                  <div className="text-sm text-foreground">{item?.reservedStock} {item?.unit}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Punto Reorden</div>
+                  <div className="text-sm text-foreground">{item?.reorderPoint} {item?.unit}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Categoría</div>
+                  <div className="text-sm text-foreground">{item?.category}</div>
+                </div>
+              </div>
+              <div className="mb-4">
+                <div className="text-xs text-muted-foreground">Proveedor</div>
+                <div className="text-sm font-medium text-foreground">{item?.supplier?.name}</div>
+                <div className="text-xs text-muted-foreground">{item?.supplier?.contact}</div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onViewDetails(item)}
+                  iconName="Eye"
+                  iconSize={16}
+                  className="flex-1"
+                >
+                  Ver Detalles
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onUpdateStock(item)}
+                  iconName="Edit"
+                  iconSize={16}
+                  className="flex-1"
+                >
+                  Actualizar
+                </Button>
+                {stockStatus?.status !== 'in-stock' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onCreatePO(item)}
+                    iconName="ShoppingCart"
+                    iconSize={16}
+                    className="flex-1"
+                  >
+                    Ordenar
+                  </Button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+export default InventoryTable;
