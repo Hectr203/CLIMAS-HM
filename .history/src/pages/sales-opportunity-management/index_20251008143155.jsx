@@ -467,9 +467,7 @@ const SalesOpportunityManagement = () => {
           </div>
 
           {/* Contenido (tarjetas) */}
-          <div className="p-4 space-y-3 bg-gray-50 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
-
-
+          <div className="p-4 space-y-3 bg-gray-50 min-h-[500px]">
             {getOpportunitiesByStage(stage.id)?.map((opportunity) => (
               <div
                 key={opportunity.id}
@@ -657,8 +655,7 @@ const SalesOpportunityManagement = () => {
   )}
 </div>
 </div>
-</div>
-</div>
+
 
       {/* New Opportunity Modal */}
       <NewOpportunityModal
