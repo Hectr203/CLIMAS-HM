@@ -2,12 +2,22 @@
 export const AUTH_ROLES = {
   ADMIN: 'admin',
   PROJECT_MANAGER: 'project manager',
+  SALES_REPRESENTATIVE: 'sales representative',
   WORKSHOP_SUPERVISOR: 'workshop supervisor',
   FINANCIAL_CONTROLLER: 'financial controller',
   HR_MANAGER: 'hr manager'
 };
 
 export const ROLE_PERMISSIONS = {
+  [AUTH_ROLES?.SALES_REPRESENTATIVE]: {
+    allowedPaths: [
+      '/client-management',
+      '/sales-opportunity-management',
+      '/quotation-development-center',
+      '/sales-execution-monitoring'
+    ],
+    defaultPath: '/client-management'
+  },
   [AUTH_ROLES?.ADMIN]: {
     allowedPaths: [
       '/main-dashboard',
