@@ -15,15 +15,7 @@ const LoginForm = () => {
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
 
-  // Mock credentials for different user roles
-  const mockCredentials = [
-    { email: 'admin@aireflowpro.com', password: 'Admin123!', role: 'Administrator', redirect: '/main-dashboard' },
-    { email: 'proyecto@aireflowpro.com', password: 'Proyecto123!', role: 'Project Manager', redirect: '/project-management' },
-    { email: 'ventas@aireflowpro.com', password: 'Ventas123!', role: 'Sales Representative', redirect: '/client-management' },
-    { email: 'taller@aireflowpro.com', password: 'Taller123!', role: 'Workshop Supervisor', redirect: '/inventory-management' },
-    { email: 'finanzas@aireflowpro.com', password: 'Finanzas123!', role: 'Financial Controller', redirect: '/financial-management' },
-    { email: 'personal@aireflowpro.com', password: 'Personal123!', role: 'HR Manager', redirect: '/personnel-management' }
-  ];
+  // El backend maneja credenciales y roles
 
   const validateForm = () => {
     const newErrors = {};
@@ -66,31 +58,43 @@ const LoginForm = () => {
     if (!validateForm()) return;
 
     setIsLoading(true);
-
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // Check credentials
-      const user = mockCredentials?.find(
-        cred => cred?.email === formData?.email && cred?.password === formData?.password
-      );
-
-      if (user) {
-        // Store auth token and user info
-        localStorage.setItem('authToken', 'mock-jwt-token-' + Date.now());
-        localStorage.setItem('userRole', user?.role);
-        localStorage.setItem('userEmail', user?.email);
-        
+      const response = await fetch('/api/usuarios/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password
+        })
+      });
+      const data = await response.json();
+      console.log('Login response status:', response.status);
+      console.log('Login response body:', data);
+      if (response.ok && data?.data?.token && data?.data?.usuario?.rol) {
+        // Guardar token y expiración (24h)
+        localStorage.setItem('authToken', data.data.token);
+        localStorage.setItem('tokenExpiresAt', String(Date.now() + 24 * 60 * 60 * 1000));
+        localStorage.setItem('userRole', data.data.usuario.rol);
+        localStorage.setItem('userEmail', data.data.usuario.email);
         if (formData?.rememberMe) {
           localStorage.setItem('rememberMe', 'true');
         }
-
-        // Redirect to appropriate dashboard
-        navigate(user?.redirect);
+        // Redirigir según rol
+        let redirect = '/main-dashboard';
+        switch (data.data.usuario.rol) {
+          case 'Administrador': redirect = '/main-dashboard'; break;
+          case 'Project Manager': redirect = '/project-management'; break;
+          case 'Sales Representative': redirect = '/client-management'; break;
+          case 'Workshop Supervisor': redirect = '/inventory-management'; break;
+          case 'Financial Controller': redirect = '/financial-management'; break;
+          case 'HR Manager': redirect = '/personnel-management'; break;
+        }
+        navigate(redirect);
       } else {
         setErrors({
-          general: 'Credenciales incorrectas. Por favor, verifique su correo y contraseña.'
+          general: data?.message || 'Credenciales incorrectas. Por favor, verifique su correo y contraseña.'
         });
       }
     } catch (error) {

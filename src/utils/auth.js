@@ -1,15 +1,14 @@
 // Authentication and Authorization utilities
 export const AUTH_ROLES = {
-  ADMINISTRATOR: 'Administrator',
-  PROJECT_MANAGER: 'Project Manager',
-  SALES_REPRESENTATIVE: 'Sales Representative',
-  WORKSHOP_SUPERVISOR: 'Workshop Supervisor',
-  FINANCIAL_CONTROLLER: 'Financial Controller',
-  HR_MANAGER: 'HR Manager'
+  ADMIN: 'admin',
+  PROJECT_MANAGER: 'project manager',
+  WORKSHOP_SUPERVISOR: 'workshop supervisor',
+  FINANCIAL_CONTROLLER: 'financial controller',
+  HR_MANAGER: 'hr manager'
 };
 
 export const ROLE_PERMISSIONS = {
-  [AUTH_ROLES?.ADMINISTRATOR]: {
+  [AUTH_ROLES?.ADMIN]: {
     allowedPaths: [
       '/main-dashboard',
       '/sales-opportunity-management',
@@ -41,15 +40,6 @@ export const ROLE_PERMISSIONS = {
       '/quotation-builder'
     ],
     defaultPath: '/project-management'
-  },
-  [AUTH_ROLES?.SALES_REPRESENTATIVE]: {
-    allowedPaths: [
-      '/client-management',
-      '/sales-opportunity-management',
-      '/quotation-development-center',
-      '/sales-execution-monitoring'
-    ],
-    defaultPath: '/client-management'
   },
   [AUTH_ROLES?.WORKSHOP_SUPERVISOR]: {
     allowedPaths: [
@@ -95,7 +85,14 @@ export const getCurrentUser = () => {
 // Check if user is authenticated
 export const isAuthenticated = () => {
   const user = getCurrentUser();
-  return user !== null;
+  const expiresAt = localStorage.getItem('tokenExpiresAt');
+  if (!user || !user.token || !expiresAt) return false;
+  // Verifica expiración del token (24h)
+  if (Date.now() > Number(expiresAt)) {
+    logout();
+    return false;
+  }
+  return true;
 };
 
 // Check if user has permission to access a specific path
@@ -125,7 +122,7 @@ export const getAllowedNavigationItems = (userRole) => {
       icon: 'LayoutDashboard',
       tooltip: 'Resumen operacional y KPIs',
       badge: null,
-      roles: [AUTH_ROLES?.ADMINISTRATOR]
+  roles: [AUTH_ROLES?.ADMIN]
     },
     {
       label: 'Oportunidades',
@@ -133,7 +130,7 @@ export const getAllowedNavigationItems = (userRole) => {
       icon: 'Target',
       tooltip: 'Gestión de oportunidades de venta',
       badge: 8,
-      roles: [AUTH_ROLES?.ADMINISTRATOR, AUTH_ROLES?.SALES_REPRESENTATIVE]
+  roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.SALES_REPRESENTATIVE]
     },
     {
       label: 'Cotizaciones',
@@ -141,7 +138,7 @@ export const getAllowedNavigationItems = (userRole) => {
       icon: 'FileText',
       tooltip: 'Desarrollo y gestión de cotizaciones',
       badge: null,
-      roles: [AUTH_ROLES?.ADMINISTRATOR, AUTH_ROLES?.SALES_REPRESENTATIVE, AUTH_ROLES?.FINANCIAL_CONTROLLER]
+  roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.SALES_REPRESENTATIVE, AUTH_ROLES?.FINANCIAL_CONTROLLER]
     },
     {
       label: 'Proyectos',
@@ -149,7 +146,7 @@ export const getAllowedNavigationItems = (userRole) => {
       icon: 'FolderOpen',
       tooltip: 'Gestión del ciclo de vida de proyectos',
       badge: 5,
-      roles: [AUTH_ROLES?.ADMINISTRATOR, AUTH_ROLES?.PROJECT_MANAGER]
+  roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.PROJECT_MANAGER]
     },
     {
       label: 'Operaciones',
@@ -157,7 +154,7 @@ export const getAllowedNavigationItems = (userRole) => {
       icon: 'ClipboardList',
       tooltip: 'Procesamiento y seguimiento de órdenes de trabajo',
       badge: 12,
-      roles: [AUTH_ROLES?.ADMINISTRATOR, AUTH_ROLES?.WORKSHOP_SUPERVISOR]
+  roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.WORKSHOP_SUPERVISOR]
     },
     {
       label: 'Recursos',
@@ -169,14 +166,14 @@ export const getAllowedNavigationItems = (userRole) => {
           path: '/personnel-management',
           icon: 'UserCheck',
           tooltip: 'Gestión de personal y horarios',
-          roles: [AUTH_ROLES?.ADMINISTRATOR, AUTH_ROLES?.HR_MANAGER]
+          roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.HR_MANAGER]
         },
         {
           label: 'Inventario',
           path: '/inventory-management',
           icon: 'Package',
           tooltip: 'Seguimiento de equipos y repuestos',
-          roles: [AUTH_ROLES?.ADMINISTRATOR, AUTH_ROLES?.WORKSHOP_SUPERVISOR]
+          roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.WORKSHOP_SUPERVISOR]
         }
       ]
     },
@@ -191,7 +188,7 @@ export const getAllowedNavigationItems = (userRole) => {
           path: '/client-management',
           icon: 'Users',
           tooltip: 'Gestión de relaciones con clientes',
-          roles: [AUTH_ROLES?.ADMINISTRATOR, AUTH_ROLES?.SALES_REPRESENTATIVE]
+          roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.SALES_REPRESENTATIVE]
         },
         {
           label: 'Finanzas',
@@ -199,7 +196,7 @@ export const getAllowedNavigationItems = (userRole) => {
           icon: 'DollarSign',
           tooltip: 'Supervisión y reportes financieros',
           badge: 3,
-          roles: [AUTH_ROLES?.ADMINISTRATOR, AUTH_ROLES?.FINANCIAL_CONTROLLER]
+          roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.FINANCIAL_CONTROLLER]
         }
       ]
     }
