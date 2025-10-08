@@ -440,19 +440,14 @@ const SalesOpportunityManagement = () => {
               </div>
             </div>
 
-            <div className="relative flex transition-all duration-300">
+            <div className={`flex gap-6 relative transition-all duration-300 ${showControls ? 'pr-[26rem]' : ''}`}>
   {/* Kanban Board */}
-  <div
-    className={`flex-1 overflow-x-auto overflow-y-hidden pb-6 transition-all duration-300 ${
-      showControls ? 'mr-[26rem]' : ''
-    }`}
-  >
-    {/* Contenedor de columnas (scroll solo aquí) */}
-    <div className="flex gap-6 min-w-max px-6">
+  <div className="flex-1 overflow-x-auto pb-6">
+    <div className="min-w-[1000px] grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
       {salesStages.map((stage) => (
-        <div
+        <div 
           key={stage.id}
-          className="flex flex-col w-[280px] bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
+          className="flex flex-col bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
         >
           {/* Header de la etapa */}
           <div className={`${stage.color} p-4 text-white flex flex-col rounded-t-2xl`}>
@@ -467,9 +462,7 @@ const SalesOpportunityManagement = () => {
           </div>
 
           {/* Contenido (tarjetas) */}
-          <div className="p-4 space-y-3 bg-gray-50 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
-
-
+          <div className="p-4 space-y-3 bg-gray-50 min-h-[500px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
             {getOpportunitiesByStage(stage.id)?.map((opportunity) => (
               <div
                 key={opportunity.id}
@@ -480,17 +473,15 @@ const SalesOpportunityManagement = () => {
                   <h4 className="font-medium text-sm text-gray-900 line-clamp-2">
                     {opportunity.clientName}
                   </h4>
-                  <span
-                    className={`text-xs px-2 py-1 rounded-full ${
-                      opportunity.priority === 'urgent'
-                        ? 'bg-red-100 text-red-800'
-                        : opportunity.priority === 'high'
-                        ? 'bg-orange-100 text-orange-800'
-                        : opportunity.priority === 'medium'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-green-100 text-green-800'
-                    }`}
-                  >
+                  <span className={`text-xs px-2 py-1 rounded-full ${
+                    opportunity.priority === 'urgent'
+                      ? 'bg-red-100 text-red-800'
+                      : opportunity.priority === 'high'
+                      ? 'bg-orange-100 text-orange-800'
+                      : opportunity.priority === 'medium'
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : 'bg-green-100 text-green-800'
+                  }`}>
                     {opportunity.priority === 'urgent'
                       ? 'Urgente'
                       : opportunity.priority === 'high'
@@ -508,13 +499,11 @@ const SalesOpportunityManagement = () => {
                       size={12}
                     />
                     <span className="capitalize">{opportunity.contactChannel}</span>
-                    <span
-                      className={`px-2 py-0.5 rounded ${
-                        opportunity.projectType === 'project'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-purple-100 text-purple-800'
-                      }`}
-                    >
+                    <span className={`px-2 py-0.5 rounded ${
+                      opportunity.projectType === 'project'
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-purple-100 text-purple-800'
+                    }`}>
                       {opportunity.projectType === 'project' ? 'Proyecto' : 'Pieza'}
                     </span>
                   </div>
@@ -528,15 +517,13 @@ const SalesOpportunityManagement = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-1">
                     <Icon name="Clock" size={12} />
-                    <span
-                      className={`text-xs font-medium ${getDurationColor(
-                        opportunity.stageDuration
-                      )}`}
-                    >
+                    <span className={`text-xs font-medium ${getDurationColor(opportunity.stageDuration)}`}>
                       {opportunity.stageDuration} días
                     </span>
                   </div>
-                  <div className="text-xs font-medium text-gray-600">ID: {opportunity.id}</div>
+                  <div className="text-xs font-medium text-gray-600">
+                    ID: {opportunity.id}
+                  </div>
                 </div>
 
                 {opportunity.workOrderGenerated && (
@@ -560,9 +547,9 @@ const SalesOpportunityManagement = () => {
     </div>
   </div>
 
-  {/* Panel lateral (fuera del scroll) */}
+  {/* Panel lateral */}
   {showControls && (
-    <div className="fixed top-[6rem] right-0 w-[25rem] h-[calc(100vh-6rem)] bg-white rounded-l-2xl shadow-xl border-l z-20 overflow-y-auto">
+    <div className="absolute top-0 right-0 w-[25rem] bg-white rounded-l-2xl shadow-xl border-l z-20 h-[calc(100vh-6rem)] overflow-y-auto">
       <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
         <h3 className="font-semibold text-gray-800">Controles de Oportunidad</h3>
         <Button
@@ -572,93 +559,89 @@ const SalesOpportunityManagement = () => {
           onClick={() => setShowControls(false)}
         />
       </div>
-
       <div className="p-4 space-y-6">
-        {selectedOpportunity && (
-          <div className="space-y-4">
-            <div>
-              <h4 className="font-medium mb-2">{selectedOpportunity?.clientName}</h4>
-              <p className="text-sm text-muted-foreground">{selectedOpportunity?.id}</p>
-            </div>
-
-            {/* Paneles según etapa */}
-            {selectedOpportunity?.stage === 'initial-contact' && (
-              <ClientRegistrationPanel
-                opportunity={selectedOpportunity}
-                onRegister={(clientData) =>
-                  handleClientRegistration(selectedOpportunity?.id, clientData)
-                }
-              />
-            )}
-
-            <CommunicationPanel
-              opportunity={selectedOpportunity}
-              onAddCommunication={(communication) =>
-                handleCommunicationAdd(selectedOpportunity?.id, communication)
-              }
-            />
-
-            {(selectedOpportunity?.stage === 'quotation-development' ||
-              selectedOpportunity?.quotationData) && (
-              <QuotationRequestPanel
-                opportunity={selectedOpportunity}
-                onUpdate={(quotationData) =>
-                  handleQuotationUpdate(selectedOpportunity?.id, quotationData)
-                }
-              />
-            )}
-
-            {selectedOpportunity?.stage === 'closure' &&
-              selectedOpportunity?.quotationData?.approved && (
-                <WorkOrderPanel
-                  opportunity={selectedOpportunity}
-                  onGenerateWorkOrder={(workOrderData) =>
-                    handleWorkOrderGeneration(selectedOpportunity?.id, workOrderData)
-                  }
-                />
-              )}
-
-            {selectedOpportunity?.stage !== 'initial-contact' && (
-              <ChangeManagementPanel
-                opportunity={selectedOpportunity}
-                onRequestChange={(changeData) =>
-                  console.log('Change requested:', changeData)
-                }
-              />
-            )}
-
-            {/* Botones para cambiar etapa */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Avanzar Etapa</label>
-              <div className="grid grid-cols-1 gap-2">
-                {salesStages?.map((stage) => (
-                  <Button
-                    key={stage?.id}
-                    variant={
-                      selectedOpportunity?.stage === stage?.id ? 'default' : 'outline'
-                    }
-                    size="sm"
-                    onClick={() =>
-                      handleStageTransition(selectedOpportunity?.id, stage?.id)
-                    }
-                    disabled={selectedOpportunity?.stage === stage?.id}
-                    className="text-xs justify-start"
-                  >
-                    <Icon name={stage?.icon} size={14} className="mr-2" />
-                    {stage?.name}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Aquí va tu contenido del panel lateral */}
       </div>
     </div>
   )}
 </div>
-</div>
-</div>
-</div>
+
+
+                  
+                  <div className="p-4 space-y-6">
+                    {selectedOpportunity && (
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="font-medium mb-2">{selectedOpportunity?.clientName}</h4>
+                          <p className="text-sm text-muted-foreground">{selectedOpportunity?.id}</p>
+                        </div>
+
+                        {/* Client Registration */}
+                        {selectedOpportunity?.stage === 'initial-contact' && (
+                          <ClientRegistrationPanel
+                            opportunity={selectedOpportunity}
+                            onRegister={(clientData) => handleClientRegistration(selectedOpportunity?.id, clientData)}
+                          />
+                        )}
+
+                        {/* Communication Panel */}
+                        <CommunicationPanel
+                          opportunity={selectedOpportunity}
+                          onAddCommunication={(communication) => handleCommunicationAdd(selectedOpportunity?.id, communication)}
+                        />
+
+                        {/* Quotation Request */}
+                        {(selectedOpportunity?.stage === 'quotation-development' || selectedOpportunity?.quotationData) && (
+                          <QuotationRequestPanel
+                            opportunity={selectedOpportunity}
+                            onUpdate={(quotationData) => handleQuotationUpdate(selectedOpportunity?.id, quotationData)}
+                          />
+                        )}
+
+                        {/* Work Order Generation */}
+                        {selectedOpportunity?.stage === 'closure' && selectedOpportunity?.quotationData?.approved && (
+                          <WorkOrderPanel
+                            opportunity={selectedOpportunity}
+                            onGenerateWorkOrder={(workOrderData) => handleWorkOrderGeneration(selectedOpportunity?.id, workOrderData)}
+                          />
+                        )}
+
+                        {/* Change Management */}
+                        {selectedOpportunity?.stage !== 'initial-contact' && (
+                          <ChangeManagementPanel
+                            opportunity={selectedOpportunity}
+                            onRequestChange={(changeData) => console.log('Change requested:', changeData)}
+                          />
+                        )}
+
+                        {/* Stage Transition */}
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Avanzar Etapa</label>
+                          <div className="grid grid-cols-1 gap-2">
+                            {salesStages?.map((stage) => (
+                              <Button
+                                key={stage?.id}
+                                variant={selectedOpportunity?.stage === stage?.id ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => handleStageTransition(selectedOpportunity?.id, stage?.id)}
+                                disabled={selectedOpportunity?.stage === stage?.id}
+                                className="text-xs justify-start"
+                              >
+                                <Icon name={stage?.icon} size={14} className="mr-2" />
+                                {stage?.name}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* New Opportunity Modal */}
       <NewOpportunityModal
