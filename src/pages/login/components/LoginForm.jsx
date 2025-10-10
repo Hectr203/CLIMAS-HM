@@ -74,24 +74,26 @@ const LoginForm = () => {
       console.log('Login response body:', data);
       if (response.ok && data?.data?.token && data?.data?.usuario?.rol) {
         // Guardar token y expiración (24h)
-        localStorage.setItem('authToken', data.data.token);
+        localStorage.setItem('userToken', data.data.token);
         localStorage.setItem('tokenExpiresAt', String(Date.now() + 24 * 60 * 60 * 1000));
         localStorage.setItem('userRole', data.data.usuario.rol);
         localStorage.setItem('userEmail', data.data.usuario.email);
         if (formData?.rememberMe) {
           localStorage.setItem('rememberMe', 'true');
         }
-        // Redirigir según rol
+        // Mostrar el valor exacto del rol recibido
+        console.log('Rol recibido:', data.data.usuario.rol);
+        // Redirigir según rol (ignorando mayúsculas/minúsculas)
+        const role = String(data.data.usuario.rol).toLowerCase();
         let redirect = '/main-dashboard';
-        switch (data.data.usuario.rol) {
-          case 'Administrador': redirect = '/main-dashboard'; break;
-          case 'Project Manager': redirect = '/project-management'; break;
-          case 'Sales Representative': redirect = '/client-management'; break;
-          case 'Workshop Supervisor': redirect = '/inventory-management'; break;
-          case 'Financial Controller': redirect = '/financial-management'; break;
-          case 'HR Manager': redirect = '/personnel-management'; break;
-        }
+        if (role === 'admin') redirect = '/main-dashboard';
+        else if (role === 'proyect manager') redirect = '/project-management';
+        else if (role === 'sales representative') redirect = '/client-management';
+        else if (role === 'workshop supervisor') redirect = '/inventory-management';
+        else if (role === 'financial controller') redirect = '/financial-management';
+        else if (role === 'hr manager') redirect = '/personnel-management';
         navigate(redirect);
+        window.location.reload();
       } else {
         setErrors({
           general: data?.message || 'Credenciales incorrectas. Por favor, verifique su correo y contraseña.'
@@ -133,6 +135,7 @@ const LoginForm = () => {
           error={errors?.password}
           required
           disabled={isLoading}
+          autoComplete="current-password"
         />
 
         {/* Remember Me Checkbox */}

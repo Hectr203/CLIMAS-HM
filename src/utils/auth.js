@@ -51,6 +51,17 @@ export const ROLE_PERMISSIONS = {
     ],
     defaultPath: '/project-management'
   },
+  'proyect manager': {
+    allowedPaths: [
+      '/project-management',
+      '/project-gallery-viewer',
+      '/project-detail-gallery',
+      '/project-documentation-center',
+      '/project-workflow-management',
+      '/quotation-builder'
+    ],
+    defaultPath: '/project-management'
+  },
   [AUTH_ROLES?.WORKSHOP_SUPERVISOR]: {
     allowedPaths: [
       '/inventory-management',
@@ -77,7 +88,7 @@ export const ROLE_PERMISSIONS = {
 
 // Get current user from localStorage
 export const getCurrentUser = () => {
-  const authToken = localStorage.getItem('authToken');
+  const authToken = localStorage.getItem('userToken');
   const userRole = localStorage.getItem('userRole');
   const userEmail = localStorage.getItem('userEmail');
   
@@ -108,13 +119,28 @@ export const isAuthenticated = () => {
 // Check if user has permission to access a specific path
 export const hasPermission = (path, userRole = null) => {
   const currentUser = getCurrentUser();
-  const role = userRole || currentUser?.role;
-  
-  if (!role || !ROLE_PERMISSIONS?.[role]) {
+  // Normaliza el rol a minúsculas y sin espacios extra
+  const normalizeRole = r => r?.toLowerCase().trim();
+  const role = normalizeRole(userRole || currentUser?.role);
+
+  // Normaliza el path, quitando parámetros (ejemplo: /project-detail-gallery/123 -> /project-detail-gallery)
+  const normalizePath = p => {
+    if (!p) return '';
+    // Solo toma la primera parte después de la barra inicial y antes de cualquier parámetro
+    const parts = p.split('/').filter(Boolean);
+    return parts.length > 1 ? `/${parts[0]}-${parts[1]}` : `/${parts[0]}`;
+  };
+  // Si el path tiene formato /algo/algo, lo dejamos como /algo-algo para coincidir con allowedPaths
+  const basePath = normalizePath(path);
+
+  // Busca el rol en el objeto de permisos
+  const permissions = ROLE_PERMISSIONS?.[role] || ROLE_PERMISSIONS?.[userRole] || ROLE_PERMISSIONS?.[normalizeRole(userRole)];
+  if (!permissions) {
     return false;
   }
-  
-  return ROLE_PERMISSIONS?.[role]?.allowedPaths?.includes(path);
+
+  // Verifica si el path base está permitido
+  return permissions.allowedPaths?.includes(basePath);
 };
 
 // Get allowed navigation items for user role
@@ -165,6 +191,20 @@ export const getAllowedNavigationItems = (userRole) => {
       tooltip: 'Procesamiento y seguimiento de órdenes de trabajo',
       badge: 12,
   roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.WORKSHOP_SUPERVISOR]
+    },
+    {
+      label: 'Operaciones de Taller',
+      path: '/workshop-operations-management',
+      icon: 'Tool',
+      tooltip: 'Gestión de operaciones de taller',
+      roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.WORKSHOP_SUPERVISOR]
+    },
+    {
+      label: 'Centro de Operaciones de Taller',
+      path: '/workshop-operations-center',
+      icon: 'Home',
+      tooltip: 'Centro de operaciones de taller',
+      roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.WORKSHOP_SUPERVISOR]
     },
     {
       label: 'Recursos',
