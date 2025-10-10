@@ -163,43 +163,51 @@ const ClientManagement = () => {
   useEffect(() => {
     let filtered = clients;
 
-    // Apply filters
+    // Filtro de búsqueda (empresa, contacto, email)
     if (filters?.search) {
+      const search = filters.search.toLowerCase();
       filtered = filtered?.filter(client =>
-        client?.companyName?.toLowerCase()?.includes(filters?.search?.toLowerCase()) ||
-        client?.contactPerson?.toLowerCase()?.includes(filters?.search?.toLowerCase()) ||
-        client?.email?.toLowerCase()?.includes(filters?.search?.toLowerCase())
+        client?.empresa?.toLowerCase()?.includes(search) ||
+        client?.contacto?.toLowerCase()?.includes(search) ||
+        client?.email?.toLowerCase()?.includes(search)
       );
     }
 
+    // Industria
     if (filters?.industry) {
-      filtered = filtered?.filter(client => client?.industry === filters?.industry);
+      filtered = filtered?.filter(client => client?.industria === filters?.industry);
     }
 
+    // Estado
     if (filters?.status) {
-      filtered = filtered?.filter(client => client?.status === filters?.status);
+      filtered = filtered?.filter(client => client?.estado === filters?.status);
     }
 
+    // Relación
     if (filters?.relationshipHealth) {
-      filtered = filtered?.filter(client => client?.relationshipHealth === filters?.relationshipHealth);
+      filtered = filtered?.filter(client => client?.relacion === filters?.relationshipHealth);
     }
 
+    // Ubicación
     if (filters?.location) {
-      filtered = filtered?.filter(client => client?.location === filters?.location);
+      filtered = filtered?.filter(client => client?.ubicacionEmpre === filters?.location || client?.ubicacion?.ciudad === filters?.location);
     }
 
+    // RFC
     if (filters?.rfc) {
       filtered = filtered?.filter(client =>
         client?.rfc?.toLowerCase()?.includes(filters?.rfc?.toLowerCase())
       );
     }
 
+    // Proyectos mínimos
     if (filters?.minProjects) {
-      filtered = filtered?.filter(client => client?.totalProjects >= parseInt(filters?.minProjects));
+      filtered = filtered?.filter(client => (parseInt(client?.totalProjects) || 0) >= parseInt(filters?.minProjects));
     }
 
+    // Valor mínimo
     if (filters?.minValue) {
-      filtered = filtered?.filter(client => client?.totalValue >= parseInt(filters?.minValue));
+      filtered = filtered?.filter(client => (parseInt(client?.totalValue) || 0) >= parseInt(filters?.minValue));
     }
 
     setFilteredClients(filtered);
@@ -284,8 +292,11 @@ const ClientManagement = () => {
 
   const handleSubmitEditClient = async (updatedClient) => {
     if (!updatedClient?.id) return;
-    await editClient(updatedClient.id, updatedClient);
-    setEditModalState({ open: false, client: null });
+    const response = await editClient(updatedClient.id, updatedClient);
+    // Espera a que el estado se actualice antes de cerrar el modal
+    if (response && response.success) {
+      setEditModalState({ open: false, client: null });
+    }
   };
 
   const handleViewProjects = (client) => {
@@ -366,17 +377,21 @@ const ClientManagement = () => {
                 <div className="p-6">
                   {/* Modals */}
                   <NewClientModal
-                    isOpen={showNewClientModal}
-                    onClose={() => setShowNewClientModal(false)}
-                    onSubmit={handleSubmitNewClient}
-                    mode="create"
+                   isOpen={showNewClientModal}
+                   onClose={() => setShowNewClientModal(false)}
+                   onSubmit={handleSubmitNewClient}
+                   mode="create"
+                   createClient={createClient}
+                   editClient={editClient}
                   />
                   <NewClientModal
-                    isOpen={editModalState.open}
-                    onClose={() => setEditModalState({ open: false, client: null })}
-                    onSubmit={handleSubmitEditClient}
-                    initialData={editModalState.client}
-                    mode="edit"
+                   isOpen={editModalState.open}
+                   onClose={() => setEditModalState({ open: false, client: null })}
+                   onSubmit={handleSubmitEditClient}
+                   initialData={editModalState.client}
+                   mode="edit"
+                   createClient={createClient}
+                   editClient={editClient}
                   />
                   {/* Breadcrumb */}
               <div className="mb-6">

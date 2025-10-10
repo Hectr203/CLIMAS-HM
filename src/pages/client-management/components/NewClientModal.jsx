@@ -3,12 +3,10 @@ import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
-import useClient from '../../../hooks/useClient';
 import { useNotifications } from '../../../context/NotificationContext.jsx';
 
-const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialData = null }) => {
+const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialData = null, createClient, editClient }) => {
   const { showSuccess, showError } = useNotifications();
-  const { createClient, loading, error, success } = useClient();
   const [formData, setFormData] = useState({
     companyName: '',
     contactPerson: '',
@@ -158,7 +156,6 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
     }
   };
 
-  const { editClient } = useClient();
   const handleSubmit = async (e) => {
     e?.preventDefault();
     if (!validateForm()) {
@@ -191,7 +188,7 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
     };
     console.log('Datos enviados al servicio:', clientData);
     if (mode === 'edit' && initialData && initialData.id) {
-      // Actualizar cliente
+      // Actualizar cliente usando la función pasada por props
       const res = await editClient(initialData.id, clientData);
       if (res && res.success) {
         showSuccess(`Cliente "${clientData.empresa}" actualizado exitosamente.`);
@@ -200,19 +197,14 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
         showError('Error al actualizar el cliente');
       }
     } else {
-      // Crear cliente
-      createClient(clientData)
-        .then((res) => {
-          if (res && res.success) {
-            showSuccess(`Cliente "${clientData.empresa}" guardado exitosamente.`);
-            handleClose();
-          } else {
-            showError('Error al guardar el cliente');
-          }
-        })
-        .catch((err) => {
-          showError('Error al guardar el cliente');
-        });
+      // Crear cliente usando la función pasada por props
+      const res = await createClient(clientData);
+      if (res && res.success) {
+        showSuccess(`Cliente "${clientData.empresa}" guardado exitosamente.`);
+        handleClose();
+      } else {
+        showError('Error al guardar el cliente');
+      }
     }
   };
 

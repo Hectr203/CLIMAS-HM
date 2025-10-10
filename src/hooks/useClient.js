@@ -31,8 +31,10 @@ const useClient = () => {
     try {
       const response = await clientService.createClient(clientData);
       setSuccess(true);
-      // Opcional: recargar clientes después de crear uno nuevo
-      await getClients();
+      // Agrega el nuevo cliente al estado local sin refrescar toda la lista
+      if (response && response.success && response.data) {
+        setClients(prevClients => [...prevClients, response.data]);
+      }
       return response;
     } catch (err) {
       setError(err);
@@ -50,7 +52,20 @@ const useClient = () => {
     try {
       const response = await clientService.updateClient(id, clientData);
       setSuccess(true);
-      await getClients();
+      // Si el backend devuelve el cliente actualizado, úsalo para actualizar el estado local
+      if (response && response.success && response.data) {
+        setClients(prevClients => prevClients.map(c =>
+          (c.id === id || c._id === id)
+            ? { ...c, ...response.data, id: c.id || c._id }
+            : c
+        ));
+      } else if (response && response.success) {
+        setClients(prevClients => prevClients.map(c =>
+          (c.id === id || c._id === id)
+            ? { ...c, ...clientData, id: c.id || c._id }
+            : c
+        ));
+      }
       return response;
     } catch (err) {
       setError(err);
