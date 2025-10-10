@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import useClient from '../../hooks/useClient';
 import Header from '../../components/ui/Header';
 import Sidebar from '../../components/ui/Sidebar';
 import Breadcrumb from '../../components/ui/Breadcrumb';
@@ -20,98 +21,12 @@ const ClientManagement = () => {
   const [selectedClient, setSelectedClient] = useState(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showNewClientModal, setShowNewClientModal] = useState(false);
-  const [clients, setClients] = useState([
-    {
-      id: 1,
-      companyName: "Grupo Industrial Monterrey",
-      contactPerson: "Carlos Hernández",
-      email: "carlos.hernandez@gimty.com.mx",
-      phone: "+52 81 1234-5678",
-      industry: "Manufactura",
-      location: "Monterrey",
-      status: "Activo",
-      relationshipHealth: "Excelente",
-      rfc: "GIM850315ABC",
-      clientSince: "15/03/2020",
-      totalProjects: 12,
-      activeContracts: 3,
-      totalValue: 2850000,
-      lastContact: "2024-09-28",
-      nextFollowUp: "2024-10-05"
-    },
-    {
-      id: 2,
-      companyName: "Comercial Plaza Central",
-      contactPerson: "María González",
-      email: "maria.gonzalez@plazacentral.mx",
-      phone: "+52 55 9876-5432",
-      industry: "Comercial",
-      location: "Ciudad de México",
-      status: "Activo",
-      relationshipHealth: "Buena",
-      rfc: "CPC920710DEF",
-      clientSince: "10/07/2021",
-      totalProjects: 8,
-      activeContracts: 2,
-      totalValue: 1650000,
-      lastContact: "2024-09-25",
-      nextFollowUp: "2024-10-02"
-    },
-    {
-      id: 3,
-      companyName: "Hotel Ejecutivo Guadalajara",
-      contactPerson: "Roberto Martínez",
-      email: "roberto.martinez@hoteleje.com",
-      phone: "+52 33 5555-1234",
-      industry: "Hospitalidad",
-      location: "Guadalajara",
-      status: "Pendiente",
-      relationshipHealth: "Regular",
-      rfc: "HEG880425GHI",
-      clientSince: "25/04/2019",
-      totalProjects: 15,
-      activeContracts: 1,
-      totalValue: 3200000,
-      lastContact: "2024-09-20",
-      nextFollowUp: "2024-09-30"
-    },
-    {
-      id: 4,
-      companyName: "Universidad Tecnológica del Norte",
-      contactPerson: "Ana Rodríguez",
-      email: "ana.rodriguez@utn.edu.mx",
-      phone: "+52 81 7777-8888",
-      industry: "Educación",
-      location: "Monterrey",
-      status: "Activo",
-      relationshipHealth: "Excelente",
-      rfc: "UTN750612JKL",
-      clientSince: "12/06/2018",
-      totalProjects: 20,
-      activeContracts: 4,
-      totalValue: 4500000,
-      lastContact: "2024-09-29",
-      nextFollowUp: "2024-10-10"
-    },
-    {
-      id: 5,
-      companyName: "Clínica Médica Especializada",
-      contactPerson: "Dr. Luis Pérez",
-      email: "luis.perez@clinicaesp.mx",
-      phone: "+52 55 3333-4444",
-      industry: "Salud",
-      location: "Ciudad de México",
-      status: "Inactivo",
-      relationshipHealth: "Mala",
-      rfc: "CME901128MNO",
-      clientSince: "28/11/2017",
-      totalProjects: 5,
-      activeContracts: 0,
-      totalValue: 980000,
-      lastContact: "2024-08-15",
-      nextFollowUp: "2024-10-15"
-    }
-  ]);
+  const { clients, getClients, createClient, editClient, loading, error } = useClient();
+
+  useEffect(() => {
+    getClients();
+    // eslint-disable-next-line
+  }, []);
 
   const [filters, setFilters] = useState({
     search: '',
@@ -361,8 +276,16 @@ const ClientManagement = () => {
     setShowSidebar(true);
   };
 
+  const [editModalState, setEditModalState] = useState({ open: false, client: null });
+
   const handleEditClient = (client) => {
-    console.log('Editando cliente:', client);
+    setEditModalState({ open: true, client });
+  };
+
+  const handleSubmitEditClient = async (updatedClient) => {
+    if (!updatedClient?.id) return;
+    await editClient(updatedClient.id, updatedClient);
+    setEditModalState({ open: false, client: null });
   };
 
   const handleViewProjects = (client) => {
@@ -378,9 +301,8 @@ const ClientManagement = () => {
     setShowNewClientModal(true);
   };
 
-  const handleSubmitNewClient = (clientData) => {
-    setClients(prevClients => [...prevClients, clientData]);
-    console.log('Cliente agregado exitosamente:', clientData);
+  const handleSubmitNewClient = async (clientData) => {
+    await createClient(clientData);
     setShowNewClientModal(false);
   };
 
@@ -439,10 +361,24 @@ const ClientManagement = () => {
         sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'
       } lg:pt-0 pt-16`}>
         <div className="flex">
-          {/* Main Content */}
-          <div className={`flex-1 transition-all duration-300 ${showSidebar ? 'mr-96' : ''}`}>
-            <div className="p-6">
-              {/* Breadcrumb */}
+              {/* Main Content */}
+              <div className={`flex-1 transition-all duration-300 ${showSidebar ? 'mr-96' : ''}`}>
+                <div className="p-6">
+                  {/* Modals */}
+                  <NewClientModal
+                    isOpen={showNewClientModal}
+                    onClose={() => setShowNewClientModal(false)}
+                    onSubmit={handleSubmitNewClient}
+                    mode="create"
+                  />
+                  <NewClientModal
+                    isOpen={editModalState.open}
+                    onClose={() => setEditModalState({ open: false, client: null })}
+                    onSubmit={handleSubmitEditClient}
+                    initialData={editModalState.client}
+                    mode="edit"
+                  />
+                  {/* Breadcrumb */}
               <div className="mb-6">
                 <Breadcrumb />
               </div>
@@ -491,7 +427,7 @@ const ClientManagement = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Total Clientes</p>
-                      <p className="text-2xl font-bold text-foreground">{clients?.length}</p>
+                      <p className="text-2xl font-bold text-foreground">{Array.isArray(clients) ? clients.length : 0}</p>
                     </div>
                     <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
                       <Icon name="Users" size={24} color="white" />
@@ -508,7 +444,7 @@ const ClientManagement = () => {
                     <div>
                       <p className="text-sm text-muted-foreground">Clientes Activos</p>
                       <p className="text-2xl font-bold text-foreground">
-                        {clients?.filter(c => c?.status === 'Activo')?.length}
+                        {Array.isArray(clients) ? clients.filter(c => c?.status === 'Activo').length : 0}
                       </p>
                     </div>
                     <div className="w-12 h-12 bg-success rounded-lg flex items-center justify-center">
@@ -526,7 +462,7 @@ const ClientManagement = () => {
                     <div>
                       <p className="text-sm text-muted-foreground">Contratos Activos</p>
                       <p className="text-2xl font-bold text-foreground">
-                        {clients?.reduce((sum, client) => sum + client?.activeContracts, 0)}
+                        {Array.isArray(clients) ? clients.reduce((sum, client) => sum + (Number(client?.activeContracts) || 0), 0) : 0}
                       </p>
                     </div>
                     <div className="w-12 h-12 bg-accent rounded-lg flex items-center justify-center">
@@ -544,7 +480,7 @@ const ClientManagement = () => {
                     <div>
                       <p className="text-sm text-muted-foreground">Valor Total</p>
                       <p className="text-2xl font-bold text-foreground">
-                        ${clients?.reduce((sum, client) => sum + client?.totalValue, 0)?.toLocaleString('es-MX')}
+                        ${Array.isArray(clients) ? clients.reduce((sum, client) => sum + (Number(client?.totalValue) || 0), 0).toLocaleString('es-MX') : '0'}
                       </p>
                     </div>
                     <div className="w-12 h-12 bg-warning rounded-lg flex items-center justify-center">

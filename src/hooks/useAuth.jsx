@@ -14,7 +14,7 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const loadUserFromStorage = async () => {
-      const token = localStorage.getItem("userToken");
+  const token = localStorage.getItem("authToken");
       // Puede venir como 'userRole', 'role' o 'rol'
       const userRole = localStorage.getItem("userRole") || localStorage.getItem("role") || localStorage.getItem("rol");
       const userEmail = localStorage.getItem("userEmail");
@@ -44,7 +44,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const result = await authService.login(email, password);
       if (result.success) {
-        localStorage.setItem("userToken", result.token);
+  localStorage.setItem("authToken", result.token);
         localStorage.setItem("userRole", result.user.rol);
         localStorage.setItem("userEmail", result.user.email);
         setUser({ ...result.user, token: result.token });
@@ -66,7 +66,7 @@ export const AuthProvider = ({ children }) => {
       await authService.logout();
     } catch {}
     finally {
-      localStorage.removeItem("userToken");
+  localStorage.removeItem("authToken");
       localStorage.removeItem("userRole");
       localStorage.removeItem("userEmail");
       setUser(null);
@@ -133,7 +133,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const result = await authService.refreshToken();
       if (result.success) {
-        localStorage.setItem("userToken", result.token);
+  localStorage.setItem("authToken", result.token);
         setUser((prevUser) => ({ ...prevUser, token: result.token }));
         return { success: true };
       } else {

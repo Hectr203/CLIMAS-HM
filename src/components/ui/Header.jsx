@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNotifications } from '../../context/NotificationContext';
 import { useLocation } from 'react-router-dom';
 import Icon from '../AppIcon';
 import Button from './Button';
@@ -29,9 +30,13 @@ const Header = ({ onMenuToggle, isMenuOpen = false }) => {
     setUserMenuOpen(!userMenuOpen);
   };
 
+  const { showSuccess } = useNotifications();
   const handleLogout = () => {
-    localStorage.removeItem('authToken');
-    window.location.href = '/login';
+    showSuccess('Sesión cerrada correctamente');
+    setTimeout(() => {
+      localStorage.removeItem('authToken');
+      window.location.href = '/login';
+    }, 1200);
   };
 
   return (

@@ -74,7 +74,7 @@ const LoginForm = () => {
       console.log('Login response body:', data);
       if (response.ok && data?.data?.token && data?.data?.usuario?.rol) {
         // Guardar token y expiración (24h)
-        localStorage.setItem('userToken', data.data.token);
+  localStorage.setItem('authToken', data.data.token);
         localStorage.setItem('tokenExpiresAt', String(Date.now() + 24 * 60 * 60 * 1000));
         localStorage.setItem('userRole', data.data.usuario.rol);
         localStorage.setItem('userEmail', data.data.usuario.email);

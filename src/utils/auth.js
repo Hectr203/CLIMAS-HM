@@ -88,7 +88,7 @@ export const ROLE_PERMISSIONS = {
 
 // Get current user from localStorage
 export const getCurrentUser = () => {
-  const authToken = localStorage.getItem('userToken');
+  const authToken = localStorage.getItem('authToken');
   const userRole = localStorage.getItem('userRole');
   const userEmail = localStorage.getItem('userEmail');
   

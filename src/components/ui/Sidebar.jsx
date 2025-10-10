@@ -6,6 +6,7 @@ import Input from './Input';
 import AppImage from '../AppImage';
 import { getAllowedNavigationItems, logout } from '../../utils/auth';
 import useAuth from '../../hooks/useAuth';
+import { useNotifications } from '../../context/NotificationContext';
 
 const Sidebar = ({ isCollapsed = false, onToggle }) => {
   const location = useLocation();
@@ -15,6 +16,7 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [navigationItems, setNavigationItems] = useState([]);
   const { user, isAuthenticated } = useAuth();
+  const { showSuccess } = useNotifications();
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -65,7 +67,10 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
 
   const handleLogout = () => {
     if (window.confirm('¿Está seguro que desea cerrar sesión?')) {
-      logout();
+      showSuccess('Sesión cerrada correctamente');
+      setTimeout(() => {
+        logout();
+      }, 1200);
     }
   };
 

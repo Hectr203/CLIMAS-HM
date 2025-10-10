@@ -3,8 +3,12 @@ import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
+import useClient from '../../../hooks/useClient';
+import { useNotifications } from '../../../context/NotificationContext.jsx';
 
-const NewClientModal = ({ isOpen, onClose, onSubmit }) => {
+const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialData = null }) => {
+  const { showSuccess, showError } = useNotifications();
+  const { createClient, loading, error, success } = useClient();
   const [formData, setFormData] = useState({
     companyName: '',
     contactPerson: '',
@@ -28,6 +32,34 @@ const NewClientModal = ({ isOpen, onClose, onSubmit }) => {
     website: '',
     notes: ''
   });
+
+  React.useEffect(() => {
+    if (isOpen && mode === 'edit' && initialData) {
+      setFormData({
+        companyName: initialData.companyName || initialData.empresa || '',
+        contactPerson: initialData.contactPerson || initialData.contacto || '',
+        email: initialData.email || '',
+        phone: initialData.phone || initialData.telefono || '',
+        industry: initialData.industry || initialData.industria || '',
+        location: initialData.location || initialData.ubicacionEmpre || '',
+        status: initialData.status || initialData.estado || 'Activo',
+        relationshipHealth: initialData.relationshipHealth || initialData.relacion || 'Buena',
+        rfc: initialData.rfc || '',
+        clientSince: initialData.clientSince || initialData.fechaDesde || '',
+        totalProjects: initialData.totalProjects || 0,
+        activeContracts: initialData.activeContracts || 0,
+        totalValue: initialData.totalValue || 0,
+        lastContact: initialData.lastContact || '',
+        nextFollowUp: initialData.nextFollowUp || initialData.proximoSeguimiento || '',
+        address: initialData.address || (initialData.ubicacion && initialData.ubicacion.direccion) || '',
+        city: initialData.city || (initialData.ubicacion && initialData.ubicacion.ciudad) || '',
+        state: initialData.state || (initialData.ubicacion && initialData.ubicacion.estado) || '',
+        postalCode: initialData.postalCode || (initialData.ubicacion && initialData.ubicacion.codigoPostal) || '',
+        website: initialData.website || initialData.sitioWeb || '',
+        notes: initialData.notes || initialData.notas || ''
+      });
+    }
+  }, [isOpen, mode, initialData]);
 
   const [errors, setErrors] = useState({});
 
@@ -126,25 +158,62 @@ const NewClientModal = ({ isOpen, onClose, onSubmit }) => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const { editClient } = useClient();
+  const handleSubmit = async (e) => {
     e?.preventDefault();
-    
     if (!validateForm()) {
       return;
     }
-
-    // Prepare the client data
     const clientData = {
-      ...formData,
-      id: Date.now(), // Temporary ID for mock data
-      rfc: formData?.rfc?.toUpperCase(),
-      totalProjects: parseInt(formData?.totalProjects) || 0,
-      activeContracts: parseInt(formData?.activeContracts) || 0,
-      totalValue: parseInt(formData?.totalValue) || 0
+      empresa: formData.companyName,
+      contacto: formData.contactPerson,
+      email: formData.email,
+      telefono: formData.phone,
+      industria: formData.industry,
+      ubicacion: {
+        direccion: formData.address,
+        ciudad: formData.city,
+        estado: formData.state,
+        codigoPostal: formData.postalCode
+      },
+      ubicacionEmpre: formData.location,
+      rfc: formData.rfc?.toUpperCase(),
+      sitioWeb: formData.website,
+      estado: formData.status,
+      relacion: formData.relationshipHealth,
+      fechaDesde: formData.clientSince,
+      proximoSeguimiento: formData.nextFollowUp,
+      notas: formData.notes,
+      totalProjects: parseInt(formData.totalProjects) || 0,
+      activeContracts: parseInt(formData.activeContracts) || 0,
+      totalValue: parseInt(formData.totalValue) || 0,
+      lastContact: formData.lastContact
     };
-
-    onSubmit(clientData);
-    handleClose();
+    console.log('Datos enviados al servicio:', clientData);
+    if (mode === 'edit' && initialData && initialData.id) {
+      // Actualizar cliente
+      const res = await editClient(initialData.id, clientData);
+      if (res && res.success) {
+        showSuccess(`Cliente "${clientData.empresa}" actualizado exitosamente.`);
+        handleClose();
+      } else {
+        showError('Error al actualizar el cliente');
+      }
+    } else {
+      // Crear cliente
+      createClient(clientData)
+        .then((res) => {
+          if (res && res.success) {
+            showSuccess(`Cliente "${clientData.empresa}" guardado exitosamente.`);
+            handleClose();
+          } else {
+            showError('Error al guardar el cliente');
+          }
+        })
+        .catch((err) => {
+          showError('Error al guardar el cliente');
+        });
+    }
   };
 
   const handleClose = () => {
@@ -420,14 +489,25 @@ const NewClientModal = ({ isOpen, onClose, onSubmit }) => {
             >
               Cancelar
             </Button>
-            <Button
-              type="submit"
-              variant="default"
-              iconName="Plus"
-              iconPosition="left"
-            >
-              Agregar Cliente
-            </Button>
+            {mode === 'edit' ? (
+              <Button
+                type="submit"
+                variant="default"
+                iconName="Save"
+                iconPosition="left"
+              >
+                Guardar
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                variant="default"
+                iconName="Plus"
+                iconPosition="left"
+              >
+                Agregar Cliente
+              </Button>
+            )}
           </div>
         </form>
       </div>

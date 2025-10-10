@@ -40,14 +40,14 @@ const ClientCard = ({ client, onViewDetails, onEditClient, onViewProjects, onVie
             <Icon name="Building2" size={24} color="white" />
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="text-lg font-semibold text-foreground truncate">{client?.companyName}</h3>
-            <p className="text-sm text-muted-foreground">{client?.industry}</p>
+            <h3 className="text-lg font-semibold text-foreground truncate">{String(client?.companyName || '')}</h3>
+            <p className="text-sm text-muted-foreground">{String(client?.industry || '')}</p>
             <div className="flex items-center space-x-2 mt-1">
               <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(client?.status)}`}>
-                {client?.status}
+                {String(client?.status || '')}
               </span>
               <span className={`text-xs font-medium ${getHealthColor(client?.relationshipHealth)}`}>
-                Relación: {client?.relationshipHealth}
+                Relación: {String(client?.relationshipHealth || '')}
               </span>
             </div>
           </div>
@@ -65,44 +65,44 @@ const ClientCard = ({ client, onViewDetails, onEditClient, onViewProjects, onVie
         <div className="space-y-2">
           <div className="flex items-center space-x-2">
             <Icon name="User" size={16} className="text-muted-foreground" />
-            <span className="text-sm text-foreground">{client?.contactPerson}</span>
+            <span className="text-sm text-foreground">{String(client?.contactPerson || '')}</span>
           </div>
           <div className="flex items-center space-x-2">
             <Icon name="Mail" size={16} className="text-muted-foreground" />
-            <span className="text-sm text-foreground">{client?.email}</span>
+            <span className="text-sm text-foreground">{String(client?.email || '')}</span>
           </div>
           <div className="flex items-center space-x-2">
             <Icon name="Phone" size={16} className="text-muted-foreground" />
-            <span className="text-sm text-foreground">{client?.phone}</span>
+            <span className="text-sm text-foreground">{String(client?.phone || '')}</span>
           </div>
         </div>
         <div className="space-y-2">
           <div className="flex items-center space-x-2">
             <Icon name="MapPin" size={16} className="text-muted-foreground" />
-            <span className="text-sm text-foreground">{client?.location}</span>
+            <span className="text-sm text-foreground">{String(client?.location || '')}</span>
           </div>
           <div className="flex items-center space-x-2">
             <Icon name="Calendar" size={16} className="text-muted-foreground" />
-            <span className="text-sm text-foreground">Cliente desde: {client?.clientSince}</span>
+            <span className="text-sm text-foreground">Cliente desde: {String(client?.clientSince || '')}</span>
           </div>
           <div className="flex items-center space-x-2">
             <Icon name="FileText" size={16} className="text-muted-foreground" />
-            <span className="text-sm text-foreground">RFC: {client?.rfc}</span>
+            <span className="text-sm text-foreground">RFC: {String(client?.rfc || '')}</span>
           </div>
         </div>
       </div>
       <div className="flex items-center justify-between pt-4 border-t border-border">
         <div className="flex items-center space-x-4">
           <div className="text-center">
-            <div className="text-lg font-semibold text-foreground">{client?.totalProjects}</div>
+            <div className="text-lg font-semibold text-foreground">{Number(client?.totalProjects) || 0}</div>
             <div className="text-xs text-muted-foreground">Proyectos</div>
           </div>
           <div className="text-center">
-            <div className="text-lg font-semibold text-foreground">{client?.activeContracts}</div>
+            <div className="text-lg font-semibold text-foreground">{Number(client?.activeContracts) || 0}</div>
             <div className="text-xs text-muted-foreground">Contratos</div>
           </div>
           <div className="text-center">
-            <div className="text-lg font-semibold text-success">${client?.totalValue?.toLocaleString('es-MX')}</div>
+            <div className="text-lg font-semibold text-success">${Number(client?.totalValue) ? Number(client?.totalValue).toLocaleString('es-MX') : '0'}</div>
             <div className="text-xs text-muted-foreground">Valor Total</div>
           </div>
         </div>
