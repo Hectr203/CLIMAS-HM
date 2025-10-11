@@ -115,7 +115,7 @@ const PersonnelTable = ({ onViewProfile, onEditPersonnel, onAssignPPE }) => {
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Empleado</th>
               <SortableHeader label="Departamento" sortKey="departamento" />
-              <SortableHeader label="Puest" sortKey="puesto" />
+              <SortableHeader label="Puestuees" sortKey="puesto" />
               <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Estado</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Estudios Médicos</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">EPP</th>

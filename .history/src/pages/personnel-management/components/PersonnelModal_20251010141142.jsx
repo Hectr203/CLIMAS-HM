@@ -1,28 +1,28 @@
-import React, { useState } from 'react';
-import Icon from '../../../components/AppIcon';
-import Button from '../../../components/ui/Button';
-import Input from '../../../components/ui/Input';
-import Select from '../../../components/ui/Select';
-import { Checkbox } from '../../../components/ui/Checkbox';
-import usePerson from '../../../hooks/usePerson'; // Se agregó esta línea
+import React, { useState, useEffect } from "react";
+import Icon from "../../../components/AppIcon";
+import Button from "../../../components/ui/Button";
+import Input from "../../../components/ui/Input";
+import Select from "../../../components/ui/Select";
+import { Checkbox } from "../../../components/ui/Checkbox";
+import usePerson from "../../../hooks/usePerson"; // Nuevo hook
 
 const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
-  const { createPerson } = usePerson(); // Se agregó esta línea
+  const { createPerson, editPerson, loading } = usePerson();
 
-  const [formData, setFormData] = useState(employee || {
-    name: '',
-    employeeId: '',
-    email: '',
-    phone: '',
-    department: '',
-    position: '',
-    hireDate: '',
-    status: 'Activo',
+  const [formData, setFormData] = useState({
+    name: "",
+    employeeId: "",
+    email: "",
+    phone: "",
+    department: "",
+    position: "",
+    hireDate: "",
+    status: "Activo",
     medicalStudies: {
-      lastExam: '',
-      nextExam: '',
-      status: 'Pendiente',
-      documents: []
+      lastExam: "",
+      nextExam: "",
+      status: "Pendiente",
+      documents: [],
     },
     ppe: {
       helmet: false,
@@ -30,111 +30,114 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
       boots: false,
       gloves: false,
       glasses: false,
-      mask: false
+      mask: false,
     },
     certifications: [],
     emergencyContact: {
-      name: '',
-      phone: '',
-      relationship: ''
-    }
+      name: "",
+      phone: "",
+      relationship: "",
+    },
   });
 
-  const [activeTab, setActiveTab] = useState('general');
+  const [activeTab, setActiveTab] = useState("general");
+
+  useEffect(() => {
+    if (employee) setFormData(employee);
+  }, [employee]);
 
   if (!isOpen) return null;
 
   const departmentOptions = [
-    { value: 'Administración', label: 'Administración' },
-    { value: 'Proyectos', label: 'Proyectos' },
-    { value: 'Taller', label: 'Taller' },
-    { value: 'Ventas', label: 'Ventas' },
-    { value: 'Mantenimiento', label: 'Mantenimiento' }
+    { value: "Administración", label: "Administración" },
+    { value: "Proyectos", label: "Proyectos" },
+    { value: "Taller", label: "Taller" },
+    { value: "Ventas", label: "Ventas" },
+    { value: "Mantenimiento", label: "Mantenimiento" },
   ];
 
   const positionOptions = [
-    { value: 'Técnico HVAC', label: 'Técnico HVAC' },
-    { value: 'Supervisor', label: 'Supervisor' },
-    { value: 'Ingeniero', label: 'Ingeniero' },
-    { value: 'Administrador', label: 'Administrador' },
-    { value: 'Vendedor', label: 'Vendedor' },
-    { value: 'Operario', label: 'Operario' }
+    { value: "Técnico HVAC", label: "Técnico HVAC" },
+    { value: "Supervisor", label: "Supervisor" },
+    { value: "Ingeniero", label: "Ingeniero" },
+    { value: "Administrador", label: "Administrador" },
+    { value: "Vendedor", label: "Vendedor" },
+    { value: "Operario", label: "Operario" },
   ];
 
   const statusOptions = [
-    { value: 'Activo', label: 'Activo' },
-    { value: 'Inactivo', label: 'Inactivo' },
-    { value: 'Suspendido', label: 'Suspendido' }
+    { value: "Activo", label: "Activo" },
+    { value: "Inactivo", label: "Inactivo" },
+    { value: "Suspendido", label: "Suspendido" },
   ];
 
   const medicalStatusOptions = [
-    { value: 'Completo', label: 'Completo' },
-    { value: 'Pendiente', label: 'Pendiente' },
-    { value: 'Vencido', label: 'Vencido' }
+    { value: "Completo", label: "Completo" },
+    { value: "Pendiente", label: "Pendiente" },
+    { value: "Vencido", label: "Vencido" },
   ];
 
   const relationshipOptions = [
-    { value: 'Cónyuge', label: 'Cónyuge' },
-    { value: 'Padre/Madre', label: 'Padre/Madre' },
-    { value: 'Hijo/Hija', label: 'Hijo/Hija' },
-    { value: 'Hermano/Hermana', label: 'Hermano/Hermana' },
-    { value: 'Otro', label: 'Otro' }
+    { value: "Cónyuge", label: "Cónyuge" },
+    { value: "Padre/Madre", label: "Padre/Madre" },
+    { value: "Hijo/Hija", label: "Hijo/Hija" },
+    { value: "Hermano/Hermana", label: "Hermano/Hermana" },
+    { value: "Otro", label: "Otro" },
   ];
 
   const handleInputChange = (field, value) => {
-    if (field?.includes('.')) {
-      const [parent, child] = field?.split('.');
-      setFormData(prev => ({
+    if (field.includes(".")) {
+      const [parent, child] = field.split(".");
+      setFormData((prev) => ({
         ...prev,
-        [parent]: {
-          ...prev?.[parent],
-          [child]: value
-        }
+        [parent]: { ...prev[parent], [child]: value },
       }));
     } else {
-      setFormData(prev => ({ ...prev, [field]: value }));
+      setFormData((prev) => ({ ...prev, [field]: value }));
     }
   };
 
   const handlePPEChange = (item, checked) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      ppe: {
-        ...prev?.ppe,
-        [item]: checked
-      }
+      ppe: { ...prev.ppe, [item]: checked },
     }));
   };
 
-  // 🔹 Guardar empleado (actualizado para usar usePerson)
   const handleSave = async () => {
+    const payload = {
+      nombreCompleto: formData.name,
+      empleadoId: formData.employeeId,
+      email: formData.email,
+      telefono: formData.phone,
+      departamento: formData.department,
+      puesto: formData.position,
+      fechaIngreso: formData.hireDate,
+      estado: formData.status,
+      activo: true,
+    };
+
     try {
-      const payload = {
-        nombreCompleto: formData.name,
-        empleadoId: formData.employeeId,
-        email: formData.email,
-        telefono: formData.phone,
-        departamento: formData.department,
-        puesto: formData.position,
-        fechaIngreso: formData.hireDate,
-        estado: formData.status,
-        activo: true,
-      };
+      let response;
+      if (mode === "edit" && employee?._id) {
+        response = await editPerson(employee._id, payload);
+      } else {
+        response = await createPerson(payload);
+      }
 
-      console.log("Enviando empleado:", payload);
-
-      const result = await createPerson(payload); // 
-
-      console.log("Empleado creado:", result);
-      alert("Empleado registrado exitosamente");
-
-      if (onSave) onSave(result);
-      onClose();
+      if (response) {
+        alert("✅ Empleado guardado exitosamente");
+        if (onSave) onSave(response);
+        onClose();
+      } else {
+        throw new Error("Error al guardar empleado");
+      }
     } catch (error) {
-      console.error("Error al guardar:", error);
-      alert("Hubo un error al guardar el empleado. Revisa la consola.");
+      console.error("❌ Error:", error);
+      alert("Hubo un error al guardar el empleado.");
     }
   };
+
 
   const tabs = [
     { id: 'general', label: 'Información General', icon: 'User' },
@@ -155,11 +158,9 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
                 {mode === 'create' ? 'Nuevo Empleado' : mode === 'edit' ? 'Editar Empleado' : 'Perfil del Empleado'}
               </h2>
               <p className="text-sm text-muted-foreground">
-                {mode === 'create'
-                  ? 'Agregar nuevo empleado al sistema'
-                  : mode === 'edit'
-                  ? 'Modificar información del empleado'
-                  : 'Ver detalles del empleado'}
+                {mode === 'create' ? 'Agregar nuevo empleado al sistema' : 
+                 mode === 'edit' ? 'Modificar información del empleado' : 
+                 'Ver detalles del empleado'}
               </p>
             </div>
           </div>
@@ -177,8 +178,7 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
                 onClick={() => setActiveTab(tab?.id)}
                 className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-smooth ${
                   activeTab === tab?.id
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                    ? 'border-primary text-primary' :'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
                 <Icon name={tab?.icon} size={16} />

@@ -1,4 +1,5 @@
 import axios from "axios";
+import EnvConfig from "../utils/config";
 
 /**
  * Cliente HTTP centralizado con interceptors para manejo automático de tokens
@@ -6,35 +7,43 @@ import axios from "axios";
  */
 class HttpService {
   constructor() {
-    // Usar el proxy de Vite — no poner localhost ni IP
+    // Crear instancia de Axios con configuración base
     this.api = axios.create({
-      baseURL: "/api",
-      timeout: 30000,
+      baseURL: EnvConfig.API_URL,
+      timeout: 30000, // 30 segundos
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
     });
 
+    // Configurar interceptors
     this.setupInterceptors();
   }
 
+  /**
+   * Configurar interceptors para requests y responses
+   */
   setupInterceptors() {
-    // REQUEST
+    // REQUEST INTERCEPTOR
     this.api.interceptors.request.use(
       (config) => {
         const token = this.getToken();
-        if (token) config.headers.Authorization = `Bearer ${token}`;
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
         return config;
       },
       (error) => Promise.reject(error)
     );
 
-    // RESPONSE
+    // RESPONSE INTERCEPTOR
     this.api.interceptors.response.use(
       (response) => response,
       (error) => {
-        if (error.response?.status === 401) this.handleUnauthorized();
+        if (error.response?.status === 401) {
+          this.handleUnauthorized();
+        }
         return Promise.reject(this.normalizeError(error));
       }
     );
@@ -45,9 +54,11 @@ class HttpService {
   }
 
   setToken(token) {
-    token
-      ? localStorage.setItem("authToken", token)
-      : localStorage.removeItem("authToken");
+    if (token) {
+      localStorage.setItem("authToken", token);
+    } else {
+      localStorage.removeItem("authToken");
+    }
   }
 
   handleUnauthorized() {
@@ -74,32 +85,33 @@ class HttpService {
     };
   }
 
-  // Métodos HTTP
+  // Métodos HTTP básicos
   async get(url, config = {}) {
-    const res = await this.api.get(url, config);
-    return res.data;
+    const response = await this.api.get(url, config);
+    return response.data;
   }
 
   async post(url, data = {}, config = {}) {
-    const res = await this.api.post(url, data, config);
-    return res.data;
+    const response = await this.api.post(url, data, config);
+    return response.data;
   }
 
   async put(url, data = {}, config = {}) {
-    const res = await this.api.put(url, data, config);
-    return res.data;
+    const response = await this.api.put(url, data, config);
+    return response.data;
   }
 
   async patch(url, data = {}, config = {}) {
-    const res = await this.api.patch(url, data, config);
-    return res.data;
+    const response = await this.api.patch(url, data, config);
+    return response.data;
   }
 
   async delete(url, config = {}) {
-    const res = await this.api.delete(url, config);
-    return res.data;
+    const response = await this.api.delete(url, config);
+    return response.data;
   }
 
+  // Health check
   async healthCheck() {
     try {
       const response = await this.get("/health");

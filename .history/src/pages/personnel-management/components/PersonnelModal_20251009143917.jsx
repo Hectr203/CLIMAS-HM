@@ -4,11 +4,8 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import { Checkbox } from '../../../components/ui/Checkbox';
-import usePerson from '../../../hooks/usePerson'; // Se agregó esta línea
 
 const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
-  const { createPerson } = usePerson(); // Se agregó esta línea
-
   const [formData, setFormData] = useState(employee || {
     name: '',
     employeeId: '',
@@ -82,12 +79,12 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
   ];
 
   const handleInputChange = (field, value) => {
-    if (field?.includes('.')) {
-      const [parent, child] = field?.split('.');
+    if (field.includes('.')) {
+      const [parent, child] = field.split('.');
       setFormData(prev => ({
         ...prev,
         [parent]: {
-          ...prev?.[parent],
+          ...prev[parent],
           [child]: value
         }
       }));
@@ -100,13 +97,13 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
     setFormData(prev => ({
       ...prev,
       ppe: {
-        ...prev?.ppe,
+        ...prev.ppe,
         [item]: checked
       }
     }));
   };
 
-  // 🔹 Guardar empleado (actualizado para usar usePerson)
+  // ✅ Guardar empleado (POST a tu API)
   const handleSave = async () => {
     try {
       const payload = {
@@ -118,20 +115,32 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
         puesto: formData.position,
         fechaIngreso: formData.hireDate,
         estado: formData.status,
-        activo: true,
+        activo: true
       };
 
-      console.log("Enviando empleado:", payload);
+      const response = await fetch("http://localhost:7071/api/empleados/crear", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
 
-      const result = await createPerson(payload); // 
+      if (!response.ok) {
+        throw new Error("Error al registrar el empleado");
+      }
 
-      console.log("Empleado creado:", result);
+      const result = await response.json();
+      console.log("✅ Empleado creado:", result);
+
       alert("Empleado registrado exitosamente");
 
-      if (onSave) onSave(result);
+      // Callback si se usa en la tabla padre
+      onSave(result.data);
+
       onClose();
     } catch (error) {
-      console.error("Error al guardar:", error);
+      console.error("❌ Error al guardar:", error);
       alert("Hubo un error al guardar el empleado. Revisa la consola.");
     }
   };
@@ -171,18 +180,18 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
         {/* Tabs */}
         <div className="border-b border-border">
           <nav className="flex space-x-8 px-6">
-            {tabs?.map((tab) => (
+            {tabs.map((tab) => (
               <button
-                key={tab?.id}
-                onClick={() => setActiveTab(tab?.id)}
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-smooth ${
-                  activeTab === tab?.id
+                  activeTab === tab.id
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
-                <Icon name={tab?.icon} size={16} />
-                <span>{tab?.label}</span>
+                <Icon name={tab.icon} size={16} />
+                <span>{tab.label}</span>
               </button>
             ))}
           </nav>
@@ -195,189 +204,61 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input
                   label="Nombre Completo"
-                  value={formData?.name}
-                  onChange={(e) => handleInputChange('name', e?.target?.value)}
+                  value={formData.name}
+                  onChange={(e) => handleInputChange('name', e.target.value)}
                   required
                   disabled={mode === 'view'}
                 />
                 <Input
                   label="ID de Empleado"
-                  value={formData?.employeeId}
-                  onChange={(e) => handleInputChange('employeeId', e?.target?.value)}
+                  value={formData.employeeId}
+                  onChange={(e) => handleInputChange('employeeId', e.target.value)}
                   required
                   disabled={mode === 'view'}
                 />
                 <Input
                   label="Correo Electrónico"
                   type="email"
-                  value={formData?.email}
-                  onChange={(e) => handleInputChange('email', e?.target?.value)}
+                  value={formData.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
                   required
                   disabled={mode === 'view'}
                 />
                 <Input
                   label="Teléfono"
                   type="tel"
-                  value={formData?.phone}
-                  onChange={(e) => handleInputChange('phone', e?.target?.value)}
+                  value={formData.phone}
+                  onChange={(e) => handleInputChange('phone', e.target.value)}
                   required
                   disabled={mode === 'view'}
                 />
                 <Select
                   label="Departamento"
                   options={departmentOptions}
-                  value={formData?.department}
+                  value={formData.department}
                   onChange={(value) => handleInputChange('department', value)}
                   disabled={mode === 'view'}
                 />
                 <Select
                   label="Puesto"
                   options={positionOptions}
-                  value={formData?.position}
+                  value={formData.position}
                   onChange={(value) => handleInputChange('position', value)}
                   disabled={mode === 'view'}
                 />
                 <Input
                   label="Fecha de Ingreso"
                   type="date"
-                  value={formData?.hireDate}
-                  onChange={(e) => handleInputChange('hireDate', e?.target?.value)}
+                  value={formData.hireDate}
+                  onChange={(e) => handleInputChange('hireDate', e.target.value)}
                   required
                   disabled={mode === 'view'}
                 />
                 <Select
                   label="Estado"
                   options={statusOptions}
-                  value={formData?.status}
+                  value={formData.status}
                   onChange={(value) => handleInputChange('status', value)}
-                  disabled={mode === 'view'}
-                />
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'medical' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Input
-                  label="Último Examen Médico"
-                  type="date"
-                  value={formData?.medicalStudies?.lastExam || ''}
-                  onChange={(e) => handleInputChange('medicalStudies.lastExam', e?.target?.value)}
-                  disabled={mode === 'view'}
-                />
-                <Input
-                  label="Próximo Examen Médico"
-                  type="date"
-                  value={formData?.medicalStudies?.nextExam || ''}
-                  onChange={(e) => handleInputChange('medicalStudies.nextExam', e?.target?.value)}
-                  disabled={mode === 'view'}
-                />
-                <Select
-                  label="Estado de Estudios Médicos"
-                  options={medicalStatusOptions}
-                  value={formData?.medicalStudies?.status || 'Pendiente'}
-                  onChange={(value) => handleInputChange('medicalStudies.status', value)}
-                  disabled={mode === 'view'}
-                />
-              </div>
-
-              <div className="border border-border rounded-lg p-4">
-                <h4 className="text-sm font-medium text-foreground mb-3">Documentos Médicos</h4>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <Icon name="FileText" size={16} />
-                      <span className="text-sm text-foreground">Examen médico general</span>
-                    </div>
-                    <Button variant="ghost" size="sm" iconName="Download" iconSize={14}>
-                      Descargar
-                    </Button>
-                  </div>
-                  {mode !== 'view' && (
-                    <Button variant="outline" size="sm" iconName="Upload" iconPosition="left" iconSize={14}>
-                      Subir Documento
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'ppe' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h4 className="text-sm font-medium text-foreground">Equipo de Protección Personal</h4>
-                  <div className="space-y-3">
-                    <Checkbox
-                      label="Casco de Seguridad"
-                      checked={formData?.ppe?.helmet || false}
-                      onChange={(e) => handlePPEChange('helmet', e?.target?.checked)}
-                      disabled={mode === 'view'}
-                    />
-                    <Checkbox
-                      label="Chaleco Reflectivo"
-                      checked={formData?.ppe?.vest || false}
-                      onChange={(e) => handlePPEChange('vest', e?.target?.checked)}
-                      disabled={mode === 'view'}
-                    />
-                    <Checkbox
-                      label="Botas de Seguridad"
-                      checked={formData?.ppe?.boots || false}
-                      onChange={(e) => handlePPEChange('boots', e?.target?.checked)}
-                      disabled={mode === 'view'}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <h4 className="text-sm font-medium text-foreground">Equipo Adicional</h4>
-                  <div className="space-y-3">
-                    <Checkbox
-                      label="Guantes de Trabajo"
-                      checked={formData?.ppe?.gloves || false}
-                      onChange={(e) => handlePPEChange('gloves', e?.target?.checked)}
-                      disabled={mode === 'view'}
-                    />
-                    <Checkbox
-                      label="Gafas de Seguridad"
-                      checked={formData?.ppe?.glasses || false}
-                      onChange={(e) => handlePPEChange('glasses', e?.target?.checked)}
-                      disabled={mode === 'view'}
-                    />
-                    <Checkbox
-                      label="Mascarilla"
-                      checked={formData?.ppe?.mask || false}
-                      onChange={(e) => handlePPEChange('mask', e?.target?.checked)}
-                      disabled={mode === 'view'}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'emergency' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Input
-                  label="Nombre del Contacto"
-                  value={formData?.emergencyContact?.name || ''}
-                  onChange={(e) => handleInputChange('emergencyContact.name', e?.target?.value)}
-                  disabled={mode === 'view'}
-                />
-                <Input
-                  label="Teléfono de Contacto"
-                  type="tel"
-                  value={formData?.emergencyContact?.phone || ''}
-                  onChange={(e) => handleInputChange('emergencyContact.phone', e?.target?.value)}
-                  disabled={mode === 'view'}
-                />
-                <Select
-                  label="Relación"
-                  options={relationshipOptions}
-                  value={formData?.emergencyContact?.relationship || ''}
-                  onChange={(value) => handleInputChange('emergencyContact.relationship', value)}
                   disabled={mode === 'view'}
                 />
               </div>

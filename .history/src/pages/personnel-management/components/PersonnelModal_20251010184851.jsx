@@ -4,7 +4,7 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import { Checkbox } from '../../../components/ui/Checkbox';
-import usePerson from '../../../hooks/usePerson'; // Se agregó esta línea
+import usePerson from '../../../hooks/usePerson'; // 👈 Se agregó esta línea
 
 const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
   const { createPerson } = usePerson(); // Se agregó esta línea

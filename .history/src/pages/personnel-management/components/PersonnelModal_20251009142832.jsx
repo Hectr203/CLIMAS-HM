@@ -4,11 +4,8 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import { Checkbox } from '../../../components/ui/Checkbox';
-import usePerson from '../../../hooks/usePerson'; // Se agregó esta línea
 
 const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
-  const { createPerson } = usePerson(); // Se agregó esta línea
-
   const [formData, setFormData] = useState(employee || {
     name: '',
     employeeId: '',
@@ -106,33 +103,45 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
     }));
   };
 
-  // 🔹 Guardar empleado (actualizado para usar usePerson)
-  const handleSave = async () => {
+  // === NUEVO: función para guardar empleado en el backend ===
+  const guardarEmpleado = async (data) => {
     try {
-      const payload = {
-        nombreCompleto: formData.name,
-        empleadoId: formData.employeeId,
-        email: formData.email,
-        telefono: formData.phone,
-        departamento: formData.department,
-        puesto: formData.position,
-        fechaIngreso: formData.hireDate,
-        estado: formData.status,
-        activo: true,
-      };
+      const response = await fetch('http://localhost:7071/api/empleados/crear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombreCompleto: data.name,
+          email: data.email,
+          telefono: data.phone,
+          puesto: data.position,
+          fechaIngreso: data.hireDate,
+          empleadoId: data.employeeId,
+          departamento: data.department,
+          estado: data.status,
+          activo: data.status === 'Activo'
+        })
+      });
 
-      console.log("Enviando empleado:", payload);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Error al crear empleado');
 
-      const result = await createPerson(payload); // 
-
-      console.log("Empleado creado:", result);
-      alert("Empleado registrado exitosamente");
-
-      if (onSave) onSave(result);
+      console.log('✅ Empleado creado exitosamente:', result);
+      if (onSave) onSave(result.data);
       onClose();
+      alert('Empleado registrado correctamente ✅');
     } catch (error) {
-      console.error("Error al guardar:", error);
-      alert("Hubo un error al guardar el empleado. Revisa la consola.");
+      console.error('❌ Error al guardar empleado:', error);
+      alert('Ocurrió un error al guardar el empleado.');
+    }
+  };
+
+  // === MODIFICADO: handleSave ===
+  const handleSave = () => {
+    if (mode === 'create') {
+      guardarEmpleado(formData);
+    } else {
+      onSave(formData);
+      onClose();
     }
   };
 
@@ -155,11 +164,9 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
                 {mode === 'create' ? 'Nuevo Empleado' : mode === 'edit' ? 'Editar Empleado' : 'Perfil del Empleado'}
               </h2>
               <p className="text-sm text-muted-foreground">
-                {mode === 'create'
-                  ? 'Agregar nuevo empleado al sistema'
-                  : mode === 'edit'
-                  ? 'Modificar información del empleado'
-                  : 'Ver detalles del empleado'}
+                {mode === 'create' ? 'Agregar nuevo empleado al sistema' :
+                 mode === 'edit' ? 'Modificar información del empleado' :
+                 'Ver detalles del empleado'}
               </p>
             </div>
           </div>
@@ -177,8 +184,7 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
                 onClick={() => setActiveTab(tab?.id)}
                 className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-smooth ${
                   activeTab === tab?.id
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                    ? 'border-primary text-primary' :'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
                 <Icon name={tab?.icon} size={16} />
@@ -280,26 +286,6 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
                   onChange={(value) => handleInputChange('medicalStudies.status', value)}
                   disabled={mode === 'view'}
                 />
-              </div>
-
-              <div className="border border-border rounded-lg p-4">
-                <h4 className="text-sm font-medium text-foreground mb-3">Documentos Médicos</h4>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <Icon name="FileText" size={16} />
-                      <span className="text-sm text-foreground">Examen médico general</span>
-                    </div>
-                    <Button variant="ghost" size="sm" iconName="Download" iconSize={14}>
-                      Descargar
-                    </Button>
-                  </div>
-                  {mode !== 'view' && (
-                    <Button variant="outline" size="sm" iconName="Upload" iconPosition="left" iconSize={14}>
-                      Subir Documento
-                    </Button>
-                  )}
-                </div>
               </div>
             </div>
           )}

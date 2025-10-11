@@ -175,7 +175,7 @@ const PersonnelTable = ({ onViewProfile, onEditPersonnel, onAssignPPE }) => {
 
             <div className="space-y-2 mb-4">
               <div className="flex justify-between text-sm"><span className="text-muted-foreground">Departamento:</span><span>{emp.departamento || '-'}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Puesto:</span><span>{emp.puesto || '-'}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Puestues:</span><span>{emp.puesto || '-'}</span></div>
               <div className="flex justify-between text-sm"><span className="text-muted-foreground">Estudios Médicos:</span>{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</div>
               <div className="flex justify-between text-sm"><span className="text-muted-foreground">EPP:</span>{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</div>
             </div>

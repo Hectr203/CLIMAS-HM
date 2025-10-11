@@ -4,12 +4,11 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import { Checkbox } from '../../../components/ui/Checkbox';
-import usePerson from '../../../hooks/usePerson'; // Se agregó esta línea
+import personService from '../../../services/personService'; // Ajusta la ruta según tu estructura de carpetas
 
 const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
-  const { createPerson } = usePerson(); // Se agregó esta línea
-
   const [formData, setFormData] = useState(employee || {
+    id: null, // Agregado para editar (debe venir del employee mapeado)
     name: '',
     employeeId: '',
     email: '',
@@ -41,6 +40,7 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
   });
 
   const [activeTab, setActiveTab] = useState('general');
+  const [saving, setSaving] = useState(false); // Para loading en save
 
   if (!isOpen) return null;
 
@@ -106,9 +106,12 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
     }));
   };
 
-  // 🔹 Guardar empleado (actualizado para usar usePerson)
   const handleSave = async () => {
+    if (mode === 'view') return; // No guardar en modo vista
+
+    setSaving(true);
     try {
+      // Payload base (igual que antes; puedes agregar más campos como medicalStudies, ppe, etc., si el backend los soporta)
       const payload = {
         nombreCompleto: formData.name,
         empleadoId: formData.employeeId,
@@ -118,21 +121,40 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
         puesto: formData.position,
         fechaIngreso: formData.hireDate,
         estado: formData.status,
-        activo: true,
+        // Opcional: agregar campos adicionales
+        // medicalStudies: formData.medicalStudies,
+        // ppe: formData.ppe,
+        // emergencyContact: formData.emergencyContact,
       };
 
-      console.log("Enviando empleado:", payload);
+      console.log("Enviando correctamente", payload);
 
-      const result = await createPerson(payload); // 
+      let result;
+      if (mode === 'create') {
+        result = await personService.createPerson(payload);
+      } else if (mode === 'edit') {
+        if (!formData.id) {
+          throw new Error('ID del empleado no encontrado para edición');
+        }
+        result = await personService.updatePerson(formData.id, payload);
+      } else {
+        throw new Error('Modo no soportado');
+      }
 
-      console.log("Empleado creado:", result);
-      alert("Empleado registrado exitosamente");
+      if (result?.success !== true) {
+        throw new Error(result?.message || 'Respuesta inesperada del servidor');
+      }
 
-      if (onSave) onSave(result);
+      console.log("✅ Empleado guardado:", result);
+      alert(mode === 'create' ? "Empleado registrado exitosamente" : "Cambios guardados exitosamente");
+
+      if (onSave) onSave(result.data);
       onClose();
     } catch (error) {
-      console.error("Error al guardar:", error);
-      alert("Hubo un error al guardar el empleado. Revisa la consola.");
+      console.error("❌ Error al guardar:", error);
+      alert(`Hubo un error al guardar el empleado: ${error.message}. Revisa la consola.`);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -155,11 +177,9 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
                 {mode === 'create' ? 'Nuevo Empleado' : mode === 'edit' ? 'Editar Empleado' : 'Perfil del Empleado'}
               </h2>
               <p className="text-sm text-muted-foreground">
-                {mode === 'create'
-                  ? 'Agregar nuevo empleado al sistema'
-                  : mode === 'edit'
-                  ? 'Modificar información del empleado'
-                  : 'Ver detalles del empleado'}
+                {mode === 'create' ? 'Agregar nuevo empleado al sistema' : 
+                 mode === 'edit' ? 'Modificar información del empleado' : 
+                 'Ver detalles del empleado'}
               </p>
             </div>
           </div>
@@ -177,8 +197,7 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
                 onClick={() => setActiveTab(tab?.id)}
                 className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-smooth ${
                   activeTab === tab?.id
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                    ? 'border-primary text-primary' :'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
                 <Icon name={tab?.icon} size={16} />
@@ -388,10 +407,10 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
         {/* Footer */}
         {mode !== 'view' && (
           <div className="flex items-center justify-end space-x-3 p-6 border-t border-border">
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="outline" onClick={onClose} disabled={saving}>
               Cancelar
             </Button>
-            <Button onClick={handleSave} iconName="Save" iconPosition="left" iconSize={16}>
+            <Button onClick={handleSave} iconName="Save" iconPosition="left" iconSize={16} disabled={saving} loading={saving}>
               {mode === 'create' ? 'Crear Empleado' : 'Guardar Cambios'}
             </Button>
           </div>

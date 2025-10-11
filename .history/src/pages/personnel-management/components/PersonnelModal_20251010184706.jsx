@@ -4,10 +4,10 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import { Checkbox } from '../../../components/ui/Checkbox';
-import usePerson from '../../../hooks/usePerson'; // Se agregó esta línea
+import usePerson from '../../../hooks/usePerson'; // 👈 Se agregó esta línea
 
 const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
-  const { createPerson } = usePerson(); // Se agregó esta línea
+  const { createPerson } = usePerson(); // 👈 Se agregó esta línea
 
   const [formData, setFormData] = useState(employee || {
     name: '',
@@ -121,17 +121,17 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
         activo: true,
       };
 
-      console.log("Enviando empleado:", payload);
+      console.log("📤 Enviando empleado:", payload);
 
       const result = await createPerson(payload); // 
 
-      console.log("Empleado creado:", result);
+      console.log("✅ Empleado creado:", result);
       alert("Empleado registrado exitosamente");
 
       if (onSave) onSave(result);
       onClose();
     } catch (error) {
-      console.error("Error al guardar:", error);
+      console.error("❌ Error al guardar:", error);
       alert("Hubo un error al guardar el empleado. Revisa la consola.");
     }
   };

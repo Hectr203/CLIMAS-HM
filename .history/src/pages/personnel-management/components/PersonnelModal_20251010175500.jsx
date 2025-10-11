@@ -4,11 +4,9 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import { Checkbox } from '../../../components/ui/Checkbox';
-import usePerson from '../../../hooks/usePerson'; // Se agregó esta línea
+
 
 const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
-  const { createPerson } = usePerson(); // Se agregó esta línea
-
   const [formData, setFormData] = useState(employee || {
     name: '',
     employeeId: '',
@@ -106,36 +104,6 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
     }));
   };
 
-  // 🔹 Guardar empleado (actualizado para usar usePerson)
-  const handleSave = async () => {
-    try {
-      const payload = {
-        nombreCompleto: formData.name,
-        empleadoId: formData.employeeId,
-        email: formData.email,
-        telefono: formData.phone,
-        departamento: formData.department,
-        puesto: formData.position,
-        fechaIngreso: formData.hireDate,
-        estado: formData.status,
-        activo: true,
-      };
-
-      console.log("Enviando empleado:", payload);
-
-      const result = await createPerson(payload); // 
-
-      console.log("Empleado creado:", result);
-      alert("Empleado registrado exitosamente");
-
-      if (onSave) onSave(result);
-      onClose();
-    } catch (error) {
-      console.error("Error al guardar:", error);
-      alert("Hubo un error al guardar el empleado. Revisa la consola.");
-    }
-  };
-
   const tabs = [
     { id: 'general', label: 'Información General', icon: 'User' },
     { id: 'medical', label: 'Estudios Médicos', icon: 'Heart' },
@@ -155,11 +123,9 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
                 {mode === 'create' ? 'Nuevo Empleado' : mode === 'edit' ? 'Editar Empleado' : 'Perfil del Empleado'}
               </h2>
               <p className="text-sm text-muted-foreground">
-                {mode === 'create'
-                  ? 'Agregar nuevo empleado al sistema'
-                  : mode === 'edit'
-                  ? 'Modificar información del empleado'
-                  : 'Ver detalles del empleado'}
+                {mode === 'create' ? 'Agregar nuevo empleado al sistema' : 
+                 mode === 'edit' ? 'Modificar información del empleado' : 
+                 'Ver detalles del empleado'}
               </p>
             </div>
           </div>
@@ -177,8 +143,7 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
                 onClick={() => setActiveTab(tab?.id)}
                 className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-smooth ${
                   activeTab === tab?.id
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                    ? 'border-primary text-primary' :'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
                 <Icon name={tab?.icon} size={16} />
