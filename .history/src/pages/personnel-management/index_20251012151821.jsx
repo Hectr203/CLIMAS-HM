@@ -7,7 +7,7 @@ import PersonnelTable from './components/PersonnelTable';
 import FilterToolbar from './components/FilterToolbar';
 import ComplianceDashboard from './components/ComplianceDashboard';
 import PersonnelModal from './components/PersonnelModal';
-import usePerson from '../../hooks/usePerson'; // 🔹 tu hook real
+import usePerson from '../../hooks/usePerson'; // 🔹 se mantiene tu hook real
 
 const PersonnelManagement = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -27,69 +27,44 @@ const PersonnelManagement = () => {
   const [modalMode, setModalMode] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // ✅ Hook original
+  // ✅ Usamos tu hook real
   const { persons, loading, error, getPersons } = usePerson();
 
   useEffect(() => {
-    getPersons(); // cargar empleados
+    getPersons(); // 🔹 carga los empleados al montar
   }, []);
 
-  // ✅ Lógica de filtrado robusta
+  // ✅ Filtrar empleados obtenidos del hook
   const filteredPersonnel = useMemo(() => {
-  if (!persons) return [];
+    if (!persons) return [];
 
-  return persons.filter((employee) => {
-    const searchTerm = filters.search?.toLowerCase().trim() || '';
+    return persons.filter((employee) => {
+      const matchSearch =
+        !filters.search ||
+        employee?.nombreCompleto?.toLowerCase()?.includes(filters.search.toLowerCase()) ||
+        employee?.empleadoId?.toLowerCase()?.includes(filters.search.toLowerCase()) ||
+        employee?.puesto?.toLowerCase()?.includes(filters.search.toLowerCase());
 
-    const matchSearch =
-      !searchTerm ||
-      employee?.nombreCompleto?.toLowerCase()?.includes(searchTerm) ||
-      employee?.empleadoId?.toLowerCase()?.includes(searchTerm) ||
-      employee?.puesto?.toLowerCase()?.includes(searchTerm);
+      const matchDept =
+        !filters.department || employee?.departamento === filters.department;
 
-    const matchDept =
-      !filters.department ||
-      employee?.departamento?.toLowerCase() === filters.department.toLowerCase();
+      const matchStatus =
+        !filters.status || (employee?.activo ? 'Activo' : 'Inactivo') === filters.status;
 
-    const matchStatus =
-      !filters.status ||
-      employee?.estado?.toLowerCase() === filters.status.toLowerCase();
+      const matchPosition =
+        !filters.position || employee?.puesto === filters.position;
 
-    const matchPosition =
-      !filters.position ||
-      employee?.puesto?.toLowerCase() === filters.position.toLowerCase();
+      const matchMedical =
+        !filters.medicalCompliance || employee?.cumplimientoMedico === filters.medicalCompliance;
 
-    // ❌ Eliminamos o comentamos estos porque NO existen en tu base
-    // const matchMedical =
-    //   !filters.medicalCompliance ||
-    //   employee?.cumplimientoMedico?.toLowerCase() ===
-    //     filters.medicalCompliance.toLowerCase();
+      const matchPPE =
+        !filters.ppeCompliance || employee?.cumplimientoEPP === filters.ppeCompliance;
 
-    // const matchPPE =
-    //   !filters.ppeCompliance ||
-    //   employee?.cumplimientoEPP?.toLowerCase() ===
-    //     filters.ppeCompliance.toLowerCase();
+      return matchSearch && matchDept && matchStatus && matchPosition && matchMedical && matchPPE;
+    });
+  }, [persons, filters]);
 
-    const matchHireDateFrom =
-      !filters.hireDateFrom ||
-      new Date(employee?.fechaIngreso) >= new Date(filters.hireDateFrom);
-
-    const matchHireDateTo =
-      !filters.hireDateTo ||
-      new Date(employee?.fechaIngreso) <= new Date(filters.hireDateTo);
-
-    return (
-      matchSearch &&
-      matchDept &&
-      matchStatus &&
-      matchPosition &&
-      matchHireDateFrom &&
-      matchHireDateTo
-    );
-  });
-}, [persons, filters]);
-
-  // ✅ Acciones UI
+  // 🔹 Acciones de UI (no cambian)
   const handleViewProfile = (employee) => {
     setSelectedEmployee(employee);
     setModalMode('view');
@@ -151,7 +126,7 @@ const PersonnelManagement = () => {
     setMobileMenuOpen(!mobileMenuOpen);
   };
 
-  // ✅ Mock dashboard data
+  // ✅ Datos de cumplimiento (mock, solo para dashboard)
   const mockComplianceData = {
     totalEmployees: persons?.length || 0,
     overallCompliance: 78,
@@ -181,8 +156,7 @@ const PersonnelManagement = () => {
       {
         id: 1,
         title: 'Estudios médicos vencidos',
-        description:
-          '3 empleados tienen estudios médicos vencidos que requieren atención inmediata',
+        description: '3 empleados tienen estudios médicos vencidos que requieren atención inmediata',
         date: '30/09/2024',
         priority: 'critical',
         type: 'medical'
@@ -190,8 +164,7 @@ const PersonnelManagement = () => {
       {
         id: 2,
         title: 'EPP pendiente de asignación',
-        description:
-          '3 empleados necesitan asignación de equipo de protección personal',
+        description: '3 empleados necesitan asignación de equipo de protección personal',
         date: '29/09/2024',
         priority: 'warning',
         type: 'ppe'
@@ -199,8 +172,7 @@ const PersonnelManagement = () => {
       {
         id: 3,
         title: 'Capacitaciones programadas',
-        description:
-          '8 empleados tienen capacitaciones programadas para la próxima semana',
+        description: '8 empleados tienen capacitaciones programadas para la próxima semana',
         date: '28/09/2024',
         priority: 'good',
         type: 'training'
@@ -276,7 +248,7 @@ const PersonnelManagement = () => {
             </div>
           </div>
 
-          {/* Vista principal */}
+          {/* Contenido principal */}
           {activeView === 'personnel' ? (
             <div className="space-y-6">
               <FilterToolbar
@@ -289,12 +261,11 @@ const PersonnelManagement = () => {
               />
 
               <PersonnelTable
-  personnel={filteredPersonnel}
-  onViewProfile={handleViewProfile}
-  onEditPersonnel={handleEditPersonnel}
-  onAssignPPE={handleAssignPPE}
-/>
-
+                personnel={filteredPersonnel} // 🔹 filtrados ya desde aquí
+                onViewProfile={handleViewProfile}
+                onEditPersonnel={handleEditPersonnel}
+                onAssignPPE={handleAssignPPE}
+              />
             </div>
           ) : (
             <ComplianceDashboard
@@ -304,7 +275,7 @@ const PersonnelManagement = () => {
             />
           )}
 
-          {/* Modal */}
+          {/* Modal de personal */}
           <PersonnelModal
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}

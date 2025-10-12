@@ -3,27 +3,48 @@ import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Image from '../../../components/AppImage';
 import usePerson from '../../../hooks/usePerson';
+import FilterToolbar from './FilterToolbar';
 
-const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE }) => {
+const PersonnelTable = ({ onViewProfile, onEditPersonnel, onAssignPPE }) => {
   const { persons, loading, error, getPersons } = usePerson();
   const [sortConfig, setSortConfig] = useState({ key: 'nombreCompleto', direction: 'asc' });
+
+  // 🔹 Estado para filtros
+  const [filters, setFilters] = useState({
+    search: '',
+    department: '',
+    status: '',
+  });
 
   // 🔹 Cargar empleados al montar
   useEffect(() => {
     getPersons();
   }, []);
 
-  // 🔹 Seleccionar fuente de datos (props filtradas o hook)
-  const dataSource = useMemo(() => {
-    if (!personnel || personnel.length === 0) {
-      return persons || [];
-    }
-    return personnel;
-  }, [personnel, persons]);
+  // 🔹 Manejo de cambios de filtros
+  const handleFilterChange = (name, value) => {
+    setFilters((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({ search: '', department: '', status: '' });
+  };
+
+  // 🔹 Filtrar empleados
+  const filteredPersonnel = useMemo(() => {
+    return (persons || []).filter((emp) => {
+      const matchesSearch =
+        emp.nombreCompleto?.toLowerCase().includes(filters.search.toLowerCase()) ||
+        emp.empleadoId?.toLowerCase().includes(filters.search.toLowerCase());
+      const matchesDepartment = !filters.department || emp.departamento === filters.department;
+      const matchesStatus = !filters.status || emp.estado === filters.status;
+      return matchesSearch && matchesDepartment && matchesStatus;
+    });
+  }, [persons, filters]);
 
   // 🔹 Ordenar datos
   const sortedPersonnel = useMemo(() => {
-    const sorted = [...(dataSource || [])];
+    const sorted = [...filteredPersonnel];
     if (!sortConfig.key) return sorted;
     sorted.sort((a, b) => {
       const aVal = a[sortConfig.key] || '';
@@ -33,7 +54,7 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
       return 0;
     });
     return sorted;
-  }, [dataSource, sortConfig]);
+  }, [filteredPersonnel, sortConfig]);
 
   const handleSort = (key) => {
     setSortConfig((prev) => ({
@@ -93,7 +114,6 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
     </th>
   );
 
-  // 🔹 Estados de carga y error
   if (loading) return (
     <div className="flex justify-center items-center py-10">
       <Icon name="Loader2" className="animate-spin mr-2" size={18} />
@@ -115,9 +135,19 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
     </div>
   );
 
-  // 🔹 Render principal
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
+      {/* 🔹 Barra de filtros */}
+      <div className="p-4 border-b border-border">
+        <FilterToolbar
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
+          totalCount={persons?.length || 0}
+          filteredCount={filteredPersonnel.length}
+        />
+      </div>
+
       {/* Tabla Desktop */}
       <div className="hidden lg:block overflow-x-auto">
         <table className="min-w-full divide-y divide-border">

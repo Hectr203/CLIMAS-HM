@@ -3,27 +3,30 @@ import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Image from '../../../components/AppImage';
 import usePerson from '../../../hooks/usePerson';
+import FilterToolbar from './FilterToolbar';
 
+/**
+ * Tabla de personal (empleados) con acciones
+ */
 const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE }) => {
   const { persons, loading, error, getPersons } = usePerson();
   const [sortConfig, setSortConfig] = useState({ key: 'nombreCompleto', direction: 'asc' });
 
-  // 🔹 Cargar empleados al montar
+  // 🔹 Cargar empleados del backend solo si no se recibe prop `personnel`
   useEffect(() => {
-    getPersons();
-  }, []);
-
-  // 🔹 Seleccionar fuente de datos (props filtradas o hook)
-  const dataSource = useMemo(() => {
     if (!personnel || personnel.length === 0) {
-      return persons || [];
+      getPersons();
     }
-    return personnel;
+  }, [personnel]);
+
+  // 🔹 Determinar fuente de datos (filtrados o desde API)
+  const dataSource = useMemo(() => {
+    return personnel && personnel.length > 0 ? personnel : persons || [];
   }, [personnel, persons]);
 
   // 🔹 Ordenar datos
   const sortedPersonnel = useMemo(() => {
-    const sorted = [...(dataSource || [])];
+    const sorted = [...dataSource];
     if (!sortConfig.key) return sorted;
     sorted.sort((a, b) => {
       const aVal = a[sortConfig.key] || '';
@@ -93,29 +96,30 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
     </th>
   );
 
-  // 🔹 Estados de carga y error
-  if (loading) return (
-    <div className="flex justify-center items-center py-10">
-      <Icon name="Loader2" className="animate-spin mr-2" size={18} />
-      <span className="text-muted-foreground">Cargando empleados...</span>
-    </div>
-  );
+  if (loading)
+    return (
+      <div className="flex justify-center items-center py-10">
+        <Icon name="Loader2" className="animate-spin mr-2" size={18} />
+        <span className="text-muted-foreground">Cargando empleados...</span>
+      </div>
+    );
 
-  if (error) return (
-    <div className="text-center py-10 text-error">
-      <Icon name="AlertCircle" className="inline-block mr-2" size={18} />
-      Error al cargar los empleados: {error.userMessage || error.message}
-    </div>
-  );
+  if (error)
+    return (
+      <div className="text-center py-10 text-error">
+        <Icon name="AlertCircle" className="inline-block mr-2" size={18} />
+        Error al cargar los empleados: {error.userMessage || error.message}
+      </div>
+    );
 
-  if (!sortedPersonnel?.length) return (
-    <div className="text-center py-10 text-muted-foreground">
-      <Icon name="UserX" className="inline-block mr-2" size={18} />
-      No hay empleados registrados.
-    </div>
-  );
+  if (!sortedPersonnel?.length)
+    return (
+      <div className="text-center py-10 text-muted-foreground">
+        <Icon name="UserX" className="inline-block mr-2" size={18} />
+        No hay empleados registrados.
+      </div>
+    );
 
-  // 🔹 Render principal
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
       {/* Tabla Desktop */}
@@ -139,20 +143,20 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center space-x-3">
                     <div className="w-10 h-10 rounded-full overflow-hidden bg-muted">
-                      <Image src={emp.foto || '/default-avatar.png'} alt={emp.nombreCompleto} className="w-full h-full object-cover" />
+                      <Image src={emp.foto || emp.avatar || '/default-avatar.png'} alt={emp.nombreCompleto || emp.name} className="w-full h-full object-cover" />
                     </div>
                     <div>
-                      <div className="text-sm font-medium text-foreground">{emp.nombreCompleto}</div>
-                      <div className="text-sm text-muted-foreground">{emp.empleadoId}</div>
+                      <div className="text-sm font-medium text-foreground">{emp.nombreCompleto || emp.name}</div>
+                      <div className="text-sm text-muted-foreground">{emp.empleadoId || emp.employeeId}</div>
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">{emp.departamento || '-'}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">{emp.puesto || '-'}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(emp.estado)}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{emp.fechaIngreso}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm">{emp.departamento || emp.department || '-'}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm">{emp.puesto || emp.position || '-'}</td>
+                <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(emp.estado || emp.status)}</td>
+                <td className="px-6 py-4 whitespace-nowrap">{getComplianceBadge(emp.medicalCompliance || (emp.estado === 'Activo' ? 'Completo' : 'Pendiente'))}</td>
+                <td className="px-6 py-4 whitespace-nowrap">{getComplianceBadge(emp.ppeCompliance || (emp.estado === 'Activo' ? 'Completo' : 'Pendiente'))}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{emp.fechaIngreso || emp.hireDate}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center space-x-2">
                     <Button variant="ghost" size="sm" onClick={() => onViewProfile(emp)} iconName="Eye" iconSize={16}>Ver</Button>
@@ -173,21 +177,21 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 rounded-full overflow-hidden bg-muted">
-                  <Image src={emp.foto || '/default-avatar.png'} alt={emp.nombreCompleto} className="w-full h-full object-cover" />
+                  <Image src={emp.foto || emp.avatar || '/default-avatar.png'} alt={emp.nombreCompleto || emp.name} className="w-full h-full object-cover" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-foreground">{emp.nombreCompleto}</h3>
-                  <p className="text-xs text-muted-foreground">{emp.empleadoId}</p>
+                  <h3 className="text-sm font-medium text-foreground">{emp.nombreCompleto || emp.name}</h3>
+                  <p className="text-xs text-muted-foreground">{emp.empleadoId || emp.employeeId}</p>
                 </div>
               </div>
-              {getStatusBadge(emp.estado)}
+              {getStatusBadge(emp.estado || emp.status)}
             </div>
 
             <div className="space-y-2 mb-4">
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Departamento:</span><span>{emp.departamento || '-'}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Puesto:</span><span>{emp.puesto || '-'}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Estudios Médicos:</span>{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</div>
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">EPP:</span>{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</div>
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Departamento:</span><span>{emp.departamento || emp.department || '-'}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Puesto:</span><span>{emp.puesto || emp.position || '-'}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Estudios Médicos:</span>{getComplianceBadge(emp.medicalCompliance || (emp.estado === 'Activo' ? 'Completo' : 'Pendiente'))}</div>
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">EPP:</span>{getComplianceBadge(emp.ppeCompliance || (emp.estado === 'Activo' ? 'Completo' : 'Pendiente'))}</div>
             </div>
 
             <div className="flex space-x-2">

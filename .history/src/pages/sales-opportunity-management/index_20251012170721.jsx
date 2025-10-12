@@ -596,121 +596,115 @@ const SalesOpportunityManagement = () => {
                     aria-hidden="true"
                   />
 
-                  {showControls && (
-  <>
-    {/* Fondo semitransparente */}
-    <div
-      className="fixed inset-0 bg-black/30 z-40 lg:hidden"
+                  <aside
+  className="
+    fixed top-[6rem] right-0 
+    w-full sm:w-[30rem] lg:w-[25rem] 
+    h-[calc(100vh-6rem)] 
+    bg-white rounded-l-2xl shadow-xl border-l z-40 overflow-y-auto
+    transform transition-transform duration-300
+
+    /* ✅ Oculto en móvil cuando showControls está en false */
+    translate-x-full
+    lg:translate-x-0
+  "
+  style={{ maxHeight: 'calc(100vh - 6rem)' }}
+  role="region"
+  aria-label="Controles de oportunidad"
+>
+  <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center z-50">
+    <h3 className="font-semibold text-gray-800">Controles de Oportunidad</h3>
+    <Button
+      variant="ghost"
+      size="sm"
+      iconName="X"
       onClick={() => setShowControls(false)}
+      ariaLabel="Cerrar controles"
     />
+  </div>
 
-    <aside
-      className={`fixed top-16 right-4 w-11/12 max-w-xs h-[80vh] bg-white z-50 rounded-l-2xl shadow-xl overflow-y-auto
-                  transform transition-transform duration-300
-                  ${showControls ? 'translate-x-0' : 'translate-x-full'}
-                  lg:top-[6rem] lg:right-0 lg:w-[25rem] lg:h-[calc(100vh-6rem)] lg:translate-x-0 lg:rounded-l-2xl lg:shadow-xl lg:border-l`}
-      role="region"
-      aria-label="Controles de oportunidad"
-    >
-      {/* Header sticky */}
-      <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center z-50">
-        <h3 className="font-semibold text-gray-800 text-lg">Controles de Oportunidad</h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          iconName="X"
-          onClick={() => setShowControls(false)}
-          ariaLabel="Cerrar controles"
+  <div className="p-4 space-y-6">
+    {selectedOpportunity ? (
+      <div className="space-y-4">
+        <div>
+          <h4 className="font-medium mb-2">{selectedOpportunity?.clientName}</h4>
+          <p className="text-sm text-muted-foreground">{selectedOpportunity?.id}</p>
+        </div>
+
+        {selectedOpportunity?.stage === 'initial-contact' && (
+          <ClientRegistrationPanel
+            opportunity={selectedOpportunity}
+            onRegister={(clientData) =>
+              handleClientRegistration(selectedOpportunity?.id, clientData)
+            }
+          />
+        )}
+
+        <CommunicationPanel
+          opportunity={selectedOpportunity}
+          onAddCommunication={(communication) =>
+            handleCommunicationAdd(selectedOpportunity?.id, communication)
+          }
         />
-      </div>
 
-      {/* Contenido */}
-      <div className="p-4 space-y-6">
-        {selectedOpportunity ? (
-          <div className="space-y-4">
-            <div>
-              <h4 className="font-medium mb-2 text-sm sm:text-base">{selectedOpportunity?.clientName}</h4>
-              <p className="text-xs text-muted-foreground">{selectedOpportunity?.id}</p>
-            </div>
+        {(selectedOpportunity?.stage === 'quotation-development' ||
+          selectedOpportunity?.quotationData) && (
+          <QuotationRequestPanel
+            opportunity={selectedOpportunity}
+            onUpdate={(quotationData) =>
+              handleQuotationUpdate(selectedOpportunity?.id, quotationData)
+            }
+          />
+        )}
 
-            {/* Paneles por etapa */}
-            {selectedOpportunity?.stage === 'initial-contact' && (
-              <ClientRegistrationPanel
-                opportunity={selectedOpportunity}
-                onRegister={(clientData) =>
-                  handleClientRegistration(selectedOpportunity?.id, clientData)
-                }
-              />
-            )}
-
-            <CommunicationPanel
+        {selectedOpportunity?.stage === 'closure' &&
+          selectedOpportunity?.quotationData?.approved && (
+            <WorkOrderPanel
               opportunity={selectedOpportunity}
-              onAddCommunication={(communication) =>
-                handleCommunicationAdd(selectedOpportunity?.id, communication)
+              onGenerateWorkOrder={(workOrderData) =>
+                handleWorkOrderGeneration(selectedOpportunity?.id, workOrderData)
               }
             />
+          )}
 
-            {(selectedOpportunity?.stage === 'quotation-development' ||
-              selectedOpportunity?.quotationData) && (
-              <QuotationRequestPanel
-                opportunity={selectedOpportunity}
-                onUpdate={(quotationData) =>
-                  handleQuotationUpdate(selectedOpportunity?.id, quotationData)
-                }
-              />
-            )}
-
-            {selectedOpportunity?.stage === 'closure' &&
-              selectedOpportunity?.quotationData?.approved && (
-                <WorkOrderPanel
-                  opportunity={selectedOpportunity}
-                  onGenerateWorkOrder={(workOrderData) =>
-                    handleWorkOrderGeneration(selectedOpportunity?.id, workOrderData)
-                  }
-                />
-              )}
-
-            {selectedOpportunity?.stage !== 'initial-contact' && (
-              <ChangeManagementPanel
-                opportunity={selectedOpportunity}
-                onRequestChange={(changeData) =>
-                  console.log('Change requested:', changeData)
-                }
-              />
-            )}
-
-            {/* Botones para cambiar etapa */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Avanzar Etapa</label>
-              <div className="grid grid-cols-1 gap-2">
-                {salesStages?.map((stage) => (
-                  <Button
-                    key={stage?.id}
-                    variant={selectedOpportunity?.stage === stage?.id ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() =>
-                      handleStageTransition(selectedOpportunity?.id, stage?.id)
-                    }
-                    disabled={selectedOpportunity?.stage === stage?.id}
-                    className="text-xs justify-start"
-                  >
-                    <Icon name={stage?.icon} size={14} className="mr-2" />
-                    {stage?.name}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="text-center text-gray-500 py-6">
-            <p className="mb-2">Selecciona una oportunidad para ver controles</p>
-            <Button onClick={() => setShowControls(false)}>Cerrar</Button>
-          </div>
+        {selectedOpportunity?.stage !== 'initial-contact' && (
+          <ChangeManagementPanel
+            opportunity={selectedOpportunity}
+            onRequestChange={(changeData) =>
+              console.log('Change requested:', changeData)
+            }
+          />
         )}
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Avanzar Etapa</label>
+          <div className="grid grid-cols-1 gap-2">
+            {salesStages?.map((stage) => (
+              <Button
+                key={stage?.id}
+                variant={selectedOpportunity?.stage === stage?.id ? 'default' : 'outline'}
+                size="sm"
+                onClick={() =>
+                  handleStageTransition(selectedOpportunity?.id, stage?.id)
+                }
+                disabled={selectedOpportunity?.stage === stage?.id}
+                className="text-xs justify-start"
+              >
+                <Icon name={stage?.icon} size={14} className="mr-2" />
+                {stage?.name}
+              </Button>
+            ))}
+          </div>
+        </div>
       </div>
-    </aside>
-  </>
-)}
+    ) : (
+      <div className="text-center text-gray-500 py-6">
+        <p className="mb-2">Selecciona una oportunidad para ver controles</p>
+        <Button onClick={() => setShowControls(false)}>Cerrar</Button>
+      </div>
+    )}
+  </div>
+</aside>
 
                 </>
               )}

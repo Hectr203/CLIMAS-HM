@@ -3,27 +3,110 @@ import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Image from '../../../components/AppImage';
 import usePerson from '../../../hooks/usePerson';
+import FilterToolbar from './FilterToolbar';
 
-const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE }) => {
+const PersonnelTable = ({ onViewProfile, onEditPersonnel, onAssignPPE }) => {
   const { persons, loading, error, getPersons } = usePerson();
-  const [sortConfig, setSortConfig] = useState({ key: 'nombreCompleto', direction: 'asc' });
 
-  // 🔹 Cargar empleados al montar
+  // 🔹 Estados
+  const [sortConfig, setSortConfig] = useState({ key: 'nombreCompleto', direction: 'asc' });
+  const [filters, setFilters] = useState({
+    search: '',
+    department: '',
+    status: '',
+    position: '',
+    medicalCompliance: '',
+    ppeCompliance: '',
+    hireDateFrom: '',
+    hireDateTo: '',
+  });
+
   useEffect(() => {
     getPersons();
   }, []);
 
-  // 🔹 Seleccionar fuente de datos (props filtradas o hook)
-  const dataSource = useMemo(() => {
-    if (!personnel || personnel.length === 0) {
-      return persons || [];
-    }
-    return personnel;
-  }, [personnel, persons]);
+  // 🔹 Manejo de cambios en filtros
+  const handleFilterChange = (newFilters) => {
+    setFilters(newFilters);
+  };
 
-  // 🔹 Ordenar datos
+  const handleClearFilters = () => {
+    setFilters({
+      search: '',
+      department: '',
+      status: '',
+      position: '',
+      medicalCompliance: '',
+      ppeCompliance: '',
+      hireDateFrom: '',
+      hireDateTo: '',
+    });
+  };
+
+  // 🔹 Filtrar empleados según los filtros activos
+  const filteredPersonnel = useMemo(() => {
+  return (persons || []).filter(emp => {
+    const searchTerm = filters.search.toLowerCase().trim();
+
+    // ✅ Coincidencia con búsqueda
+    const matchesSearch =
+      !filters.search ||
+      (emp.nombreCompleto?.toLowerCase().includes(searchTerm)) ||
+      (emp.empleadoId?.toLowerCase().includes(searchTerm)) ||
+      (emp.puesto?.toLowerCase().includes(searchTerm));
+
+    // ✅ Filtro por departamento
+    const matchesDepartment =
+      !filters.department || emp.departamento?.toLowerCase() === filters.department.toLowerCase();
+
+    // ✅ Filtro por estado
+    const matchesStatus =
+      !filters.status || emp.estado?.toLowerCase() === filters.status.toLowerCase();
+
+    // ✅ Filtro por puesto
+    const matchesPosition =
+      !filters.position || emp.puesto?.toLowerCase() === filters.position.toLowerCase();
+
+    // ✅ Filtro por cumplimiento médico
+    const matchesMedical =
+      !filters.medicalCompliance ||
+      (filters.medicalCompliance === 'Completo' && emp.medicoCumplimiento === true) ||
+      (filters.medicalCompliance === 'Pendiente' && emp.medicoCumplimiento === false);
+
+    // ✅ Filtro por cumplimiento de EPP
+    const matchesPPE =
+      !filters.ppeCompliance ||
+      (filters.ppeCompliance === 'Completo' && emp.eppCumplimiento === true) ||
+      (filters.ppeCompliance === 'Pendiente' && emp.eppCumplimiento === false);
+
+    // ✅ Filtro de fechas
+    const empDate = emp.fechaIngreso ? new Date(emp.fechaIngreso) : null;
+    const fromDate = filters.hireDateFrom ? new Date(filters.hireDateFrom) : null;
+    const toDate = filters.hireDateTo ? new Date(filters.hireDateTo) : null;
+
+    const matchesHireDateFrom =
+      !fromDate || (empDate && empDate >= fromDate);
+
+    const matchesHireDateTo =
+      !toDate || (empDate && empDate <= toDate);
+
+    return (
+      matchesSearch &&
+      matchesDepartment &&
+      matchesStatus &&
+      matchesPosition &&
+      matchesMedical &&
+      matchesPPE &&
+      matchesHireDateFrom &&
+      matchesHireDateTo
+    );
+  });
+}, [persons, filters]);
+
+
+  // 🔹 Ordenar resultados filtrados
   const sortedPersonnel = useMemo(() => {
-    const sorted = [...(dataSource || [])];
+    const sorted = [...filteredPersonnel];
     if (!sortConfig.key) return sorted;
     sorted.sort((a, b) => {
       const aVal = a[sortConfig.key] || '';
@@ -33,7 +116,7 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
       return 0;
     });
     return sorted;
-  }, [dataSource, sortConfig]);
+  }, [filteredPersonnel, sortConfig]);
 
   const handleSort = (key) => {
     setSortConfig((prev) => ({
@@ -42,7 +125,6 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
     }));
   };
 
-  // 🔹 Badges de estado
   const getStatusBadge = (status) => {
     const config = {
       'Activo': { bg: 'bg-success', text: 'text-success-foreground' },
@@ -93,32 +175,29 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
     </th>
   );
 
-  // 🔹 Estados de carga y error
-  if (loading) return (
-    <div className="flex justify-center items-center py-10">
-      <Icon name="Loader2" className="animate-spin mr-2" size={18} />
-      <span className="text-muted-foreground">Cargando empleados...</span>
-    </div>
-  );
+  if (loading)
+    return (
+      <div className="flex justify-center items-center py-10">
+        <Icon name="Loader2" className="animate-spin mr-2" size={18} />
+        <span className="text-muted-foreground">Cargando empleados...</span>
+      </div>
+    );
 
-  if (error) return (
-    <div className="text-center py-10 text-error">
-      <Icon name="AlertCircle" className="inline-block mr-2" size={18} />
-      Error al cargar los empleados: {error.userMessage || error.message}
-    </div>
-  );
+  if (error)
+    return (
+      <div className="text-center py-10 text-error">
+        <Icon name="AlertCircle" className="inline-block mr-2" size={18} />
+        Error al cargar los empleados: {error.userMessage || error.message}
+      </div>
+    );
 
-  if (!sortedPersonnel?.length) return (
-    <div className="text-center py-10 text-muted-foreground">
-      <Icon name="UserX" className="inline-block mr-2" size={18} />
-      No hay empleados registrados.
-    </div>
-  );
+  // ✅ Código corregido:
+return (
+  <div className="space-y-6">
+    {/* ✅ Eliminamos el FilterToolbar duplicado */}
 
-  // 🔹 Render principal
-  return (
+    {/* 🔹 Tabla */}
     <div className="bg-card rounded-lg border border-border overflow-hidden">
-      {/* Tabla Desktop */}
       <div className="hidden lg:block overflow-x-auto">
         <table className="min-w-full divide-y divide-border">
           <thead className="bg-muted">
@@ -147,13 +226,13 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">{emp.departamento || '-'}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">{emp.puesto || '-'}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(emp.estado)}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{emp.fechaIngreso}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-6 py-4 text-sm">{emp.departamento || '-'}</td>
+                <td className="px-6 py-4 text-sm">{emp.puesto || '-'}</td>
+                <td className="px-6 py-4">{getStatusBadge(emp.estado)}</td>
+                <td className="px-6 py-4">{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</td>
+                <td className="px-6 py-4">{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</td>
+                <td className="px-6 py-4 text-sm text-muted-foreground">{emp.fechaIngreso}</td>
+                <td className="px-6 py-4">
                   <div className="flex items-center space-x-2">
                     <Button variant="ghost" size="sm" onClick={() => onViewProfile(emp)} iconName="Eye" iconSize={16}>Ver</Button>
                     <Button variant="ghost" size="sm" onClick={() => onEditPersonnel(emp)} iconName="Edit" iconSize={16}>Editar</Button>
@@ -165,41 +244,10 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
           </tbody>
         </table>
       </div>
-
-      {/* Vista Móvil */}
-      <div className="lg:hidden space-y-4 p-4">
-        {sortedPersonnel.map(emp => (
-          <div key={emp.id} className="bg-card border border-border rounded-lg p-4">
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 rounded-full overflow-hidden bg-muted">
-                  <Image src={emp.foto || '/default-avatar.png'} alt={emp.nombreCompleto} className="w-full h-full object-cover" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-foreground">{emp.nombreCompleto}</h3>
-                  <p className="text-xs text-muted-foreground">{emp.empleadoId}</p>
-                </div>
-              </div>
-              {getStatusBadge(emp.estado)}
-            </div>
-
-            <div className="space-y-2 mb-4">
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Departamento:</span><span>{emp.departamento || '-'}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Puesto:</span><span>{emp.puesto || '-'}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Estudios Médicos:</span>{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</div>
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">EPP:</span>{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</div>
-            </div>
-
-            <div className="flex space-x-2">
-              <Button variant="outline" size="sm" onClick={() => onViewProfile(emp)} iconName="Eye" iconSize={16} className="flex-1">Ver Perfil</Button>
-              <Button variant="ghost" size="sm" onClick={() => onEditPersonnel(emp)} iconName="Edit" iconSize={16}>Editar</Button>
-              <Button variant="ghost" size="sm" onClick={() => onAssignPPE(emp)} iconName="Shield" iconSize={16}>EPP</Button>
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
-  );
+  </div>
+);
+
 };
 
 export default PersonnelTable;

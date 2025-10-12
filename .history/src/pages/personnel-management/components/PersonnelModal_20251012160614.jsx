@@ -7,7 +7,7 @@ import { Checkbox } from '../../../components/ui/Checkbox';
 import usePerson from '../../../hooks/usePerson';
 
 const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
-const { createPerson, updatePersonByEmpleadoId } = usePerson();
+  const { createPerson } = usePerson();
 
   // 🔹 Estado inicial del formulario
   const [formData, setFormData] = useState({
@@ -179,38 +179,33 @@ const { createPerson, updatePersonByEmpleadoId } = usePerson();
 
   // 🔹 Guardar nuevo empleado
   const handleSave = async () => {
-  try {
-    const payload = {
-      nombreCompleto: formData.name,
-      email: formData.email,
-      telefono: formData.phone,
-      departamento: formData.department,
-      puesto: formData.position,
-      fechaIngreso: formData.hireDate,
-      estado: formData.status,
-    };
+    try {
+      const payload = {
+        nombreCompleto: formData.name,
+        empleadoId: formData.employeeId,
+        email: formData.email,
+        telefono: formData.phone,
+        departamento: formData.department,
+        puesto: formData.position,
+        fechaIngreso: formData.hireDate,
+        estado: formData.status,
+        activo: true
+      };
 
-    console.log("Payload enviado:", payload);
+      console.log('Enviando empleado:', payload);
 
-    let result;
-    if (mode === 'edit' && formData.employeeId) {
-      // 🔹 Si es edición, actualiza solo lo modificado
-      result = await updatePersonByEmpleadoId(formData.employeeId, payload);
-      alert("Empleado actualizado correctamente ✅");
-    } else {
-      // 🔹 Si es creación, registra nuevo
-      result = await createPerson({ ...payload, empleadoId: formData.employeeId, activo: true });
-      alert("Empleado registrado correctamente ✅");
+      const result = await createPerson(payload);
+
+      console.log('Empleado creado:', result);
+      alert('Empleado registrado exitosamente');
+
+      if (onSave) onSave(result);
+      onClose();
+    } catch (error) {
+      console.error('Error al guardar:', error);
+      alert('Hubo un error al guardar el empleado. Revisa la consola.');
     }
-
-    if (onSave) onSave(result);
-    onClose();
-  } catch (error) {
-    console.error("Error al guardar:", error);
-    alert("Hubo un error al guardar el empleado. Revisa la consola.");
-  }
-};
-
+  };
 
   // 🔹 Tabs del modal
   const tabs = [

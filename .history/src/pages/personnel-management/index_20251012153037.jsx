@@ -59,16 +59,15 @@ const PersonnelManagement = () => {
       !filters.position ||
       employee?.puesto?.toLowerCase() === filters.position.toLowerCase();
 
-    // ❌ Eliminamos o comentamos estos porque NO existen en tu base
-    // const matchMedical =
-    //   !filters.medicalCompliance ||
-    //   employee?.cumplimientoMedico?.toLowerCase() ===
-    //     filters.medicalCompliance.toLowerCase();
+    const matchMedical =
+      !filters.medicalCompliance ||
+      employee?.cumplimientoMedico?.toLowerCase() ===
+        filters.medicalCompliance.toLowerCase();
 
-    // const matchPPE =
-    //   !filters.ppeCompliance ||
-    //   employee?.cumplimientoEPP?.toLowerCase() ===
-    //     filters.ppeCompliance.toLowerCase();
+    const matchPPE =
+      !filters.ppeCompliance ||
+      employee?.cumplimientoEPP?.toLowerCase() ===
+        filters.ppeCompliance.toLowerCase();
 
     const matchHireDateFrom =
       !filters.hireDateFrom ||
@@ -83,11 +82,14 @@ const PersonnelManagement = () => {
       matchDept &&
       matchStatus &&
       matchPosition &&
+      matchMedical &&
+      matchPPE &&
       matchHireDateFrom &&
       matchHireDateTo
     );
   });
 }, [persons, filters]);
+
 
   // ✅ Acciones UI
   const handleViewProfile = (employee) => {

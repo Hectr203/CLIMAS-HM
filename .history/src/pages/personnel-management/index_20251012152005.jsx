@@ -36,58 +36,61 @@ const PersonnelManagement = () => {
 
   // ✅ Lógica de filtrado robusta
   const filteredPersonnel = useMemo(() => {
-  if (!persons) return [];
+    if (!persons) return [];
 
-  return persons.filter((employee) => {
-    const searchTerm = filters.search?.toLowerCase().trim() || '';
+    return persons.filter((employee) => {
+      const searchTerm = filters.search?.toLowerCase().trim() || '';
 
-    const matchSearch =
-      !searchTerm ||
-      employee?.nombreCompleto?.toLowerCase()?.includes(searchTerm) ||
-      employee?.empleadoId?.toLowerCase()?.includes(searchTerm) ||
-      employee?.puesto?.toLowerCase()?.includes(searchTerm);
+      const matchSearch =
+        !searchTerm ||
+        employee?.nombreCompleto?.toLowerCase()?.includes(searchTerm) ||
+        employee?.empleadoId?.toLowerCase()?.includes(searchTerm) ||
+        employee?.puesto?.toLowerCase()?.includes(searchTerm);
 
-    const matchDept =
-      !filters.department ||
-      employee?.departamento?.toLowerCase() === filters.department.toLowerCase();
+      const matchDept =
+        !filters.department ||
+        employee?.departamento?.toLowerCase() === filters.department.toLowerCase();
 
-    const matchStatus =
-      !filters.status ||
-      employee?.estado?.toLowerCase() === filters.status.toLowerCase();
+      const matchStatus =
+        !filters.status ||
+        (employee?.activo ? 'activo' : 'inactivo')?.toLowerCase() ===
+          filters.status.toLowerCase();
 
-    const matchPosition =
-      !filters.position ||
-      employee?.puesto?.toLowerCase() === filters.position.toLowerCase();
+      const matchPosition =
+        !filters.position ||
+        employee?.puesto?.toLowerCase() === filters.position.toLowerCase();
 
-    // ❌ Eliminamos o comentamos estos porque NO existen en tu base
-    // const matchMedical =
-    //   !filters.medicalCompliance ||
-    //   employee?.cumplimientoMedico?.toLowerCase() ===
-    //     filters.medicalCompliance.toLowerCase();
+      const matchMedical =
+        !filters.medicalCompliance ||
+        employee?.cumplimientoMedico?.toLowerCase() ===
+          filters.medicalCompliance.toLowerCase();
 
-    // const matchPPE =
-    //   !filters.ppeCompliance ||
-    //   employee?.cumplimientoEPP?.toLowerCase() ===
-    //     filters.ppeCompliance.toLowerCase();
+      const matchPPE =
+        !filters.ppeCompliance ||
+        employee?.cumplimientoEPP?.toLowerCase() ===
+          filters.ppeCompliance.toLowerCase();
 
-    const matchHireDateFrom =
-      !filters.hireDateFrom ||
-      new Date(employee?.fechaIngreso) >= new Date(filters.hireDateFrom);
+      // 🔹 Filtros de fechas (desde / hasta)
+      const matchHireDateFrom =
+        !filters.hireDateFrom ||
+        new Date(employee?.fechaIngreso) >= new Date(filters.hireDateFrom);
 
-    const matchHireDateTo =
-      !filters.hireDateTo ||
-      new Date(employee?.fechaIngreso) <= new Date(filters.hireDateTo);
+      const matchHireDateTo =
+        !filters.hireDateTo ||
+        new Date(employee?.fechaIngreso) <= new Date(filters.hireDateTo);
 
-    return (
-      matchSearch &&
-      matchDept &&
-      matchStatus &&
-      matchPosition &&
-      matchHireDateFrom &&
-      matchHireDateTo
-    );
-  });
-}, [persons, filters]);
+      return (
+        matchSearch &&
+        matchDept &&
+        matchStatus &&
+        matchPosition &&
+        matchMedical &&
+        matchPPE &&
+        matchHireDateFrom &&
+        matchHireDateTo
+      );
+    });
+  }, [persons, filters]);
 
   // ✅ Acciones UI
   const handleViewProfile = (employee) => {
@@ -289,12 +292,11 @@ const PersonnelManagement = () => {
               />
 
               <PersonnelTable
-  personnel={filteredPersonnel}
-  onViewProfile={handleViewProfile}
-  onEditPersonnel={handleEditPersonnel}
-  onAssignPPE={handleAssignPPE}
-/>
-
+                personnel={filteredPersonnel.length > 0 ? filteredPersonnel : persons}
+                onViewProfile={handleViewProfile}
+                onEditPersonnel={handleEditPersonnel}
+                onAssignPPE={handleAssignPPE}
+              />
             </div>
           ) : (
             <ComplianceDashboard

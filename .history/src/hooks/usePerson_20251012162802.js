@@ -42,21 +42,23 @@ const usePerson = () => {
     }
   };
 
-  // 🔹 NUEVA FUNCIÓN PARA ACTUALIZAR EMPLEADO EXISTENTE
-  const updatePersonByEmpleadoId = async (empleadoId, payload) => {
+  // 🔹 Nueva función para actualizar un empleado sin borrar sus otros datos
+  const updatePerson = async (empleadoId, payload) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await personService.updatePersonByEmpleadoId(empleadoId, payload);
-      if (response.success) {
-        // Actualiza la lista local sin perder los datos previos
+      const response = await personService.updatePerson(empleadoId, payload);
+      if (response.success && response.data) {
+        // ✅ Actualiza solo el campo modificado en el estado local
         setPersons(prev =>
-          prev.map(p => (p.empleadoId === empleadoId ? { ...p, ...response.data } : p))
+          prev.map(p =>
+            p.empleadoId === empleadoId ? { ...p, ...response.data } : p
+          )
         );
         return response.data;
       }
     } catch (err) {
-      console.error("Error en usePerson.updatePersonByEmpleadoId:", err);
+      console.error("Error en usePerson.updatePerson:", err);
       setError(err);
       throw err;
     } finally {
@@ -64,7 +66,7 @@ const usePerson = () => {
     }
   };
 
-  return { persons, loading, error, getPersons, createPerson, updatePersonByEmpleadoId };
+  return { persons, loading, error, getPersons, createPerson, updatePerson };
 };
 
 export default usePerson;

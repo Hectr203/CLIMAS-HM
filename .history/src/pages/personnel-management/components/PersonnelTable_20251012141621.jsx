@@ -1,29 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Image from '../../../components/AppImage';
-import usePerson from '../../../hooks/usePerson';
 
-const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE }) => {
-  const { persons, loading, error, getPersons } = usePerson();
+const PersonnelTable = ({ filteredPersonnel = [], onViewProfile, onEditPersonnel, onAssignPPE }) => {
   const [sortConfig, setSortConfig] = useState({ key: 'nombreCompleto', direction: 'asc' });
-
-  // 🔹 Cargar empleados al montar
-  useEffect(() => {
-    getPersons();
-  }, []);
-
-  // 🔹 Seleccionar fuente de datos (props filtradas o hook)
-  const dataSource = useMemo(() => {
-    if (!personnel || personnel.length === 0) {
-      return persons || [];
-    }
-    return personnel;
-  }, [personnel, persons]);
 
   // 🔹 Ordenar datos
   const sortedPersonnel = useMemo(() => {
-    const sorted = [...(dataSource || [])];
+    const sorted = [...(filteredPersonnel || [])];
     if (!sortConfig.key) return sorted;
     sorted.sort((a, b) => {
       const aVal = a[sortConfig.key] || '';
@@ -33,7 +18,7 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
       return 0;
     });
     return sorted;
-  }, [dataSource, sortConfig]);
+  }, [filteredPersonnel, sortConfig]);
 
   const handleSort = (key) => {
     setSortConfig((prev) => ({
@@ -93,21 +78,6 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
     </th>
   );
 
-  // 🔹 Estados de carga y error
-  if (loading) return (
-    <div className="flex justify-center items-center py-10">
-      <Icon name="Loader2" className="animate-spin mr-2" size={18} />
-      <span className="text-muted-foreground">Cargando empleados...</span>
-    </div>
-  );
-
-  if (error) return (
-    <div className="text-center py-10 text-error">
-      <Icon name="AlertCircle" className="inline-block mr-2" size={18} />
-      Error al cargar los empleados: {error.userMessage || error.message}
-    </div>
-  );
-
   if (!sortedPersonnel?.length) return (
     <div className="text-center py-10 text-muted-foreground">
       <Icon name="UserX" className="inline-block mr-2" size={18} />
@@ -115,7 +85,6 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
     </div>
   );
 
-  // 🔹 Render principal
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
       {/* Tabla Desktop */}

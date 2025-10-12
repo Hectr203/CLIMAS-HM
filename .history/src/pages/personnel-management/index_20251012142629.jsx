@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Header from '../../components/ui/Header';
 import Sidebar from '../../components/ui/Sidebar';
 import Breadcrumb from '../../components/ui/Breadcrumb';
 import Button from '../../components/ui/Button';
-import PersonnelTable from './components/PersonnelTable';
 import FilterToolbar from './components/FilterToolbar';
+import PersonnelTable from './components/PersonnelTable';
 import ComplianceDashboard from './components/ComplianceDashboard';
 import PersonnelModal from './components/PersonnelModal';
-import usePerson from '../../hooks/usePerson'; // 🔹 tu hook real
+import usePerson from '../../../hooks/usePerson';
 
 const PersonnelManagement = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -21,75 +21,69 @@ const PersonnelManagement = () => {
     medicalCompliance: '',
     ppeCompliance: '',
     hireDateFrom: '',
-    hireDateTo: ''
+    hireDateTo: '',
   });
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [modalMode, setModalMode] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // ✅ Hook original
   const { persons, loading, error, getPersons } = usePerson();
 
   useEffect(() => {
-    getPersons(); // cargar empleados
+    getPersons();
   }, []);
 
-  // ✅ Lógica de filtrado robusta
+  // 🔹 Filtrado centralizado aquí
   const filteredPersonnel = useMemo(() => {
-  if (!persons) return [];
+    if (!persons) return [];
+    return persons.filter((emp) => {
+      const matchesSearch =
+        !filters.search ||
+        emp.nombreCompleto?.toLowerCase().includes(filters.search.toLowerCase()) ||
+        emp.empleadoId?.toLowerCase().includes(filters.search.toLowerCase()) ||
+        emp.puesto?.toLowerCase().includes(filters.search.toLowerCase());
 
-  return persons.filter((employee) => {
-    const searchTerm = filters.search?.toLowerCase().trim() || '';
+      const matchesDepartment =
+        !filters.department || emp.departamento === filters.department;
 
-    const matchSearch =
-      !searchTerm ||
-      employee?.nombreCompleto?.toLowerCase()?.includes(searchTerm) ||
-      employee?.empleadoId?.toLowerCase()?.includes(searchTerm) ||
-      employee?.puesto?.toLowerCase()?.includes(searchTerm);
+      const matchesStatus = !filters.status || emp.estado === filters.status;
 
-    const matchDept =
-      !filters.department ||
-      employee?.departamento?.toLowerCase() === filters.department.toLowerCase();
+      const matchesPosition =
+        !filters.position || emp.puesto === filters.position;
 
-    const matchStatus =
-      !filters.status ||
-      employee?.estado?.toLowerCase() === filters.status.toLowerCase();
+      // Simulaciones de cumplimiento
+      const simulatedMedical = emp.estado === 'Activo' ? 'Completo' : 'Pendiente';
+      const simulatedPPE = emp.estado === 'Activo' ? 'Completo' : 'Pendiente';
 
-    const matchPosition =
-      !filters.position ||
-      employee?.puesto?.toLowerCase() === filters.position.toLowerCase();
+      const matchesMedical =
+        !filters.medicalCompliance ||
+        simulatedMedical === filters.medicalCompliance;
 
-    // ❌ Eliminamos o comentamos estos porque NO existen en tu base
-    // const matchMedical =
-    //   !filters.medicalCompliance ||
-    //   employee?.cumplimientoMedico?.toLowerCase() ===
-    //     filters.medicalCompliance.toLowerCase();
+      const matchesPPE =
+        !filters.ppeCompliance || simulatedPPE === filters.ppeCompliance;
 
-    // const matchPPE =
-    //   !filters.ppeCompliance ||
-    //   employee?.cumplimientoEPP?.toLowerCase() ===
-    //     filters.ppeCompliance.toLowerCase();
+      const matchesDateFrom =
+        !filters.hireDateFrom ||
+        new Date(emp.fechaIngreso) >= new Date(filters.hireDateFrom);
 
-    const matchHireDateFrom =
-      !filters.hireDateFrom ||
-      new Date(employee?.fechaIngreso) >= new Date(filters.hireDateFrom);
+      const matchesDateTo =
+        !filters.hireDateTo ||
+        new Date(emp.fechaIngreso) <= new Date(filters.hireDateTo);
 
-    const matchHireDateTo =
-      !filters.hireDateTo ||
-      new Date(employee?.fechaIngreso) <= new Date(filters.hireDateTo);
+      return (
+        matchesSearch &&
+        matchesDepartment &&
+        matchesStatus &&
+        matchesPosition &&
+        matchesMedical &&
+        matchesPPE &&
+        matchesDateFrom &&
+        matchesDateTo
+      );
+    });
+  }, [persons, filters]);
 
-    return (
-      matchSearch &&
-      matchDept &&
-      matchStatus &&
-      matchPosition &&
-      matchHireDateFrom &&
-      matchHireDateTo
-    );
-  });
-}, [persons, filters]);
-
-  // ✅ Acciones UI
+  // 🔹 Handlers
   const handleViewProfile = (employee) => {
     setSelectedEmployee(employee);
     setModalMode('view');
@@ -127,20 +121,8 @@ const PersonnelManagement = () => {
       medicalCompliance: '',
       ppeCompliance: '',
       hireDateFrom: '',
-      hireDateTo: ''
+      hireDateTo: '',
     });
-  };
-
-  const handleExportData = () => {
-    console.log('Exporting personnel data...');
-  };
-
-  const handleViewComplianceDetails = (type) => {
-    console.log('Viewing compliance details for:', type);
-  };
-
-  const handleScheduleTraining = () => {
-    console.log('Scheduling training...');
   };
 
   const handleSidebarToggle = () => {
@@ -149,63 +131,6 @@ const PersonnelManagement = () => {
 
   const handleMobileMenuToggle = () => {
     setMobileMenuOpen(!mobileMenuOpen);
-  };
-
-  // ✅ Mock dashboard data
-  const mockComplianceData = {
-    totalEmployees: persons?.length || 0,
-    overallCompliance: 78,
-    upcomingExpirations: 8,
-    medicalStudies: {
-      total: persons?.length || 0,
-      expired: 3,
-      pending: 7,
-      complete: 35
-    },
-    ppe: {
-      total: persons?.length || 0,
-      assigned: 42,
-      pending: 3
-    },
-    training: {
-      pending: 12,
-      scheduled: 8,
-      completed: 25
-    },
-    documents: {
-      missing: 5,
-      pending: 8,
-      complete: 32
-    },
-    alerts: [
-      {
-        id: 1,
-        title: 'Estudios médicos vencidos',
-        description:
-          '3 empleados tienen estudios médicos vencidos que requieren atención inmediata',
-        date: '30/09/2024',
-        priority: 'critical',
-        type: 'medical'
-      },
-      {
-        id: 2,
-        title: 'EPP pendiente de asignación',
-        description:
-          '3 empleados necesitan asignación de equipo de protección personal',
-        date: '29/09/2024',
-        priority: 'warning',
-        type: 'ppe'
-      },
-      {
-        id: 3,
-        title: 'Capacitaciones programadas',
-        description:
-          '8 empleados tienen capacitaciones programadas para la próxima semana',
-        date: '28/09/2024',
-        priority: 'good',
-        type: 'training'
-      }
-    ]
   };
 
   return (
@@ -227,7 +152,6 @@ const PersonnelManagement = () => {
         } lg:pt-0 pt-16`}
       >
         <div className="p-6">
-          {/* Breadcrumb */}
           <div className="mb-6">
             <Breadcrumb />
           </div>
@@ -276,31 +200,29 @@ const PersonnelManagement = () => {
             </div>
           </div>
 
-          {/* Vista principal */}
+          {/* Contenido dinámico */}
           {activeView === 'personnel' ? (
             <div className="space-y-6">
               <FilterToolbar
                 filters={filters}
                 onFilterChange={setFilters}
                 onClearFilters={handleClearFilters}
-                onExportData={handleExportData}
                 totalCount={persons?.length || 0}
                 filteredCount={filteredPersonnel?.length || 0}
               />
 
               <PersonnelTable
-  personnel={filteredPersonnel}
-  onViewProfile={handleViewProfile}
-  onEditPersonnel={handleEditPersonnel}
-  onAssignPPE={handleAssignPPE}
-/>
-
+                personnel={filteredPersonnel}
+                onViewProfile={handleViewProfile}
+                onEditPersonnel={handleEditPersonnel}
+                onAssignPPE={handleAssignPPE}
+              />
             </div>
           ) : (
             <ComplianceDashboard
-              complianceData={mockComplianceData}
-              onViewDetails={handleViewComplianceDetails}
-              onScheduleTraining={handleScheduleTraining}
+              complianceData={{}}
+              onViewDetails={(type) => console.log('Detalles:', type)}
+              onScheduleTraining={() => console.log('Programar capacitación')}
             />
           )}
 
