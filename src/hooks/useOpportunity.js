@@ -11,7 +11,33 @@ export function useOpportunity() {
     setError(null);
     try {
       const response = await opportunityService.obtenerTodasLasOportunidades();
-  setOportunidades(response.data || []);
+      // Mapeo los datos del backend a la estructura esperada por el Kanban
+      const raw = response.data || [];
+      const mapped = raw.map((opp) => ({
+        id: opp.id,
+        clientName: opp.nombreCliente,
+        contactChannel: opp.canalContacto,
+        projectType: opp.tipoProyecto,
+        salesRep: opp.ejecutivoVentas,
+        stage: opp.etapa || 'initial-contact',
+        priority: opp.prioridad,
+        stageDuration: opp.diasEnEtapa || 1,
+        contactInfo: {
+          phone: opp.telefono,
+          email: opp.email,
+          contactPerson: opp.personaContacto,
+        },
+        projectDetails: {
+          description: opp.descripcionProyecto,
+          location: opp.ubicacion,
+          estimatedBudget: opp.presupuestoEstimado,
+          timeline: opp.cronogramaEsperado,
+        },
+        notes: opp.notasAdicionales,
+        createdAt: opp.createdAt,
+        updatedAt: opp.updatedAt,
+      }));
+      setOportunidades(mapped);
     } catch (err) {
       setError(err);
     } finally {
