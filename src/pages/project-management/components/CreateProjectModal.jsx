@@ -1,15 +1,53 @@
-import React, { useState } from 'react';
-import Icon from '../../../components/AppIcon';
+import React, { useEffect, useMemo, useState } from 'react';
 import Button from '../../../components/ui/Button';
+import Icon from '../../../components/AppIcon';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
+import proyectoService from 'services/proyectoService';
+import clientService from 'services/clientService';
+
+const projectTypes = [
+  { value: 'Instalación', label: 'Instalación' },
+  { value: 'Mantenimiento Preventivo', label: 'Mantenimiento Preventivo' },
+  { value: 'Mantenimiento Correctivo', label: 'Mantenimiento Correctivo' },
+  { value: 'Inspección', label: 'Inspección' },
+];
+
+const departmentOptions = [
+  { value: 'Ingeniería', label: 'Ingeniería' },
+  { value: 'Mantenimiento', label: 'Mantenimiento' },
+  { value: 'Operaciones', label: 'Operaciones' },
+];
+
+const priorityOptions = [
+  { value: 'low', label: 'Baja' },
+  { value: 'medium', label: 'Media' },
+  { value: 'high', label: 'Alta' },
+  { value: 'urgent', label: 'Urgente' },
+];
+
+// Opcional: si ya tienes un catálogo real de personal, cámbialo aquí
+const personnelOptions = [
+  { value: 'Andrés Torres - Técnico HVAC', label: 'Andrés Torres - Técnico HVAC' },
+  { value: 'Laura Gómez - Supervisora de Mantenimiento', label: 'Laura Gómez - Supervisora de Mantenimiento' },
+  { value: 'Pedro Hernández - Ingeniero de Campo', label: 'Pedro Hernández - Ingeniero de Campo' },
+];
+
+const mapPriorityToEs = (v) => {
+  const m = { low: 'Baja', medium: 'Media', high: 'Alta', urgent: 'Urgente' };
+  return m[(v || '').toString().toLowerCase()] || v || '';
+};
 
 const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  // Estado del formulario (nombres en inglés solo para UI; al enviar se mapea a ES)
   const [formData, setFormData] = useState({
     name: '',
     code: '',
     type: '',
-    client: '',
+    client: '', // guardamos el id del cliente
     department: '',
     priority: '',
     budgetBreakdown: {
@@ -18,201 +56,132 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
       equipment: '',
       materials: '',
       transportation: '',
-      other: ''
+      other: '',
     },
+    location: '',
     startDate: '',
     endDate: '',
+    assignedPersonnel: [], // arreglo de strings "Nombre - Rol"
     description: '',
-    location: '',
-    assignedPersonnel: []
   });
 
-  const [errors, setErrors] = useState({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // CLIENTES: se cargan reales y se mapean a options { value, label }
+  const [clientOptions, setClientOptions] = useState([]);
+  const [loadingClients, setLoadingClients] = useState(false);
 
-  const projectTypes = [
-    { value: 'installation', label: 'Instalación HVAC' },
-    { value: 'maintenance', label: 'Mantenimiento' },
-    { value: 'repair', label: 'Reparación' },
-    { value: 'upgrade', label: 'Actualización' }
-  ];
-
-  const clientOptions = [
-    { value: 'abc-corp', label: 'ABC Corporation' },
-    { value: 'xyz-industries', label: 'XYZ Industries' },
-    { value: 'tech-solutions', label: 'Tech Solutions SA' },
-    { value: 'green-energy', label: 'Green Energy México' },
-    { value: 'urban-development', label: 'Urban Development Group' }
-  ];
-
-  const departmentOptions = [
-    { value: 'sales', label: 'Ventas' },
-    { value: 'engineering', label: 'Ingeniería' },
-    { value: 'installation', label: 'Instalación' },
-    { value: 'maintenance', label: 'Mantenimiento' },
-    { value: 'administration', label: 'Administración' }
-  ];
-
-  const priorityOptions = [
-    { value: 'low', label: 'Baja' },
-    { value: 'medium', label: 'Media' },
-    { value: 'high', label: 'Alta' },
-    { value: 'urgent', label: 'Urgente' }
-  ];
-
-  const personnelOptions = [
-    { value: 'carlos-martinez', label: 'Carlos Martínez - Ingeniero' },
-    { value: 'ana-rodriguez', label: 'Ana Rodríguez - Técnico' },
-    { value: 'luis-garcia', label: 'Luis García - Supervisor' },
-    { value: 'maria-lopez', label: 'María López - Coordinadora' },
-    { value: 'jose-hernandez', label: 'José Hernández - Instalador' }
-  ];
-
-  const handleInputChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-    
-    // Clear error when user starts typing
-    if (errors?.[field]) {
-      setErrors(prev => ({
-        ...prev,
-        [field]: ''
-      }));
-    }
-  };
-
-  const handleBudgetChange = (category, value) => {
-    setFormData(prev => ({
-      ...prev,
-      budgetBreakdown: {
-        ...prev?.budgetBreakdown,
-        [category]: value
+  useEffect(() => {
+    if (!isOpen) return;
+    let mounted = true;
+    (async () => {
+      try {
+        setLoadingClients(true);
+        const resp = await clientService.getClients(); // {success, data:[...] }
+        const list = Array.isArray(resp?.data) ? resp.data : [];
+        const opts = list.map((c) => ({
+          value: c.id,
+          label: c.empresa || c.contacto || '—',
+        }));
+        if (mounted) setClientOptions(opts);
+      } catch (e) {
+        console.error('Error cargando clientes:', e);
+      } finally {
+        if (mounted) setLoadingClients(false);
       }
+    })();
+    return () => { mounted = false; };
+  }, [isOpen]);
+
+  // Total presupuesto
+  const totalBudget = useMemo(() => {
+    const b = formData.budgetBreakdown || {};
+    const sum = ['labor','parts','equipment','materials','transportation','other']
+      .map(k => Number(b[k] || 0))
+      .reduce((a,b) => a + b, 0);
+    return Number.isFinite(sum) ? sum : 0;
+  }, [formData.budgetBreakdown]);
+
+  const calculateTotalBudget = () => totalBudget;
+
+  const handleInputChange = (key, value) => {
+    setFormData((s) => ({ ...s, [key]: value }));
+    if (errors[key]) setErrors((e) => ({ ...e, [key]: undefined }));
+  };
+
+  const handleBudgetChange = (key, value) => {
+    setFormData((s) => ({
+      ...s,
+      budgetBreakdown: { ...s.budgetBreakdown, [key]: value },
     }));
-    
-    // Clear budget errors when user starts typing
-    if (errors?.budget) {
-      setErrors(prev => ({
-        ...prev,
-        budget: ''
-      }));
-    }
   };
 
-  const calculateTotalBudget = () => {
-    const breakdown = formData?.budgetBreakdown || {};
-    return Object.values(breakdown)?.reduce((total, value) => {
-      return total + (parseFloat(value) || 0);
-    }, 0);
+  const validate = () => {
+    const e = {};
+    if (!formData.name) e.name = 'Requerido';
+    if (!formData.type) e.type = 'Requerido';
+    if (!formData.client) e.client = 'Seleccione un cliente';
+    if (!formData.department) e.department = 'Requerido';
+    if (!formData.priority) e.priority = 'Requerido';
+    if (!formData.location) e.location = 'Requerido';
+    if (!formData.startDate) e.startDate = 'Requerido';
+    if (!formData.endDate) e.endDate = 'Requerido';
+    if (new Date(formData.endDate) < new Date(formData.startDate)) {
+      e.endDate = 'La fecha de fin no puede ser anterior al inicio';
+    }
+    setErrors(e);
+    return Object.keys(e).length === 0;
   };
 
-  const validateForm = () => {
-    const newErrors = {};
+  const buildPayloadES = () => {
+    // buscar nombre del cliente (empresa) desde options
+    const clienteFound = clientOptions.find((o) => o.value === formData.client);
+    const clienteNombre = clienteFound?.label || '';
 
-    if (!formData?.name?.trim()) {
-      newErrors.name = 'El nombre del proyecto es requerido';
-    }
+    const manoObra = Number(formData?.budgetBreakdown?.labor || 0);
+    const piezas = Number(formData?.budgetBreakdown?.parts || 0);
+    const equipos = Number(formData?.budgetBreakdown?.equipment || 0);
+    const materiales = Number(formData?.budgetBreakdown?.materials || 0);
+    const transporte = Number(formData?.budgetBreakdown?.transportation || 0);
+    const otros = Number(formData?.budgetBreakdown?.other || 0);
+    const total = manoObra + piezas + equipos + materiales + transporte + otros;
 
-    if (!formData?.code?.trim()) {
-      newErrors.code = 'El código del proyecto es requerido';
-    }
-
-    if (!formData?.type) {
-      newErrors.type = 'El tipo de proyecto es requerido';
-    }
-
-    if (!formData?.client) {
-      newErrors.client = 'El cliente es requerido';
-    }
-
-    if (!formData?.department) {
-      newErrors.department = 'El departamento es requerido';
-    }
-
-    if (!formData?.priority) {
-      newErrors.priority = 'La prioridad es requerida';
-    }
-
-    // Validate budget breakdown - at least one category must have a value
-    const totalBudget = calculateTotalBudget();
-    if (totalBudget <= 0) {
-      newErrors.budget = 'Al menos una categoría del presupuesto debe tener un valor mayor a 0';
-    }
-
-    if (!formData?.startDate) {
-      newErrors.startDate = 'La fecha de inicio es requerida';
-    }
-
-    if (!formData?.endDate) {
-      newErrors.endDate = 'La fecha de finalización es requerida';
-    }
-
-    if (formData?.startDate && formData?.endDate && new Date(formData.startDate) >= new Date(formData.endDate)) {
-      newErrors.endDate = 'La fecha de finalización debe ser posterior a la fecha de inicio';
-    }
-
-    if (!formData?.location?.trim()) {
-      newErrors.location = 'La ubicación es requerida';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors)?.length === 0;
+    return {
+      codigo: formData.code || '',
+      nombreProyecto: formData.name || '',
+      tipoProyecto: formData.type || '',
+      cliente: {
+        id: formData.client || '',
+        nombre: clienteNombre,
+      },
+      departamento: formData.department || '',
+      prioridad: mapPriorityToEs(formData.priority),
+      ubicacion: formData.location || '',
+      descripcion: formData.description || '',
+      personalAsignado: Array.isArray(formData.assignedPersonnel) ? formData.assignedPersonnel : [],
+      cronograma: {
+        fechaInicio: formData.startDate || '',
+        fechaFin: formData.endDate || '',
+      },
+      presupuesto: {
+        manoObra, piezas, equipos, materiales, transporte, otros, total,
+      },
+      totalPresupuesto: total,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
   };
 
   const handleSubmit = async (e) => {
     e?.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-
+    if (!validate()) return;
     setIsSubmitting(true);
-    
     try {
-      // Generate project code if not provided
-      const projectCode = formData?.code || `PROJ-${Date.now()?.toString()?.slice(-6)}`;
-      
-      const projectData = {
-        ...formData,
-        code: projectCode,
-        totalBudget: calculateTotalBudget(),
-        id: Date.now()?.toString(),
-        status: 'planning',
-        progress: 0,
-        createdAt: new Date()?.toISOString(),
-        createdBy: 'current-user'
-      };
-
-      await onSubmit(projectData);
-      
-      // Reset form
-      setFormData({
-        name: '',
-        code: '',
-        type: '',
-        client: '',
-        department: '',
-        priority: '',
-        budgetBreakdown: {
-          labor: '',
-          parts: '',
-          equipment: '',
-          materials: '',
-          transportation: '',
-          other: ''
-        },
-        startDate: '',
-        endDate: '',
-        description: '',
-        location: '',
-        assignedPersonnel: []
-      });
-      
-      onClose();
-    } catch (error) {
-      console.error('Error creating project:', error);
+      const payload = buildPayloadES();
+      await proyectoService.crearProyecto(payload);
+      onSubmit && onSubmit(payload);
+      onClose && onClose();
+    } catch (err) {
+      console.error('Error creando proyecto:', err);
+      alert('No se pudo crear el proyecto.');
     } finally {
       setIsSubmitting(false);
     }
@@ -229,11 +198,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
             <h2 className="text-xl font-semibold text-foreground">Crear Nuevo Proyecto</h2>
             <p className="text-sm text-muted-foreground">Complete la información del proyecto</p>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-          >
+          <Button variant="ghost" size="icon" onClick={onClose}>
             <Icon name="X" size={20} />
           </Button>
         </div>
@@ -450,20 +415,10 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
 
           {/* Actions */}
           <div className="flex items-center justify-end space-x-4 mt-8 pt-6 border-t border-border">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isSubmitting}
-            >
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
               Cancelar
             </Button>
-            <Button
-              type="submit"
-              loading={isSubmitting}
-              iconName="Plus"
-              iconPosition="left"
-            >
+            <Button type="submit" loading={isSubmitting} iconName="Plus" iconPosition="left">
               {isSubmitting ? 'Creando...' : 'Crear Proyecto'}
             </Button>
           </div>

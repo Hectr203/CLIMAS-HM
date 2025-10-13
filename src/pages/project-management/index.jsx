@@ -184,8 +184,8 @@ const ProjectManagement = () => {
     const loadProjects = async () => {
       setIsLoading(true);
       await new Promise(resolve => setTimeout(resolve, 1000));
-      setProjects(mockProjects);
-      setFilteredProjects(mockProjects);
+      // setProjects(mockProjects);
+      // setFilteredProjects(mockProjects);
       setIsLoading(false);
     };
 
