@@ -30,18 +30,11 @@ const Routes = () => {
       <ButtonHandlersProvider>
         <ScrollToTop />
         <RouterRoutes>
-          {/* Public Routes */}
+          {/* Public Route: Login */}
           <Route path="/login" element={<LoginPage />} />
-          
-          {/* Protected Routes - Each route is protected based on user role permissions */}
-          <Route 
-            path="/" 
-            element={
-                <ProtectedRoute requiredPath="/main-dashboard">
-                  <MainDashboard />
-                </ProtectedRoute>
-              } 
-            />
+
+          {/* Redirigir la raíz a login si no está autenticado */}
+          <Route path="/" element={<LoginPage />} />
             <Route 
               path="/main-dashboard" 
               element={

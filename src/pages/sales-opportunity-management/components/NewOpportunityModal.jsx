@@ -108,36 +108,19 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity }) => {
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       const newOpportunity = {
-        id: generateOpportunityId(),
-        clientName: formData?.clientName?.trim(),
-        contactChannel: formData?.contactChannel,
-        projectType: formData?.projectType,
-        salesRep: formData?.salesRep,
-        stage: 'initial-contact',
-        priority: formData?.priority,
-        stageDuration: 0,
-        contactInfo: {
-          phone: formData?.phone?.trim(),
-          email: formData?.email?.trim(),
-          contactPerson: formData?.contactPerson?.trim()
-        },
-        projectDetails: {
-          description: formData?.projectDescription?.trim(),
-          location: formData?.location?.trim(),
-          estimatedBudget: parseFloat(formData?.estimatedBudget) || 0,
-          timeline: formData?.timeline?.trim()
-        },
-        documents: [],
-        communications: [
-          {
-            id: `comm-${Date.now()}`,
-            type: formData?.contactChannel,
-            date: new Date()?.toISOString()?.split('T')?.[0],
-            content: `Nueva oportunidad registrada: ${formData?.projectDescription?.trim()}`,
-            urgency: 'normal'
-          }
-        ],
-        notes: formData?.notes?.trim() || `Nueva oportunidad registrada por ${formData?.salesRep}`
+        nombreCliente: formData?.clientName?.trim(),
+        canalContacto: formData?.contactChannel,
+        tipoProyecto: formData?.projectType,
+        prioridad: formData?.priority,
+        personaContacto: formData?.contactPerson?.trim(),
+        telefono: formData?.phone?.trim(),
+        email: formData?.email?.trim(),
+        descripcionProyecto: formData?.projectDescription?.trim(),
+        ubicacion: formData?.location?.trim(),
+        presupuestoEstimado: formData?.estimatedBudget?.trim(),
+        cronogramaEsperado: formData?.timeline?.trim(),
+        ejecutivoVentas: formData?.salesRep,
+        notasAdicionales: formData?.notes?.trim() || `Nueva oportunidad registrada por ${formData?.salesRep}`
       };
 
       onCreateOpportunity?.(newOpportunity);

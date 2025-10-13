@@ -10,9 +10,11 @@ import QuotationRequestPanel from './components/QuotationRequestPanel';
 import WorkOrderPanel from './components/WorkOrderPanel';
 import ChangeManagementPanel from './components/ChangeManagementPanel';
 import NewOpportunityModal from './components/NewOpportunityModal';
+import { useOpportunity } from '../../hooks/useOpportunity';
 
 const SalesOpportunityManagement = () => {
-  const [opportunities, setOpportunities] = useState([]);
+  const { oportunidades, loading, error, crearOportunidad, fetchOportunidades } = useOpportunity();
+  // Elimina el estado local de oportunidades, usa el hook
   const [selectedOpportunity, setSelectedOpportunity] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showControls, setShowControls] = useState(false);
@@ -288,23 +290,20 @@ const SalesOpportunityManagement = () => {
     }
   ];
 
-  useEffect(() => {
-    const loadOpportunities = async () => {
-      setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setOpportunities(mockOpportunities);
-      setIsLoading(false);
-    };
+  // Elimina el efecto de mock, el hook ya carga las oportunidades
 
-    loadOpportunities();
-  }, []);
+  // (Eliminado: declaración duplicada)
 
-  const handleCreateOpportunity = (newOpportunity) => {
-    setOpportunities(prev => [newOpportunity, ...prev]);
-    setShowNewOpportunityModal(false);
-    
-    // Show success message or notification
-    console.log('Nueva oportunidad creada:', newOpportunity);
+  const handleCreateOpportunity = async (newOpportunity) => {
+    try {
+      await crearOportunidad(newOpportunity);
+      setShowNewOpportunityModal(false);
+      // Show success message or notification
+      console.log('Nueva oportunidad creada:', newOpportunity);
+    } catch (err) {
+      // Manejar error
+      console.error('Error al crear oportunidad:', err);
+    }
   };
 
   const handleNewOpportunityClick = () => {
@@ -367,7 +366,12 @@ const SalesOpportunityManagement = () => {
   };
 
   const getOpportunitiesByStage = (stageId) => {
-    return opportunities?.filter(opp => opp?.stage === stageId) || [];
+    if (!oportunidades) return [];
+    // Si la etapa es 'initial-contact', incluir las que no tienen etapa
+    if (stageId === 'initial-contact') {
+      return oportunidades.filter(opp => !opp.stage || opp.stage === 'initial-contact');
+    }
+    return oportunidades.filter(opp => opp.stage === stageId);
   };
 
   const getPriorityColor = (priority) => {
@@ -386,7 +390,7 @@ const SalesOpportunityManagement = () => {
     return 'text-red-600';
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-background flex">
         <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
@@ -474,28 +478,28 @@ const SalesOpportunityManagement = () => {
               <div
                 key={opportunity.id}
                 onClick={() => handleOpportunitySelect(opportunity)}
-                className={`p-3 rounded-xl border-l-4 cursor-pointer hover:scale-[1.02] transform transition-all ${getPriorityColor(opportunity.priority)}`}
+                className={`p-3 rounded-xl border-l-4 cursor-pointer hover:scale-[1.02] transform transition-all ${getPriorityColor(opportunity.prioridad)}`}
               >
                 <div className="flex items-start justify-between mb-2">
                   <h4 className="font-medium text-sm text-gray-900 line-clamp-2">
-                    {opportunity.clientName}
+                    {opportunity.nombreCliente}
                   </h4>
                   <span
                     className={`text-xs px-2 py-1 rounded-full ${
-                      opportunity.priority === 'urgent'
+                      opportunity.prioridad === 'urgent'
                         ? 'bg-red-100 text-red-800'
-                        : opportunity.priority === 'high'
+                        : opportunity.prioridad === 'high'
                         ? 'bg-orange-100 text-orange-800'
-                        : opportunity.priority === 'medium'
+                        : opportunity.prioridad === 'medium'
                         ? 'bg-yellow-100 text-yellow-800'
                         : 'bg-green-100 text-green-800'
                     }`}
                   >
-                    {opportunity.priority === 'urgent'
+                    {opportunity.prioridad === 'urgent'
                       ? 'Urgente'
-                      : opportunity.priority === 'high'
+                      : opportunity.prioridad === 'high'
                       ? 'Alta'
-                      : opportunity.priority === 'medium'
+                      : opportunity.prioridad === 'medium'
                       ? 'Media'
                       : 'Baja'}
                   </span>
@@ -504,47 +508,38 @@ const SalesOpportunityManagement = () => {
                 <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
                   <div className="flex items-center space-x-2">
                     <Icon
-                      name={opportunity.contactChannel === 'whatsapp' ? 'MessageCircle' : 'Mail'}
+                      name={opportunity.canalContacto === 'whatsapp' ? 'MessageCircle' : 'Mail'}
                       size={12}
                     />
-                    <span className="capitalize">{opportunity.contactChannel}</span>
+                    <span className="capitalize">{opportunity.canalContacto}</span>
                     <span
                       className={`px-2 py-0.5 rounded ${
-                        opportunity.projectType === 'project'
+                        opportunity.tipoProyecto === 'project'
                           ? 'bg-blue-100 text-blue-800'
                           : 'bg-purple-100 text-purple-800'
                       }`}
                     >
-                      {opportunity.projectType === 'project' ? 'Proyecto' : 'Pieza'}
+                      {opportunity.tipoProyecto === 'project' ? 'Proyecto' : 'Pieza'}
                     </span>
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-2 mb-1">
                   <Icon name="User" size={12} />
-                  <span className="text-xs text-gray-600">{opportunity.salesRep}</span>
+                  <span className="text-xs text-gray-600">{opportunity.ejecutivoVentas}</span>
                 </div>
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-1">
                     <Icon name="Clock" size={12} />
-                    <span
-                      className={`text-xs font-medium ${getDurationColor(
-                        opportunity.stageDuration
-                      )}`}
-                    >
-                      {opportunity.stageDuration} días
+                    <span className="text-xs font-medium text-green-600">
+                      {/* Si tienes fecha de creación, puedes calcular días aquí */}
+                      {/* Ejemplo: */}
+                      {opportunity.createdAt ? `${Math.max(1, Math.floor((Date.now() - new Date(opportunity.createdAt)) / (1000 * 60 * 60 * 24)))} días` : '—'}
                     </span>
                   </div>
                   <div className="text-xs font-medium text-gray-600">ID: {opportunity.id}</div>
                 </div>
-
-                {opportunity.workOrderGenerated && (
-                  <div className="flex items-center space-x-1 mt-2 text-green-600">
-                    <Icon name="CheckCircle2" size={12} />
-                    <span className="text-xs font-medium">Orden generada</span>
-                  </div>
-                )}
               </div>
             ))}
 
@@ -582,7 +577,7 @@ const SalesOpportunityManagement = () => {
             </div>
 
             {/* Paneles según etapa */}
-            {selectedOpportunity?.stage === 'initial-contact' && (
+            {(selectedOpportunity?.stage === 'initial-contact' || !selectedOpportunity?.stage) && (
               <ClientRegistrationPanel
                 opportunity={selectedOpportunity}
                 onRegister={(clientData) =>
