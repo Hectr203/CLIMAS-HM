@@ -4,6 +4,7 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import useClient from '../../../hooks/useClient';
+import usePerson from '../../../hooks/usePerson';
 
 const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity }) => {
   const [formData, setFormData] = useState({
@@ -21,25 +22,25 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity }) => {
     salesRep: 'María García',
     notes: ''
   });
-  // Hook para obtener clientes
+
   const { clients, getClients, loading: loadingClients, error: errorClients } = useClient();
+ 
+  const { departmentPersons, getPersonsByDepartment, loading: loadingSalesReps, error: errorSalesReps } = usePerson();
 
   useEffect(() => {
     if (isOpen) {
       getClients();
+      getPersonsByDepartment('Ventas');
     }
   }, [isOpen]);
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const salesRepOptions = [
-    'María García',
-    'Roberto Silva', 
-    'Carmen Díaz',
-    'Patricia Morales',
-    'Alejandro Torres'
-  ];
+  // Opciones de ejecutivos de ventas
+  const salesRepOptions = Array.isArray(departmentPersons) && departmentPersons.length > 0
+  ? departmentPersons.map(emp => ({ value: emp.nombreCompleto || emp.nombre || emp.name || emp.fullName || emp.email, label: emp.nombreCompleto || emp.nombre || emp.name || emp.fullName || emp.email }))
+    : [];
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -385,7 +386,11 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity }) => {
                   <Select
                     value={formData?.salesRep}
                     onChange={(value) => handleInputChange('salesRep', value)}
-                    options={salesRepOptions?.map(rep => ({ value: rep, label: rep }))}
+                    options={salesRepOptions}
+                    loading={loadingSalesReps}
+                    error={errorSalesReps}
+                    placeholder={loadingSalesReps ? 'Cargando ejecutivos...' : (salesRepOptions.length === 0 ? 'No hay ejecutivos de ventas' : 'Selecciona ejecutivo')}
+                    searchable
                   />
                 </div>
 

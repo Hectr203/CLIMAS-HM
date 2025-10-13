@@ -1,9 +1,9 @@
-import httpService from './httpService';
+import httpService from "./httpService";
 
 const personService = {
   async getPersons() {
     try {
-      const response = await httpService.get('/empleados');
+      const response = await httpService.get("/empleados");
       return response;
     } catch (error) {
       console.error("Error al obtener empleados:", error);
@@ -13,7 +13,7 @@ const personService = {
 
   async createPerson(payload) {
     try {
-      const response = await httpService.post('/empleados/crear', payload);
+      const response = await httpService.post("/empleados/crear", payload);
       return response;
     } catch (error) {
       console.error("Error al crear empleado:", error);
@@ -22,9 +22,23 @@ const personService = {
   },
 
   // 🔹 NUEVA FUNCIÓN PARA ACTUALIZAR EMPLEADO EXISTENTE
+  async getPersonsByDepartment(department) {
+    try {
+      const response = await httpService.get(
+        `/obtenerEmpleadosPorDepartamentos?departamentos=${encodeURIComponent(department)}`
+      );
+      return response;
+    } catch (error) {
+      console.error("Error al obtener empleados por departamento:", error);
+      throw error;
+    }
+  },
   async updatePersonByEmpleadoId(empleadoId, payload) {
     try {
-      const response = await httpService.put(`/empleados/byEmpleadoId/${empleadoId}`, payload);
+      const response = await httpService.put(
+        `/empleados/byEmpleadoId/${empleadoId}`,
+        payload
+      );
       return response;
     } catch (error) {
       console.error("Error al actualizar empleado:", error);

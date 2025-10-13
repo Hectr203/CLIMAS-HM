@@ -631,7 +631,7 @@ const SalesOpportunityManagement = () => {
                         size="sm"
                         iconName="X"
                         onClick={() => setShowControls(false)}
-                        ariaLabel="Cerrar controles"
+                        aria-label="Cerrar controles"
                       />
                     </div>
 
