@@ -4,7 +4,9 @@ import Icon from '../AppIcon';
 import Button from './Button';
 import Input from './Input';
 import AppImage from '../AppImage';
-import { getCurrentUser, getAllowedNavigationItems, logout } from '../../utils/auth';
+import { getAllowedNavigationItems, logout } from '../../utils/auth';
+import useAuth from '../../hooks/useAuth';
+import { useNotifications } from '../../context/NotificationContext';
 
 const Sidebar = ({ isCollapsed = false, onToggle }) => {
   const location = useLocation();
@@ -13,20 +15,17 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
   const [searchResults, setSearchResults] = useState([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [navigationItems, setNavigationItems] = useState([]);
-  const [currentUser, setCurrentUser] = useState(null);
+  const { user, isAuthenticated } = useAuth();
+  const { showSuccess } = useNotifications();
 
   useEffect(() => {
-    // Get current user and set navigation items based on role
-    const user = getCurrentUser();
-    if (user) {
-      setCurrentUser(user);
-      const allowedItems = getAllowedNavigationItems(user?.role);
+    if (isAuthenticated && user) {
+      const allowedItems = getAllowedNavigationItems(user?.rol);
       setNavigationItems(allowedItems);
     } else {
-      // If no user, redirect to login
       navigate('/login');
     }
-  }, [navigate]);
+  }, [isAuthenticated, user, navigate]);
 
   const [expandedItems, setExpandedItems] = useState(['Recursos', 'Negocio']);
 
@@ -68,7 +67,10 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
 
   const handleLogout = () => {
     if (window.confirm('¿Está seguro que desea cerrar sesión?')) {
-      logout();
+      showSuccess('Sesión cerrada correctamente');
+      setTimeout(() => {
+        logout();
+      }, 1200);
     }
   };
 
@@ -236,10 +238,10 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
                 {!isCollapsed && (
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium text-foreground truncate">
-                      {currentUser?.email?.split('@')?.[0] || 'Usuario'}
+                      {user?.email?.split('@')?.[0] || 'Usuario'}
                     </div>
                     <div className="text-xs text-muted-foreground truncate">
-                      {currentUser?.role || 'Sin rol'}
+                      {user?.rol || 'Sin rol'}
                     </div>
                   </div>
                 )}

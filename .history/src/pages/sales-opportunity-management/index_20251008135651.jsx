@@ -1,0 +1,637 @@
+import React, { useState, useEffect } from 'react';
+import Icon from '../../components/AppIcon';
+import Button from '../../components/ui/Button';
+import Sidebar from '../../components/ui/Sidebar';
+import Header from '../../components/ui/Header';
+
+import ClientRegistrationPanel from './components/ClientRegistrationPanel';
+import CommunicationPanel from './components/CommunicationPanel';
+import QuotationRequestPanel from './components/QuotationRequestPanel';
+import WorkOrderPanel from './components/WorkOrderPanel';
+import ChangeManagementPanel from './components/ChangeManagementPanel';
+import NewOpportunityModal from './components/NewOpportunityModal';
+
+const SalesOpportunityManagement = () => {
+  const [opportunities, setOpportunities] = useState([]);
+  const [selectedOpportunity, setSelectedOpportunity] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showControls, setShowControls] = useState(false);
+  const [showNewOpportunityModal, setShowNewOpportunityModal] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+
+  // Sales workflow stages based on the Spanish diagram
+  const salesStages = [
+    {
+      id: 'initial-contact',
+      name: 'Contacto Inicial',
+      description: 'Recepción de solicitud (WhatsApp/Correo)',
+      color: 'bg-blue-500',
+      icon: 'MessageCircle'
+    },
+    {
+      id: 'information-validation',
+      name: 'Validación de Información',
+      description: 'Clasificación y validación de información mínima',
+      color: 'bg-indigo-500',
+      icon: 'CheckSquare'
+    },
+    {
+      id: 'quotation-development',
+      name: 'Desarrollo de Cotización',
+      description: 'Preparar cotización con alcances, supuestos y tiempos',
+      color: 'bg-purple-500',
+      icon: 'FileText'
+    },
+    {
+      id: 'client-review',
+      name: 'Revisión del Cliente',
+      description: 'Envío de cotización y seguimiento de aprobación',
+      color: 'bg-yellow-500',
+      icon: 'Eye'
+    },
+    {
+      id: 'closure',
+      name: 'Cierre',
+      description: 'Aprobación final o cierre de oportunidad',
+      color: 'bg-green-500',
+      icon: 'CheckCircle2'
+    }
+  ];
+
+  // Mock sales opportunity data following the workflow
+  const mockOpportunities = [
+    {
+      id: "SALES-001",
+      clientName: "Corporación ABC",
+      contactChannel: "whatsapp",
+      projectType: "project",
+      salesRep: "María García",
+      stage: "initial-contact",
+      priority: "high",
+      stageDuration: 2,
+      contactInfo: {
+        phone: "+52 55 1234 5678",
+        email: "contacto@corporacionabc.com",
+        contactPerson: "Ing. Carlos Rodriguez"
+      },
+      projectDetails: {
+        description: "Instalación de sistema HVAC para edificio corporativo",
+        location: "Ciudad de México",
+        estimatedBudget: 2500000,
+        timeline: "3 meses"
+      },
+      documents: [],
+      communications: [
+        {
+          id: "comm-1",
+          type: "whatsapp",
+          date: "2024-03-28",
+          content: "Cliente solicita cotización para sistema HVAC",
+          urgency: "normal"
+        }
+      ],
+      notes: "Cliente contactó por WhatsApp. Requiere instalación completa."
+    },
+    {
+      id: "SALES-002",
+      clientName: "Industrias XYZ",
+      contactChannel: "email",
+      projectType: "piece",
+      salesRep: "Roberto Silva",
+      stage: "information-validation",
+      priority: "medium",
+      stageDuration: 5,
+      contactInfo: {
+        phone: "+52 55 9876 5432",
+        email: "proyectos@industriasxyz.com",
+        contactPerson: "Arq. Ana Martinez"
+      },
+      projectDetails: {
+        description: "Mantenimiento y actualización de sistema existente",
+        location: "Guadalajara, Jalisco",
+        estimatedBudget: 850000,
+        timeline: "6 semanas"
+      },
+      requirements: {
+        complete: false,
+        checklist: {
+          technicalSpecs: true,
+          locationAccess: false,
+          budgetRange: true,
+          timeline: true,
+          permits: false
+        }
+      },
+      communications: [
+        {
+          id: "comm-2",
+          type: "email",
+          date: "2024-03-25",
+          content: "Enviamos formulario de requerimientos técnicos",
+          urgency: "normal"
+        }
+      ],
+      notes: "Pendiente confirmación de acceso y permisos"
+    },
+    {
+      id: "SALES-003",
+      clientName: "Green Energy México",
+      contactChannel: "whatsapp",
+      projectType: "project",
+      salesRep: "Carmen Díaz",
+      stage: "quotation-development",
+      priority: "urgent",
+      stageDuration: 8,
+      contactInfo: {
+        phone: "+52 55 4567 8901",
+        email: "ventas@greenenergy.mx",
+        contactPerson: "Ing. Fernando López"
+      },
+      projectDetails: {
+        description: "Sistema HVAC para complejo residencial sustentable",
+        location: "Monterrey, Nuevo León",
+        estimatedBudget: 4200000,
+        timeline: "4 meses"
+      },
+      requirements: {
+        complete: true,
+        checklist: {
+          technicalSpecs: true,
+          locationAccess: true,
+          budgetRange: true,
+          timeline: true,
+          permits: true
+        }
+      },
+      quotationData: {
+        scope: "Instalación completa de sistema HVAC con controles inteligentes",
+        assumptions: [
+          "Acceso libre a todas las áreas durante horario laboral",
+          "Cliente proporciona conexiones eléctricas principales"
+        ],
+        timeline: "16 semanas",
+        conditions: "50% anticipo, 50% contra entrega",
+        materials: ["Unidades condensadoras", "Ductos", "Controles"],
+        riskAssessment: "Medio - proyecto en construcción",
+        extraCosts: []
+      },
+      communications: [
+        {
+          id: "comm-3",
+          type: "whatsapp",
+          date: "2024-03-20",
+          content: "Cliente solicita ajustes en cronograma",
+          urgency: "urgent"
+        }
+      ],
+      notes: "Cotización en desarrollo. Cliente muy interesado."
+    },
+    {
+      id: "SALES-004",
+      clientName: "Tech Solutions SA",
+      contactChannel: "email",
+      projectType: "project",
+      salesRep: "Patricia Morales",
+      stage: "client-review",
+      priority: "high",
+      stageDuration: 12,
+      contactInfo: {
+        phone: "+52 55 2345 6789",
+        email: "infraestructura@techsolutions.com",
+        contactPerson: "Lic. Miguel Hernández"
+      },
+      projectDetails: {
+        description: "Modernización de sistema de climatización para oficinas",
+        location: "Puebla, Puebla",
+        estimatedBudget: 1800000,
+        timeline: "10 semanas"
+      },
+      quotationData: {
+        scope: "Reemplazo de equipos obsoletos y optimización energética",
+        assumptions: [
+          "Trabajo nocturno y fines de semana",
+          "Coordinación con otros contratistas"
+        ],
+        timeline: "10 semanas",
+        conditions: "30% anticipo, 40% avance 50%, 30% finalización",
+        totalAmount: 1950000,
+        validity: "30 días"
+      },
+      quotationStatus: {
+        sent: true,
+        sentDate: "2024-03-15",
+        method: "email",
+        attachments: ["Cotización_TechSolutions.pdf", "Cronograma.pdf"],
+        clientFeedback: "Cliente solicitó ajustes menores"
+      },
+      communications: [
+        {
+          id: "comm-4",
+          type: "email",
+          date: "2024-03-22",
+          content: "Cliente acepta condiciones, solicita ajuste en cronograma",
+          urgency: "normal"
+        }
+      ],
+      notes: "Cotización enviada. Cliente en proceso de aprobación interna."
+    },
+    {
+      id: "SALES-005",
+      clientName: "Urban Development Group",
+      contactChannel: "whatsapp",
+      projectType: "project",
+      salesRep: "Alejandro Torres",
+      stage: "closure",
+      priority: "medium",
+      stageDuration: 15,
+      contactInfo: {
+        phone: "+52 55 6789 0123",
+        email: "desarrollo@urbandevelopment.mx",
+        contactPerson: "Arq. Sofia Ramírez"
+      },
+      projectDetails: {
+        description: "Sistema HVAC para centro comercial",
+        location: "Tijuana, Baja California",
+        estimatedBudget: 3500000,
+        timeline: "5 meses"
+      },
+      quotationData: {
+        totalAmount: 3750000,
+        approved: true,
+        approvalDate: "2024-03-26"
+      },
+      contractualInfo: {
+        paymentConditions: "40% anticipo, 30% avance 50%, 30% finalización",
+        billingData: {
+          businessName: "Urban Development Group S.A. de C.V.",
+          rfc: "UDG123456789",
+          address: "Av. Revolución 1234, Tijuana, BC"
+        },
+        deliverySchedule: [
+          { milestone: "Equipos principales", date: "2024-05-15" },
+          { milestone: "Instalación completa", date: "2024-07-30" }
+        ]
+      },
+      workOrderGenerated: true,
+      workOrderRef: "WO-2024-UDG-001",
+      communications: [
+        {
+          id: "comm-5",
+          type: "email",
+          date: "2024-03-26",
+          content: "Contrato firmado. Iniciando proceso interno",
+          urgency: "normal"
+        }
+      ],
+      notes: "¡Oportunidad cerrada exitosamente! Orden de trabajo generada."
+    }
+  ];
+
+  useEffect(() => {
+    const loadOpportunities = async () => {
+      setIsLoading(true);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setOpportunities(mockOpportunities);
+      setIsLoading(false);
+    };
+
+    loadOpportunities();
+  }, []);
+
+  const handleCreateOpportunity = (newOpportunity) => {
+    setOpportunities(prev => [newOpportunity, ...prev]);
+    setShowNewOpportunityModal(false);
+    
+    // Show success message or notification
+    console.log('Nueva oportunidad creada:', newOpportunity);
+  };
+
+  const handleNewOpportunityClick = () => {
+    setShowNewOpportunityModal(true);
+    setShowControls(false);
+    setSelectedOpportunity(null);
+  };
+
+  // Existing handlers
+  const handleStageTransition = (opportunityId, newStage) => {
+    setOpportunities(prev => prev?.map(opp => 
+      opp?.id === opportunityId 
+        ? { ...opp, stage: newStage, stageDuration: 0 }
+        : opp
+    ));
+  };
+
+  const handleOpportunitySelect = (opportunity) => {
+    setSelectedOpportunity(opportunity);
+    setShowControls(true);
+  };
+
+  const handleClientRegistration = (opportunityId, clientData) => {
+    setOpportunities(prev => prev?.map(opp => 
+      opp?.id === opportunityId 
+        ? { ...opp, contactInfo: { ...opp?.contactInfo, ...clientData } }
+        : opp
+    ));
+  };
+
+  const handleCommunicationAdd = (opportunityId, communication) => {
+    setOpportunities(prev => prev?.map(opp => 
+      opp?.id === opportunityId 
+        ? { 
+            ...opp, 
+            communications: [...(opp?.communications || []), communication]
+          }
+        : opp
+    ));
+  };
+
+  const handleQuotationUpdate = (opportunityId, quotationData) => {
+    setOpportunities(prev => prev?.map(opp => 
+      opp?.id === opportunityId 
+        ? { ...opp, quotationData }
+        : opp
+    ));
+  };
+
+  const handleWorkOrderGeneration = (opportunityId, workOrderData) => {
+    setOpportunities(prev => prev?.map(opp => 
+      opp?.id === opportunityId 
+        ? { 
+            ...opp, 
+            workOrderGenerated: true,
+            workOrderRef: workOrderData?.reference
+          }
+        : opp
+    ));
+  };
+
+  const getOpportunitiesByStage = (stageId) => {
+    return opportunities?.filter(opp => opp?.stage === stageId) || [];
+  };
+
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 'urgent': return 'border-l-red-600 bg-red-50';
+      case 'high': return 'border-l-orange-500 bg-orange-50';
+      case 'medium': return 'border-l-yellow-500 bg-yellow-50';
+      case 'low': return 'border-l-green-500 bg-green-50';
+      default: return 'border-l-gray-400 bg-gray-50';
+    }
+  };
+
+  const getDurationColor = (days) => {
+    if (days <= 3) return 'text-green-600';
+    if (days <= 7) return 'text-yellow-600';
+    return 'text-red-600';
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex">
+        <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
+        <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
+          <Header onMenuToggle={() => setHeaderMenuOpen(!headerMenuOpen)} isMenuOpen={headerMenuOpen} />
+          <div className="pt-16 flex items-center justify-center h-96">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Cargando oportunidades de venta...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background flex">
+      <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
+      
+      <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
+        <Header onMenuToggle={() => setHeaderMenuOpen(!headerMenuOpen)} isMenuOpen={headerMenuOpen} />
+        
+        <div className="pt-16">
+          <div c<div className="flex flex-col lg:flex-row gap-6 relative">lassName="container mx-auto px-4 py-8">
+            {/* Header */}
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
+              <div>
+                <h1 className="text-3xl font-bold text-foreground mb-2">Gestión de Oportunidades de Venta</h1>
+                <p className="text-muted-foreground">
+                  Flujo completo de ventas desde contacto inicial hasta cierre de oportunidad
+                </p>
+              </div>
+              
+              <div className="flex items-center space-x-4 mt-4 lg:mt-0">
+                <Button
+                  variant="outline"
+                  iconName="RefreshCw"
+                  iconPosition="left"
+                  onClick={() => window.location?.reload()}
+                >
+                  Actualizar
+                </Button>
+                <Button
+                  iconName="Plus"
+                  iconPosition="left"
+                  onClick={handleNewOpportunityClick}
+                >
+                  Nueva Oportunidad
+                </Button>
+              </div>
+            </div>
+
+            
+              {/* Main Kanban Board */}
+              <div className="flex-1">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+                  {salesStages?.map((stage) => (
+                    <div key={stage?.id} className="bg-card rounded-lg shadow-sm border">
+                      <div className={`p-4 ${stage?.color} text-white rounded-t-lg`}>
+                        <div className="flex items-center space-x-2">
+                          <Icon name={stage?.icon} size={20} />
+                          <h3 className="font-semibold text-sm">{stage?.name}</h3>
+                        </div>
+                        <p className="text-xs mt-1 opacity-90">{stage?.description}</p>
+                        <div className="text-xs mt-2 bg-white/20 rounded px-2 py-1 inline-block">
+                          {getOpportunitiesByStage(stage?.id)?.length} oportunidades
+                        </div>
+                      </div>
+                      
+                      <div className="p-4 space-y-3 min-h-[500px]">
+                        {getOpportunitiesByStage(stage?.id)?.map((opportunity) => (
+                          <div
+                            key={opportunity?.id}
+                            onClick={() => handleOpportunitySelect(opportunity)}
+                            className={`p-3 rounded-lg border-l-4 cursor-pointer hover:shadow-md transition-all ${getPriorityColor(opportunity?.priority)}`}
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <h4 className="font-medium text-sm text-foreground line-clamp-2">
+                                {opportunity?.clientName}
+                              </h4>
+                              <span className={`text-xs px-2 py-1 rounded-full ${
+                                opportunity?.priority === 'urgent' ? 'bg-red-100 text-red-800' :
+                                opportunity?.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                                opportunity?.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
+                              }`}>
+                                {opportunity?.priority === 'urgent' ? 'Urgente' :
+                                 opportunity?.priority === 'high' ? 'Alta' :
+                                 opportunity?.priority === 'medium' ? 'Media' : 'Baja'}
+                              </span>
+                            </div>
+                            
+                            <div className="flex items-center space-x-2 mb-2">
+                              <Icon 
+                                name={opportunity?.contactChannel === 'whatsapp' ? 'MessageCircle' : 'Mail'} 
+                                size={12} 
+                                className="text-muted-foreground" 
+                              />
+                              <span className="text-xs text-muted-foreground capitalize">
+                                {opportunity?.contactChannel}
+                              </span>
+                              <span className={`text-xs px-2 py-1 rounded ${
+                                opportunity?.projectType === 'project' ?'bg-blue-100 text-blue-800' :'bg-purple-100 text-purple-800'
+                              }`}>
+                                {opportunity?.projectType === 'project' ? 'Proyecto' : 'Pieza'}
+                              </span>
+                            </div>
+                            
+                            <div className="flex items-center space-x-2 mb-2">
+                              <Icon name="User" size={12} className="text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground">{opportunity?.salesRep}</span>
+                            </div>
+                            
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-1">
+                                <Icon name="Clock" size={12} className="text-muted-foreground" />
+                                <span className={`text-xs font-medium ${getDurationColor(opportunity?.stageDuration)}`}>
+                                  {opportunity?.stageDuration} días
+                                </span>
+                              </div>
+                              <div className="text-xs font-medium text-foreground">
+                                ID: {opportunity?.id}
+                              </div>
+                            </div>
+
+                            {opportunity?.workOrderGenerated && (
+                              <div className="flex items-center space-x-1 mt-2">
+                                <Icon name="CheckCircle2" size={12} className="text-green-600" />
+                                <span className="text-xs text-green-600">Orden generada</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        
+                        {getOpportunitiesByStage(stage?.id)?.length === 0 && (
+                          <div className="text-center py-8">
+                            <Icon name="Inbox" size={32} className="text-muted-foreground mx-auto mb-2" />
+                            <p className="text-sm text-muted-foreground">Sin oportunidades</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Controls Panel */}
+              {showControls && (
+  <div className="w-96 bg-card rounded-lg shadow-lg border h-[calc(100vh-6rem)] overflow-y-auto flex-shrink-0">
+    <div className="p-4 border-b sticky top-0 bg-card z-10">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold">Controles de Oportunidad</h3>
+        <Button
+          variant="ghost"
+          size="sm"
+          iconName="X"
+          onClick={() => setShowControls(false)}
+        />
+      </div>
+    </div>
+
+                  
+                  <div className="p-4 space-y-6">
+                    {selectedOpportunity && (
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="font-medium mb-2">{selectedOpportunity?.clientName}</h4>
+                          <p className="text-sm text-muted-foreground">{selectedOpportunity?.id}</p>
+                        </div>
+
+                        {/* Client Registration */}
+                        {selectedOpportunity?.stage === 'initial-contact' && (
+                          <ClientRegistrationPanel
+                            opportunity={selectedOpportunity}
+                            onRegister={(clientData) => handleClientRegistration(selectedOpportunity?.id, clientData)}
+                          />
+                        )}
+
+                        {/* Communication Panel */}
+                        <CommunicationPanel
+                          opportunity={selectedOpportunity}
+                          onAddCommunication={(communication) => handleCommunicationAdd(selectedOpportunity?.id, communication)}
+                        />
+
+                        {/* Quotation Request */}
+                        {(selectedOpportunity?.stage === 'quotation-development' || selectedOpportunity?.quotationData) && (
+                          <QuotationRequestPanel
+                            opportunity={selectedOpportunity}
+                            onUpdate={(quotationData) => handleQuotationUpdate(selectedOpportunity?.id, quotationData)}
+                          />
+                        )}
+
+                        {/* Work Order Generation */}
+                        {selectedOpportunity?.stage === 'closure' && selectedOpportunity?.quotationData?.approved && (
+                          <WorkOrderPanel
+                            opportunity={selectedOpportunity}
+                            onGenerateWorkOrder={(workOrderData) => handleWorkOrderGeneration(selectedOpportunity?.id, workOrderData)}
+                          />
+                        )}
+
+                        {/* Change Management */}
+                        {selectedOpportunity?.stage !== 'initial-contact' && (
+                          <ChangeManagementPanel
+                            opportunity={selectedOpportunity}
+                            onRequestChange={(changeData) => console.log('Change requested:', changeData)}
+                          />
+                        )}
+
+                        {/* Stage Transition */}
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Avanzar Etapa</label>
+                          <div className="grid grid-cols-1 gap-2">
+                            {salesStages?.map((stage) => (
+                              <Button
+                                key={stage?.id}
+                                variant={selectedOpportunity?.stage === stage?.id ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => handleStageTransition(selectedOpportunity?.id, stage?.id)}
+                                disabled={selectedOpportunity?.stage === stage?.id}
+                                className="text-xs justify-start"
+                              >
+                                <Icon name={stage?.icon} size={14} className="mr-2" />
+                                {stage?.name}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* New Opportunity Modal */}
+      <NewOpportunityModal
+        isOpen={showNewOpportunityModal}
+        onClose={() => setShowNewOpportunityModal(false)}
+        onCreateOpportunity={handleCreateOpportunity}
+      />
+    </div>
+  );
+};
+
+export default SalesOpportunityManagement;

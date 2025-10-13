@@ -26,18 +26,17 @@ import SalesExecutionMonitoring from './pages/sales-execution-monitoring';
 
 const Routes = () => {
   return (
-    <BrowserRouter>
-      <ErrorBoundary>
-        <ButtonHandlersProvider>
-          <ScrollToTop />
-          <RouterRoutes>
-            {/* Public Routes */}
-            <Route path="/login" element={<LoginPage />} />
-            
-            {/* Protected Routes - Each route is protected based on user role permissions */}
-            <Route 
-              path="/" 
-              element={
+    <ErrorBoundary>
+      <ButtonHandlersProvider>
+        <ScrollToTop />
+        <RouterRoutes>
+          {/* Public Routes */}
+          <Route path="/login" element={<LoginPage />} />
+          
+          {/* Protected Routes - Each route is protected based on user role permissions */}
+          <Route 
+            path="/" 
+            element={
                 <ProtectedRoute requiredPath="/main-dashboard">
                   <MainDashboard />
                 </ProtectedRoute>
@@ -185,7 +184,6 @@ const Routes = () => {
           </RouterRoutes>
         </ButtonHandlersProvider>
       </ErrorBoundary>
-    </BrowserRouter>
   );
 };
 

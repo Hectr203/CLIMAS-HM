@@ -15,15 +15,7 @@ const LoginForm = () => {
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
 
-  // Mock credentials for different user roles
-  const mockCredentials = [
-    { email: 'admin@aireflowpro.com', password: 'Admin123!', role: 'Administrator', redirect: '/main-dashboard' },
-    { email: 'proyecto@aireflowpro.com', password: 'Proyecto123!', role: 'Project Manager', redirect: '/project-management' },
-    { email: 'ventas@aireflowpro.com', password: 'Ventas123!', role: 'Sales Representative', redirect: '/client-management' },
-    { email: 'taller@aireflowpro.com', password: 'Taller123!', role: 'Workshop Supervisor', redirect: '/inventory-management' },
-    { email: 'finanzas@aireflowpro.com', password: 'Finanzas123!', role: 'Financial Controller', redirect: '/financial-management' },
-    { email: 'personal@aireflowpro.com', password: 'Personal123!', role: 'HR Manager', redirect: '/personnel-management' }
-  ];
+  // El backend maneja credenciales y roles
 
   const validateForm = () => {
     const newErrors = {};
@@ -66,31 +58,45 @@ const LoginForm = () => {
     if (!validateForm()) return;
 
     setIsLoading(true);
-
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // Check credentials
-      const user = mockCredentials?.find(
-        cred => cred?.email === formData?.email && cred?.password === formData?.password
-      );
-
-      if (user) {
-        // Store auth token and user info
-        localStorage.setItem('authToken', 'mock-jwt-token-' + Date.now());
-        localStorage.setItem('userRole', user?.role);
-        localStorage.setItem('userEmail', user?.email);
-        
+      const response = await fetch('/api/usuarios/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password
+        })
+      });
+      const data = await response.json();
+      console.log('Login response status:', response.status);
+      console.log('Login response body:', data);
+      if (response.ok && data?.data?.token && data?.data?.usuario?.rol) {
+        // Guardar token y expiración (24h)
+  localStorage.setItem('authToken', data.data.token);
+        localStorage.setItem('tokenExpiresAt', String(Date.now() + 24 * 60 * 60 * 1000));
+        localStorage.setItem('userRole', data.data.usuario.rol);
+        localStorage.setItem('userEmail', data.data.usuario.email);
         if (formData?.rememberMe) {
           localStorage.setItem('rememberMe', 'true');
         }
-
-        // Redirect to appropriate dashboard
-        navigate(user?.redirect);
+        // Mostrar el valor exacto del rol recibido
+        console.log('Rol recibido:', data.data.usuario.rol);
+        // Redirigir según rol (ignorando mayúsculas/minúsculas)
+        const role = String(data.data.usuario.rol).toLowerCase();
+        let redirect = '/main-dashboard';
+        if (role === 'admin') redirect = '/main-dashboard';
+        else if (role === 'proyect manager') redirect = '/project-management';
+        else if (role === 'sales representative') redirect = '/client-management';
+        else if (role === 'workshop supervisor') redirect = '/inventory-management';
+        else if (role === 'financial controller') redirect = '/financial-management';
+        else if (role === 'hr manager') redirect = '/personnel-management';
+        navigate(redirect);
+        window.location.reload();
       } else {
         setErrors({
-          general: 'Credenciales incorrectas. Por favor, verifique su correo y contraseña.'
+          general: data?.message || 'Credenciales incorrectas. Por favor, verifique su correo y contraseña.'
         });
       }
     } catch (error) {
@@ -129,6 +135,7 @@ const LoginForm = () => {
           error={errors?.password}
           required
           disabled={isLoading}
+          autoComplete="current-password"
         />
 
         {/* Remember Me Checkbox */}

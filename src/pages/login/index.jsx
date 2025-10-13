@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { isAuthenticated, getDefaultPath, getCurrentUser } from '../../utils/auth';
+import { getDefaultPath } from '../../utils/auth';
+import useAuth from '../../hooks/useAuth';
 import CompanyBranding from './components/CompanyBranding';
 import LoginForm from './components/LoginForm';
 import CredentialsHelper from './components/CredentialsHelper';
@@ -9,20 +10,14 @@ import SecurityFeatures from './components/SecurityFeatures';
 const LoginPage = () => {
   const navigate = useNavigate();
 
+  const { user, isAuthenticated } = useAuth();
   useEffect(() => {
-    // Check if user is already authenticated
-    if (isAuthenticated()) {
-      const currentUser = getCurrentUser();
-      if (currentUser?.role) {
-        // Redirect to user's default path based on role
-        const defaultPath = getDefaultPath(currentUser?.role);
-        navigate(defaultPath, { replace: true });
-      }
+    if (isAuthenticated && user?.rol) {
+      const defaultPath = getDefaultPath(user.rol);
+      navigate(defaultPath, { replace: true });
     }
-
-    // Set page title
     document.title = 'Iniciar Sesión - AireFlow Pro';
-  }, [navigate]);
+  }, [isAuthenticated, user, navigate]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">

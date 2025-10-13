@@ -1,42 +1,36 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { isAuthenticated, hasPermission, getCurrentUser, getDefaultPath } from '../utils/auth';
+import useAuth from '../hooks/useAuth';
+import { hasPermission, getDefaultPath } from '../utils/auth';
 
 const ProtectedRoute = ({ children, requiredPath }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
-    // Check if user is authenticated
-    if (!isAuthenticated()) {
-      navigate('/login', { 
+    if (!isLoading && !isAuthenticated) {
+      navigate('/login', {
         replace: true,
         state: { from: location?.pathname }
       });
       return;
     }
-
-    const currentUser = getCurrentUser();
-    
-    // Check if user has permission to access this specific path
-    if (requiredPath && !hasPermission(requiredPath, currentUser?.role)) {
-      // Redirect to user's default path if they don't have permission
-      const defaultPath = getDefaultPath(currentUser?.role);
+    // Check permission with user role
+    if (!isLoading && requiredPath && (!user || !hasPermission(requiredPath, user.rol))) {
+      const defaultPath = getDefaultPath(user?.rol);
       navigate(defaultPath, { replace: true });
       return;
     }
-  }, [navigate, location?.pathname, requiredPath]);
+  }, [isAuthenticated, isLoading, user, navigate, location?.pathname, requiredPath]);
 
   // Show nothing while checking authentication/authorization
-  if (!isAuthenticated()) {
+  if (isLoading || !isAuthenticated) {
     return null;
   }
-
-  const currentUser = getCurrentUser();
-  if (requiredPath && !hasPermission(requiredPath, currentUser?.role)) {
+  if (requiredPath && (!user || !hasPermission(requiredPath, user.rol))) {
     return null;
   }
-
   return children;
 };
 

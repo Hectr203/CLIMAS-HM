@@ -3,7 +3,7 @@ import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 
 const ClientTable = ({ clients, onViewDetails, onEditClient, onViewProjects, onViewContracts }) => {
-  const [sortField, setSortField] = useState('companyName');
+  const [sortField, setSortField] = useState('empresa');
   const [sortDirection, setSortDirection] = useState('asc');
 
   const handleSort = (field) => {
@@ -18,7 +18,6 @@ const ClientTable = ({ clients, onViewDetails, onEditClient, onViewProjects, onV
   const sortedClients = [...clients]?.sort((a, b) => {
     const aValue = a?.[sortField];
     const bValue = b?.[sortField];
-    
     if (sortDirection === 'asc') {
       return aValue > bValue ? 1 : -1;
     } else {
@@ -75,12 +74,12 @@ const ClientTable = ({ clients, onViewDetails, onEditClient, onViewProjects, onV
         <table className="min-w-full divide-y divide-border">
           <thead className="bg-muted">
             <tr>
-              <SortableHeader field="companyName">Empresa</SortableHeader>
-              <SortableHeader field="contactPerson">Contacto</SortableHeader>
-              <SortableHeader field="industry">Industria</SortableHeader>
-              <SortableHeader field="location">Ubicación</SortableHeader>
-              <SortableHeader field="status">Estado</SortableHeader>
-              <SortableHeader field="relationshipHealth">Relación</SortableHeader>
+              <SortableHeader field="empresa">Empresa</SortableHeader>
+              <SortableHeader field="contacto">Contacto</SortableHeader>
+              <SortableHeader field="industria">Industria</SortableHeader>
+              <SortableHeader field="ubicacionEmpre">Ubicación</SortableHeader>
+              <SortableHeader field="estado">Estado</SortableHeader>
+              <SortableHeader field="relacion">Relación</SortableHeader>
               <SortableHeader field="totalProjects">Proyectos</SortableHeader>
               <SortableHeader field="totalValue">Valor Total</SortableHeader>
               <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -90,46 +89,47 @@ const ClientTable = ({ clients, onViewDetails, onEditClient, onViewProjects, onV
           </thead>
           <tbody className="bg-card divide-y divide-border">
             {sortedClients?.map((client) => (
-              <tr key={client?.id} className="hover:bg-muted transition-smooth">
+              <tr key={client?.id || client?._id || client?.empresa} className="hover:bg-muted transition-smooth">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
                     <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
                       <Icon name="Building2" size={16} color="white" />
                     </div>
                     <div className="ml-4">
-                      <div className="text-sm font-medium text-foreground">{client?.companyName}</div>
-                      <div className="text-sm text-muted-foreground">RFC: {client?.rfc}</div>
+                      <div className="text-sm font-medium text-foreground">{String(client?.empresa || '')}</div>
+                      <div className="text-sm text-muted-foreground">RFC: {String(client?.rfc || '')}</div>
                     </div>
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-foreground">{client?.contactPerson}</div>
-                  <div className="text-sm text-muted-foreground">{client?.email}</div>
-                  <div className="text-sm text-muted-foreground">{client?.phone}</div>
+                  <div className="text-sm text-foreground">{String(client?.contacto || '')}</div>
+                  <div className="text-sm text-muted-foreground">{String(client?.email || '')}</div>
+                  <div className="text-sm text-muted-foreground">{String(client?.telefono || '')}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-foreground">{client?.industry}</div>
+                  <div className="text-sm text-foreground">{String(client?.industria || '')}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-foreground">{client?.location}</div>
+                  <div className="text-sm text-foreground">{String(client?.ubicacionEmpre || client?.ubicacion?.direccion || '')}</div>
+                  <div className="text-xs text-muted-foreground">{String(client?.ubicacion?.ciudad || '')}, {String(client?.ubicacion?.estado || '')}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(client?.status)}`}>
-                    {client?.status}
+                  <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(client?.estado)}`}>
+                    {String(client?.estado || '')}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`text-sm font-medium ${getHealthColor(client?.relationshipHealth)}`}>
-                    {client?.relationshipHealth}
+                  <span className={`text-sm font-medium ${getHealthColor(client?.relacion)}`}>
+                    {String(client?.relacion || '')}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-foreground">{client?.totalProjects}</div>
-                  <div className="text-xs text-muted-foreground">{client?.activeContracts} contratos</div>
+                  <div className="text-sm text-foreground">{Number(client?.totalProjects || 0)}</div>
+                  <div className="text-xs text-muted-foreground">{Number(client?.activeContracts || 0)} contratos</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-semibold text-success">
-                    ${client?.totalValue?.toLocaleString('es-MX')}
+                    ${Number(client?.totalValue || 0).toLocaleString('es-MX')}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
