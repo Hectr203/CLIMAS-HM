@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
+import useClient from '../../../hooks/useClient';
 
 const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity }) => {
   const [formData, setFormData] = useState({
-    clientName: '',
+    clientId: '',
     contactChannel: 'whatsapp',
     projectType: 'project',
     priority: 'medium',
@@ -20,6 +21,14 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity }) => {
     salesRep: 'María García',
     notes: ''
   });
+  // Hook para obtener clientes
+  const { clients, getClients, loading: loadingClients, error: errorClients } = useClient();
+
+  useEffect(() => {
+    if (isOpen) {
+      getClients();
+    }
+  }, [isOpen]);
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -50,8 +59,8 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity }) => {
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData?.clientName?.trim()) {
-      newErrors.clientName = 'El nombre del cliente es requerido';
+    if (!formData?.clientId?.trim()) {
+      newErrors.clientId = 'El cliente es requerido';
     }
 
     if (!formData?.contactPerson?.trim()) {
@@ -107,8 +116,10 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity }) => {
       // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 1000));
 
+      const selectedClient = clients?.find(c => c.id === formData?.clientId || c._id === formData?.clientId);
       const newOpportunity = {
-        nombreCliente: formData?.clientName?.trim(),
+        clienteId: formData?.clientId,
+        nombreCliente: selectedClient?.nombre || selectedClient?.name || '',
         canalContacto: formData?.contactChannel,
         tipoProyecto: formData?.projectType,
         prioridad: formData?.priority,
@@ -134,7 +145,7 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity }) => {
 
   const handleClose = () => {
     setFormData({
-      clientName: '',
+      clientId: '',
       contactChannel: 'whatsapp',
       projectType: 'project',
       priority: 'medium',
@@ -191,14 +202,32 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity }) => {
                 Información Básica
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Nombre del Cliente"
-                  required
-                  value={formData?.clientName}
-                  onChange={(e) => handleInputChange('clientName', e?.target?.value)}
-                  error={errors?.clientName}
-                  placeholder="Ej. Corporación ABC"
-                />
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Cliente <span className="text-destructive">*</span>
+                  </label>
+                  <Select
+                    value={formData?.clientId}
+                    onChange={(value) => handleInputChange('clientId', value)}
+                    options={
+                      Array.isArray(clients) && clients.length > 0
+                        ? clients.map(c => ({
+                            value: c.id || c._id,
+                            label: c.companyName || c.empresa || 'Sin nombre'
+                          }) )
+                        : []
+                    }
+                    placeholder={
+                      loadingClients
+                        ? 'Cargando clientes...'
+                        : (clients.length === 0 ? 'No hay clientes registrados' : 'Selecciona un cliente')
+                    }
+                    loading={loadingClients}
+                    error={errors?.clientId}
+                    searchable
+                  />
+                  {errorClients && <div className="text-xs text-destructive">Error al cargar clientes</div>}
+                </div>
                 
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">

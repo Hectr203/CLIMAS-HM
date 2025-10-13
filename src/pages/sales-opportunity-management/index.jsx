@@ -20,7 +20,8 @@ import { useOpportunity } from '../../hooks/useOpportunity';
  */
 const SalesOpportunityManagement = () => {
   const { oportunidades, loading, error, crearOportunidad, fetchOportunidades } = useOpportunity();
-  // Elimina el estado local de oportunidades, usa el hook
+  // Estado local de oportunidades para el mock y handlers
+  const [opportunities, setOpportunities] = useState([]);
   const [selectedOpportunity, setSelectedOpportunity] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showControls, setShowControls] = useState(false);
