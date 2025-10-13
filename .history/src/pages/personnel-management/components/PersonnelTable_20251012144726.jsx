@@ -1,29 +1,19 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react'; // Removí useEffect ya que usamos props
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Image from '../../../components/AppImage';
-import usePerson from '../../../hooks/usePerson';
+// import usePerson from '../../../hooks/usePerson'; // Comentado para mocks; reactívalo si usas API real
+// import FilterToolbar from './FilterToolbar'; // No se usa aquí
 
-const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE }) => {
-  const { persons, loading, error, getPersons } = usePerson();
+const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE }) => { // Recibe 'personnel' como prop
   const [sortConfig, setSortConfig] = useState({ key: 'nombreCompleto', direction: 'asc' });
 
-  // 🔹 Cargar empleados al montar
-  useEffect(() => {
-    getPersons();
-  }, []);
-
-  // 🔹 Seleccionar fuente de datos (props filtradas o hook)
-  const dataSource = useMemo(() => {
-    if (!personnel || personnel.length === 0) {
-      return persons || [];
-    }
-    return personnel;
-  }, [personnel, persons]);
+  // Si no hay datos de prop, usa array vacío (o integra hook aquí si es necesario)
+  const persons = personnel || [];
 
   // 🔹 Ordenar datos
   const sortedPersonnel = useMemo(() => {
-    const sorted = [...(dataSource || [])];
+    const sorted = [...persons];
     if (!sortConfig.key) return sorted;
     sorted.sort((a, b) => {
       const aVal = a[sortConfig.key] || '';
@@ -33,7 +23,7 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
       return 0;
     });
     return sorted;
-  }, [dataSource, sortConfig]);
+  }, [persons, sortConfig]);
 
   const handleSort = (key) => {
     setSortConfig((prev) => ({
@@ -57,6 +47,7 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
     );
   };
 
+  // 🔹 Badges de cumplimiento (ahora usa campos específicos del mock)
   const getComplianceBadge = (status) => {
     const config = {
       'Completo': { bg: 'bg-success', text: 'text-success-foreground', icon: 'CheckCircle' },
@@ -93,7 +84,10 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
     </th>
   );
 
-  // 🔹 Estados de carga y error
+  // Estados de carga/error (simulados para mocks; ajusta si usas hook)
+  const loading = false;
+  const error = null;
+
   if (loading) return (
     <div className="flex justify-center items-center py-10">
       <Icon name="Loader2" className="animate-spin mr-2" size={18} />
@@ -115,7 +109,6 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
     </div>
   );
 
-  // 🔹 Render principal
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
       {/* Tabla Desktop */}
@@ -150,9 +143,11 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
                 <td className="px-6 py-4 whitespace-nowrap text-sm">{emp.departamento || '-'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">{emp.puesto || '-'}</td>
                 <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(emp.estado)}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{emp.fechaIngreso}</td>
+                <td className="px-6 py-4 whitespace-nowrap">{getComplianceBadge(emp.medicalCompliance || 'Pendiente')}</td> {/* Usa campo real */}
+                <td className="px-6 py-4 whitespace-nowrap">{getComplianceBadge(emp.ppeCompliance || 'Pendiente')}</td> {/* Usa campo real */}
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                  {emp.fechaIngreso ? new Date(emp.fechaIngreso).toLocaleDateString('es-MX') : '-'} {/* Formato legible */}
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center space-x-2">
                     <Button variant="ghost" size="sm" onClick={() => onViewProfile(emp)} iconName="Eye" iconSize={16}>Ver</Button>
@@ -186,8 +181,9 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
             <div className="space-y-2 mb-4">
               <div className="flex justify-between text-sm"><span className="text-muted-foreground">Departamento:</span><span>{emp.departamento || '-'}</span></div>
               <div className="flex justify-between text-sm"><span className="text-muted-foreground">Puesto:</span><span>{emp.puesto || '-'}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Estudios Médicos:</span>{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</div>
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">EPP:</span>{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</div>
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Estudios Médicos:</span>{getComplianceBadge(emp.medicalCompliance || 'Pendiente')}</div>
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">EPP:</span>{getComplianceBadge(emp.ppeCompliance || 'Pendiente')}</div>
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Fecha Ingreso:</span><span>{emp.fechaIngreso ? new Date(emp.fechaIngreso).toLocaleDateString('es-MX') : '-'}</span></div>
             </div>
 
             <div className="flex space-x-2">

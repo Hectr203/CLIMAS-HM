@@ -11,7 +11,6 @@ import QuotationRequestPanel from './components/QuotationRequestPanel';
 import WorkOrderPanel from './components/WorkOrderPanel';
 import ChangeManagementPanel from './components/ChangeManagementPanel';
 import NewOpportunityModal from './components/NewOpportunityModal';
-import { useOpportunity } from '../../hooks/useOpportunity';
 
 /**
  * Componente principal: Gestión de Oportunidades de Venta
@@ -19,8 +18,7 @@ import { useOpportunity } from '../../hooks/useOpportunity';
  * - Se asume TailwindCSS y componentes UI ya existentes
  */
 const SalesOpportunityManagement = () => {
-  const { oportunidades, loading, error, crearOportunidad, fetchOportunidades } = useOpportunity();
-  // Elimina el estado local de oportunidades, usa el hook
+  const [opportunities, setOpportunities] = useState([]);
   const [selectedOpportunity, setSelectedOpportunity] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showControls, setShowControls] = useState(false);
@@ -393,14 +391,8 @@ const SalesOpportunityManagement = () => {
     }
   };
 
-  const getOpportunitiesByStage = (stageId) => {
-    if (!oportunidades) return [];
-    // Si la etapa es 'initial-contact', incluir las que no tienen etapa
-    if (stageId === 'initial-contact') {
-      return oportunidades.filter(opp => !opp.stage || opp.stage === 'initial-contact');
-    }
-    return oportunidades.filter(opp => opp.stage === stageId);
-  };
+  // --- Utilidades ---
+  const getOpportunitiesByStage = (stageId) => opportunities?.filter(opp => opp?.stage === stageId) || [];
 
   const getPriorityColor = (priority) => {
     switch (priority) {
@@ -418,7 +410,8 @@ const SalesOpportunityManagement = () => {
     return 'text-red-600';
   };
 
-  if (loading) {
+  // Loading state
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex">
         <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
@@ -556,33 +549,29 @@ const SalesOpportunityManagement = () => {
                                 </div>
                               </div>
 
-                <div className="flex items-center space-x-2 mb-1">
-                  <Icon name="User" size={12} />
-                  <span className="text-xs text-gray-600">{opportunity.salesRep}</span>
-                </div>
+                              <div className="flex items-center space-x-2 mb-1">
+                                <Icon name="User" size={12} />
+                                <span className="text-xs text-gray-600">{opportunity.salesRep}</span>
+                              </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-1">
-                    <Icon name="Clock" size={12} />
-                    <span
-                      className={`text-xs font-medium ${getDurationColor(
-                        opportunity.stageDuration
-                      )}`}
-                    >
-                      {opportunity.stageDuration} días
-                    </span>
-                  </div>
-                  <div className="text-xs font-medium text-gray-600">ID: {opportunity.id}</div>
-                </div>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-1">
+                                  <Icon name="Clock" size={12} />
+                                  <span className={`text-xs font-medium ${getDurationColor(opportunity.stageDuration)}`}>
+                                    {opportunity.stageDuration} días
+                                  </span>
+                                </div>
+                                <div className="text-xs font-medium text-gray-600">ID: {opportunity.id}</div>
+                              </div>
 
-                {opportunity.workOrderGenerated && (
-                  <div className="flex items-center space-x-1 mt-2 text-green-600">
-                    <Icon name="CheckCircle2" size={12} />
-                    <span className="text-xs font-medium">Orden generada</span>
-                  </div>
-                )}
-              </div>
-            ))}
+                              {opportunity.workOrderGenerated && (
+                                <div className="flex items-center space-x-1 mt-2 text-green-600">
+                                  <Icon name="CheckCircle2" size={12} />
+                                  <span className="text-xs font-medium">Orden generada</span>
+                                </div>
+                              )}
+                            </article>
+                          ))}
 
                           {getOpportunitiesByStage(stage.id)?.length === 0 && (
                             <div className="text-center py-8 text-gray-400">
@@ -644,8 +633,8 @@ const SalesOpportunityManagement = () => {
               <p className="text-xs text-muted-foreground">{selectedOpportunity?.id}</p>
             </div>
 
-            {/* Paneles según etapa */}
-            {(selectedOpportunity?.stage === 'initial-contact' || !selectedOpportunity?.stage) && (
+            {/* Paneles por etapa */}
+            {selectedOpportunity?.stage === 'initial-contact' && (
               <ClientRegistrationPanel
                 opportunity={selectedOpportunity}
                 onRegister={(clientData) =>

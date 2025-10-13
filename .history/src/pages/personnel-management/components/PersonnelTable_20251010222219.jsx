@@ -4,7 +4,7 @@ import Button from '../../../components/ui/Button';
 import Image from '../../../components/AppImage';
 import usePerson from '../../../hooks/usePerson';
 
-const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE }) => {
+const PersonnelTable = ({ onViewProfile, onEditPersonnel, onAssignPPE, filters }) => {
   const { persons, loading, error, getPersons } = usePerson();
   const [sortConfig, setSortConfig] = useState({ key: 'nombreCompleto', direction: 'asc' });
 
@@ -13,17 +13,59 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
     getPersons();
   }, []);
 
-  // 🔹 Seleccionar fuente de datos (props filtradas o hook)
-  const dataSource = useMemo(() => {
-    if (!personnel || personnel.length === 0) {
-      return persons || [];
-    }
-    return personnel;
-  }, [personnel, persons]);
+  // 🔹 Aplicar filtros
+  const filteredPersonnel = useMemo(() => {
+    if (!persons) return [];
 
-  // 🔹 Ordenar datos
+    return persons.filter((emp) => {
+      const searchTerm = filters?.search?.toLowerCase() || '';
+
+      const matchesSearch =
+        emp.nombreCompleto?.toLowerCase().includes(searchTerm) ||
+        emp.empleadoId?.toLowerCase().includes(searchTerm) ||
+        emp.puesto?.toLowerCase().includes(searchTerm);
+
+      const matchesDepartment =
+        !filters?.department || emp.departamento === filters.department;
+
+      const matchesStatus =
+        !filters?.status || emp.estado === filters.status;
+
+      const matchesPosition =
+        !filters?.position || emp.puesto === filters.position;
+
+      const matchesMedicalCompliance =
+        !filters?.medicalCompliance ||
+        emp.estudiosMedicos === filters.medicalCompliance;
+
+      const matchesPPECompliance =
+        !filters?.ppeCompliance ||
+        emp.epp === filters.ppeCompliance;
+
+      // 🔹 Filtrar por fechas (si existen)
+      const hireDate = emp.fechaIngreso ? new Date(emp.fechaIngreso) : null;
+      const hireFrom = filters?.hireDateFrom ? new Date(filters.hireDateFrom) : null;
+      const hireTo = filters?.hireDateTo ? new Date(filters.hireDateTo) : null;
+
+      const matchesHireDate =
+        (!hireFrom || (hireDate && hireDate >= hireFrom)) &&
+        (!hireTo || (hireDate && hireDate <= hireTo));
+
+      return (
+        matchesSearch &&
+        matchesDepartment &&
+        matchesStatus &&
+        matchesPosition &&
+        matchesMedicalCompliance &&
+        matchesPPECompliance &&
+        matchesHireDate
+      );
+    });
+  }, [persons, filters]);
+
+  // 🔹 Ordenar datos (ya filtrados)
   const sortedPersonnel = useMemo(() => {
-    const sorted = [...(dataSource || [])];
+    const sorted = [...filteredPersonnel];
     if (!sortConfig.key) return sorted;
     sorted.sort((a, b) => {
       const aVal = a[sortConfig.key] || '';
@@ -33,7 +75,7 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
       return 0;
     });
     return sorted;
-  }, [dataSource, sortConfig]);
+  }, [filteredPersonnel, sortConfig]);
 
   const handleSort = (key) => {
     setSortConfig((prev) => ({
@@ -93,29 +135,30 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
     </th>
   );
 
-  // 🔹 Estados de carga y error
-  if (loading) return (
-    <div className="flex justify-center items-center py-10">
-      <Icon name="Loader2" className="animate-spin mr-2" size={18} />
-      <span className="text-muted-foreground">Cargando empleados...</span>
-    </div>
-  );
+  if (loading)
+    return (
+      <div className="flex justify-center items-center py-10">
+        <Icon name="Loader2" className="animate-spin mr-2" size={18} />
+        <span className="text-muted-foreground">Cargando empleados...</span>
+      </div>
+    );
 
-  if (error) return (
-    <div className="text-center py-10 text-error">
-      <Icon name="AlertCircle" className="inline-block mr-2" size={18} />
-      Error al cargar los empleados: {error.userMessage || error.message}
-    </div>
-  );
+  if (error)
+    return (
+      <div className="text-center py-10 text-error">
+        <Icon name="AlertCircle" className="inline-block mr-2" size={18} />
+        Error al cargar los empleados: {error.userMessage || error.message}
+      </div>
+    );
 
-  if (!sortedPersonnel?.length) return (
-    <div className="text-center py-10 text-muted-foreground">
-      <Icon name="UserX" className="inline-block mr-2" size={18} />
-      No hay empleados registrados.
-    </div>
-  );
+  if (!sortedPersonnel?.length)
+    return (
+      <div className="text-center py-10 text-muted-foreground">
+        <Icon name="UserX" className="inline-block mr-2" size={18} />
+        No hay empleados que coincidan con los filtros.
+      </div>
+    );
 
-  // 🔹 Render principal
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
       {/* Tabla Desktop */}
@@ -129,12 +172,12 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
               <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Estado</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Estudios Médicos</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">EPP</th>
-              <SortableHeader label="Última Actualización" sortKey="fechaIngreso" />
+              <SortableHeader label="Fecha de Ingreso" sortKey="fechaIngreso" />
               <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Acciones</th>
             </tr>
           </thead>
           <tbody className="bg-card divide-y divide-border">
-            {sortedPersonnel.map(emp => (
+            {sortedPersonnel.map((emp) => (
               <tr key={emp.id} className="hover:bg-muted/50 transition-smooth">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center space-x-3">
@@ -150,8 +193,8 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
                 <td className="px-6 py-4 whitespace-nowrap text-sm">{emp.departamento || '-'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">{emp.puesto || '-'}</td>
                 <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(emp.estado)}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</td>
+                <td className="px-6 py-4 whitespace-nowrap">{getComplianceBadge(emp.estudiosMedicos || 'Pendiente')}</td>
+                <td className="px-6 py-4 whitespace-nowrap">{getComplianceBadge(emp.epp || 'Pendiente')}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{emp.fechaIngreso}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center space-x-2">
@@ -168,7 +211,7 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
 
       {/* Vista Móvil */}
       <div className="lg:hidden space-y-4 p-4">
-        {sortedPersonnel.map(emp => (
+        {sortedPersonnel.map((emp) => (
           <div key={emp.id} className="bg-card border border-border rounded-lg p-4">
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center space-x-3">
@@ -186,8 +229,8 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
             <div className="space-y-2 mb-4">
               <div className="flex justify-between text-sm"><span className="text-muted-foreground">Departamento:</span><span>{emp.departamento || '-'}</span></div>
               <div className="flex justify-between text-sm"><span className="text-muted-foreground">Puesto:</span><span>{emp.puesto || '-'}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Estudios Médicos:</span>{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</div>
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">EPP:</span>{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</div>
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Estudios Médicos:</span>{getComplianceBadge(emp.estudiosMedicos || 'Pendiente')}</div>
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">EPP:</span>{getComplianceBadge(emp.epp || 'Pendiente')}</div>
             </div>
 
             <div className="flex space-x-2">

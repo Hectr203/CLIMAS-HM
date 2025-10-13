@@ -20,17 +20,6 @@ const personService = {
       throw error;
     }
   },
-
-  // 🔹 NUEVA FUNCIÓN PARA ACTUALIZAR EMPLEADO EXISTENTE
-  async updatePersonByEmpleadoId(empleadoId, payload) {
-    try {
-      const response = await httpService.put(`/empleados/byEmpleadoId/${empleadoId}`, payload);
-      return response;
-    } catch (error) {
-      console.error("Error al actualizar empleado:", error);
-      throw error;
-    }
-  },
 };
 
 export default personService;

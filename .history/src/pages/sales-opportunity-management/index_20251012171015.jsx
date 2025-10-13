@@ -11,7 +11,6 @@ import QuotationRequestPanel from './components/QuotationRequestPanel';
 import WorkOrderPanel from './components/WorkOrderPanel';
 import ChangeManagementPanel from './components/ChangeManagementPanel';
 import NewOpportunityModal from './components/NewOpportunityModal';
-import { useOpportunity } from '../../hooks/useOpportunity';
 
 /**
  * Componente principal: Gestión de Oportunidades de Venta
@@ -19,8 +18,7 @@ import { useOpportunity } from '../../hooks/useOpportunity';
  * - Se asume TailwindCSS y componentes UI ya existentes
  */
 const SalesOpportunityManagement = () => {
-  const { oportunidades, loading, error, crearOportunidad, fetchOportunidades } = useOpportunity();
-  // Elimina el estado local de oportunidades, usa el hook
+  const [opportunities, setOpportunities] = useState([]);
   const [selectedOpportunity, setSelectedOpportunity] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showControls, setShowControls] = useState(false);
@@ -393,14 +391,8 @@ const SalesOpportunityManagement = () => {
     }
   };
 
-  const getOpportunitiesByStage = (stageId) => {
-    if (!oportunidades) return [];
-    // Si la etapa es 'initial-contact', incluir las que no tienen etapa
-    if (stageId === 'initial-contact') {
-      return oportunidades.filter(opp => !opp.stage || opp.stage === 'initial-contact');
-    }
-    return oportunidades.filter(opp => opp.stage === stageId);
-  };
+  // --- Utilidades ---
+  const getOpportunitiesByStage = (stageId) => opportunities?.filter(opp => opp?.stage === stageId) || [];
 
   const getPriorityColor = (priority) => {
     switch (priority) {
@@ -418,7 +410,8 @@ const SalesOpportunityManagement = () => {
     return 'text-red-600';
   };
 
-  if (loading) {
+  // Loading state
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex">
         <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
@@ -556,33 +549,29 @@ const SalesOpportunityManagement = () => {
                                 </div>
                               </div>
 
-                <div className="flex items-center space-x-2 mb-1">
-                  <Icon name="User" size={12} />
-                  <span className="text-xs text-gray-600">{opportunity.salesRep}</span>
-                </div>
+                              <div className="flex items-center space-x-2 mb-1">
+                                <Icon name="User" size={12} />
+                                <span className="text-xs text-gray-600">{opportunity.salesRep}</span>
+                              </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-1">
-                    <Icon name="Clock" size={12} />
-                    <span
-                      className={`text-xs font-medium ${getDurationColor(
-                        opportunity.stageDuration
-                      )}`}
-                    >
-                      {opportunity.stageDuration} días
-                    </span>
-                  </div>
-                  <div className="text-xs font-medium text-gray-600">ID: {opportunity.id}</div>
-                </div>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-1">
+                                  <Icon name="Clock" size={12} />
+                                  <span className={`text-xs font-medium ${getDurationColor(opportunity.stageDuration)}`}>
+                                    {opportunity.stageDuration} días
+                                  </span>
+                                </div>
+                                <div className="text-xs font-medium text-gray-600">ID: {opportunity.id}</div>
+                              </div>
 
-                {opportunity.workOrderGenerated && (
-                  <div className="flex items-center space-x-1 mt-2 text-green-600">
-                    <Icon name="CheckCircle2" size={12} />
-                    <span className="text-xs font-medium">Orden generada</span>
-                  </div>
-                )}
-              </div>
-            ))}
+                              {opportunity.workOrderGenerated && (
+                                <div className="flex items-center space-x-1 mt-2 text-green-600">
+                                  <Icon name="CheckCircle2" size={12} />
+                                  <span className="text-xs font-medium">Orden generada</span>
+                                </div>
+                              )}
+                            </article>
+                          ))}
 
                           {getOpportunitiesByStage(stage.id)?.length === 0 && (
                             <div className="text-center py-8 text-gray-400">
@@ -607,122 +596,110 @@ const SalesOpportunityManagement = () => {
                     aria-hidden="true"
                   />
 
-                  {showControls && (
-  <>
-    {/* Fondo semitransparente */}
-    <div
-      className="fixed inset-0 bg-black/30 z-40 lg:hidden"
-      onClick={() => setShowControls(false)}
-    />
-
-    <aside
-      className={`fixed top-16 right-4 w-11/12 max-w-xs h-[80vh] bg-white z-50 rounded-l-2xl shadow-xl overflow-y-auto
-                  transform transition-transform duration-300
-                  ${showControls ? 'translate-x-0' : 'translate-x-full'}
-                  lg:top-[6rem] lg:right-0 lg:w-[25rem] lg:h-[calc(100vh-6rem)] lg:translate-x-0 lg:rounded-l-2xl lg:shadow-xl lg:border-l`}
-      role="region"
-      aria-label="Controles de oportunidad"
-    >
-      {/* Header sticky */}
-      <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center z-50">
-        <h3 className="font-semibold text-gray-800 text-lg">Controles de Oportunidad</h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          iconName="X"
-          onClick={() => setShowControls(false)}
-          ariaLabel="Cerrar controles"
-        />
-      </div>
-
-      {/* Contenido */}
-      <div className="p-4 space-y-6">
-        {selectedOpportunity ? (
-          <div className="space-y-4">
-            <div>
-              <h4 className="font-medium mb-2 text-sm sm:text-base">{selectedOpportunity?.clientName}</h4>
-              <p className="text-xs text-muted-foreground">{selectedOpportunity?.id}</p>
-            </div>
-
-            {/* Paneles según etapa */}
-            {(selectedOpportunity?.stage === 'initial-contact' || !selectedOpportunity?.stage) && (
-              <ClientRegistrationPanel
-                opportunity={selectedOpportunity}
-                onRegister={(clientData) =>
-                  handleClientRegistration(selectedOpportunity?.id, clientData)
-                }
-              />
-            )}
-
-            <CommunicationPanel
-              opportunity={selectedOpportunity}
-              onAddCommunication={(communication) =>
-                handleCommunicationAdd(selectedOpportunity?.id, communication)
-              }
-            />
-
-            {(selectedOpportunity?.stage === 'quotation-development' ||
-              selectedOpportunity?.quotationData) && (
-              <QuotationRequestPanel
-                opportunity={selectedOpportunity}
-                onUpdate={(quotationData) =>
-                  handleQuotationUpdate(selectedOpportunity?.id, quotationData)
-                }
-              />
-            )}
-
-            {selectedOpportunity?.stage === 'closure' &&
-              selectedOpportunity?.quotationData?.approved && (
-                <WorkOrderPanel
-                  opportunity={selectedOpportunity}
-                  onGenerateWorkOrder={(workOrderData) =>
-                    handleWorkOrderGeneration(selectedOpportunity?.id, workOrderData)
-                  }
-                />
-              )}
-
-            {selectedOpportunity?.stage !== 'initial-contact' && (
-              <ChangeManagementPanel
-                opportunity={selectedOpportunity}
-                onRequestChange={(changeData) =>
-                  console.log('Change requested:', changeData)
-                }
-              />
-            )}
-
-            {/* Botones para cambiar etapa */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Avanzar Etapa</label>
-              <div className="grid grid-cols-1 gap-2">
-                {salesStages?.map((stage) => (
-                  <Button
-                    key={stage?.id}
-                    variant={selectedOpportunity?.stage === stage?.id ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() =>
-                      handleStageTransition(selectedOpportunity?.id, stage?.id)
-                    }
-                    disabled={selectedOpportunity?.stage === stage?.id}
-                    className="text-xs justify-start"
+                  <aside
+                    className="fixed top-[6rem] right-0 w-full lg:w-[25rem] h-[calc(100vh-6rem)] bg-white rounded-l-2xl shadow-xl border-l z-40 overflow-y-auto transform
+                               transition-transform duration-300
+                               lg:translate-x-0
+                               "
+                    style={{ maxHeight: 'calc(100vh - 6rem)' }}
+                    role="region"
+                    aria-label="Controles de oportunidad"
                   >
-                    <Icon name={stage?.icon} size={14} className="mr-2" />
-                    {stage?.name}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="text-center text-gray-500 py-6">
-            <p className="mb-2">Selecciona una oportunidad para ver controles</p>
-            <Button onClick={() => setShowControls(false)}>Cerrar</Button>
-          </div>
-        )}
-      </div>
-    </aside>
-  </>
-)}
+                    <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center z-50">
+                      <h3 className="font-semibold text-gray-800">Controles de Oportunidad</h3>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        iconName="X"
+                        onClick={() => setShowControls(false)}
+                        ariaLabel="Cerrar controles"
+                      />
+                    </div>
 
+                    <div className="p-4 space-y-6">
+                      {selectedOpportunity ? (
+                        <div className="space-y-4">
+                          <div>
+                            <h4 className="font-medium mb-2">{selectedOpportunity?.clientName}</h4>
+                            <p className="text-sm text-muted-foreground">{selectedOpportunity?.id}</p>
+                          </div>
+
+                          {/* Paneles por etapa */}
+                          {selectedOpportunity?.stage === 'initial-contact' && (
+                            <ClientRegistrationPanel
+                              opportunity={selectedOpportunity}
+                              onRegister={(clientData) =>
+                                handleClientRegistration(selectedOpportunity?.id, clientData)
+                              }
+                            />
+                          )}
+
+                          <CommunicationPanel
+                            opportunity={selectedOpportunity}
+                            onAddCommunication={(communication) =>
+                              handleCommunicationAdd(selectedOpportunity?.id, communication)
+                            }
+                          />
+
+                          {(selectedOpportunity?.stage === 'quotation-development' ||
+                            selectedOpportunity?.quotationData) && (
+                            <QuotationRequestPanel
+                              opportunity={selectedOpportunity}
+                              onUpdate={(quotationData) =>
+                                handleQuotationUpdate(selectedOpportunity?.id, quotationData)
+                              }
+                            />
+                          )}
+
+                          {selectedOpportunity?.stage === 'closure' &&
+                            selectedOpportunity?.quotationData?.approved && (
+                              <WorkOrderPanel
+                                opportunity={selectedOpportunity}
+                                onGenerateWorkOrder={(workOrderData) =>
+                                  handleWorkOrderGeneration(selectedOpportunity?.id, workOrderData)
+                                }
+                              />
+                            )}
+
+                          {selectedOpportunity?.stage !== 'initial-contact' && (
+                            <ChangeManagementPanel
+                              opportunity={selectedOpportunity}
+                              onRequestChange={(changeData) =>
+                                console.log('Change requested:', changeData)
+                              }
+                            />
+                          )}
+
+                          {/* Botones para cambiar etapa */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Avanzar Etapa</label>
+                            <div className="grid grid-cols-1 gap-2">
+                              {salesStages?.map((stage) => (
+                                <Button
+                                  key={stage?.id}
+                                  variant={selectedOpportunity?.stage === stage?.id ? 'default' : 'outline'}
+                                  size="sm"
+                                  onClick={() =>
+                                    handleStageTransition(selectedOpportunity?.id, stage?.id)
+                                  }
+                                  disabled={selectedOpportunity?.stage === stage?.id}
+                                  className="text-xs justify-start"
+                                >
+                                  <Icon name={stage?.icon} size={14} className="mr-2" />
+                                  {stage?.name}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center text-gray-500 py-6">
+                          <p className="mb-2">Selecciona una oportunidad para ver controles</p>
+                          <Button onClick={() => setShowControls(false)}>Cerrar</Button>
+                        </div>
+                      )}
+                    </div>
+                  </aside>
                 </>
               )}
             </div>

@@ -1,13 +1,15 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState } from 'react';
 import Header from '../../components/ui/Header';
 import Sidebar from '../../components/ui/Sidebar';
 import Breadcrumb from '../../components/ui/Breadcrumb';
 import Button from '../../components/ui/Button';
 import PersonnelTable from './components/PersonnelTable';
 import FilterToolbar from './components/FilterToolbar';
+import usePerson from '../../../hooks/usePerson';
+import FilterToolbar from './FilterToolbar';
+import PersonnelTable from './PersonnelTable';
 import ComplianceDashboard from './components/ComplianceDashboard';
 import PersonnelModal from './components/PersonnelModal';
-import usePerson from '../../hooks/usePerson'; // 🔹 tu hook real
 
 const PersonnelManagement = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -27,69 +29,28 @@ const PersonnelManagement = () => {
   const [modalMode, setModalMode] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // ✅ Hook original
-  const { persons, loading, error, getPersons } = usePerson();
+  // --- Mock data de empleados (igual que antes) ---
+  const mockPersonnel = [/* ...tu lista completa de empleados aquí... */];
 
-  useEffect(() => {
-    getPersons(); // cargar empleados
-  }, []);
+  // --- Mock de datos de cumplimiento ---
+  const mockComplianceData = { /* ...datos de cumplimiento... */ };
 
-  // ✅ Lógica de filtrado robusta
-  const filteredPersonnel = useMemo(() => {
-  if (!persons) return [];
-
-  return persons.filter((employee) => {
-    const searchTerm = filters.search?.toLowerCase().trim() || '';
-
-    const matchSearch =
-      !searchTerm ||
-      employee?.nombreCompleto?.toLowerCase()?.includes(searchTerm) ||
-      employee?.empleadoId?.toLowerCase()?.includes(searchTerm) ||
-      employee?.puesto?.toLowerCase()?.includes(searchTerm);
-
-    const matchDept =
-      !filters.department ||
-      employee?.departamento?.toLowerCase() === filters.department.toLowerCase();
-
-    const matchStatus =
-      !filters.status ||
-      employee?.estado?.toLowerCase() === filters.status.toLowerCase();
-
-    const matchPosition =
-      !filters.position ||
-      employee?.puesto?.toLowerCase() === filters.position.toLowerCase();
-
-    // ❌ Eliminamos o comentamos estos porque NO existen en tu base
-    // const matchMedical =
-    //   !filters.medicalCompliance ||
-    //   employee?.cumplimientoMedico?.toLowerCase() ===
-    //     filters.medicalCompliance.toLowerCase();
-
-    // const matchPPE =
-    //   !filters.ppeCompliance ||
-    //   employee?.cumplimientoEPP?.toLowerCase() ===
-    //     filters.ppeCompliance.toLowerCase();
-
-    const matchHireDateFrom =
-      !filters.hireDateFrom ||
-      new Date(employee?.fechaIngreso) >= new Date(filters.hireDateFrom);
-
-    const matchHireDateTo =
-      !filters.hireDateTo ||
-      new Date(employee?.fechaIngreso) <= new Date(filters.hireDateTo);
-
+  // --- Filtrado controlado desde este componente ---
+  const filteredPersonnel = mockPersonnel?.filter(employee => {
     return (
-      matchSearch &&
-      matchDept &&
-      matchStatus &&
-      matchPosition &&
-      matchHireDateFrom &&
-      matchHireDateTo
+      (!filters.search ||
+        employee.name.toLowerCase().includes(filters.search.toLowerCase()) ||
+        employee.employeeId.toLowerCase().includes(filters.search.toLowerCase()) ||
+        employee.position.toLowerCase().includes(filters.search.toLowerCase())) &&
+      (!filters.department || employee.department === filters.department) &&
+      (!filters.status || employee.status === filters.status) &&
+      (!filters.position || employee.position === filters.position) &&
+      (!filters.medicalCompliance || employee.medicalCompliance === filters.medicalCompliance) &&
+      (!filters.ppeCompliance || employee.ppeCompliance === filters.ppeCompliance)
     );
   });
-}, [persons, filters]);
 
-  // ✅ Acciones UI
+  // --- Handlers ---
   const handleViewProfile = (employee) => {
     setSelectedEmployee(employee);
     setModalMode('view');
@@ -135,77 +96,12 @@ const PersonnelManagement = () => {
     console.log('Exporting personnel data...');
   };
 
-  const handleViewComplianceDetails = (type) => {
-    console.log('Viewing compliance details for:', type);
-  };
-
-  const handleScheduleTraining = () => {
-    console.log('Scheduling training...');
-  };
-
   const handleSidebarToggle = () => {
     setSidebarCollapsed(!sidebarCollapsed);
   };
 
   const handleMobileMenuToggle = () => {
     setMobileMenuOpen(!mobileMenuOpen);
-  };
-
-  // ✅ Mock dashboard data
-  const mockComplianceData = {
-    totalEmployees: persons?.length || 0,
-    overallCompliance: 78,
-    upcomingExpirations: 8,
-    medicalStudies: {
-      total: persons?.length || 0,
-      expired: 3,
-      pending: 7,
-      complete: 35
-    },
-    ppe: {
-      total: persons?.length || 0,
-      assigned: 42,
-      pending: 3
-    },
-    training: {
-      pending: 12,
-      scheduled: 8,
-      completed: 25
-    },
-    documents: {
-      missing: 5,
-      pending: 8,
-      complete: 32
-    },
-    alerts: [
-      {
-        id: 1,
-        title: 'Estudios médicos vencidos',
-        description:
-          '3 empleados tienen estudios médicos vencidos que requieren atención inmediata',
-        date: '30/09/2024',
-        priority: 'critical',
-        type: 'medical'
-      },
-      {
-        id: 2,
-        title: 'EPP pendiente de asignación',
-        description:
-          '3 empleados necesitan asignación de equipo de protección personal',
-        date: '29/09/2024',
-        priority: 'warning',
-        type: 'ppe'
-      },
-      {
-        id: 3,
-        title: 'Capacitaciones programadas',
-        description:
-          '8 empleados tienen capacitaciones programadas para la próxima semana',
-        date: '28/09/2024',
-        priority: 'good',
-        type: 'training'
-      }
-    ]
   };
 
   return (
@@ -276,35 +172,36 @@ const PersonnelManagement = () => {
             </div>
           </div>
 
-          {/* Vista principal */}
+          {/* Contenido dinámico */}
           {activeView === 'personnel' ? (
             <div className="space-y-6">
+              {/* 🔹 Filtro controlado desde aquí */}
               <FilterToolbar
                 filters={filters}
                 onFilterChange={setFilters}
                 onClearFilters={handleClearFilters}
                 onExportData={handleExportData}
-                totalCount={persons?.length || 0}
-                filteredCount={filteredPersonnel?.length || 0}
+                totalCount={mockPersonnel.length}
+                filteredCount={filteredPersonnel.length}
               />
 
+              {/* 🔹 Tabla solo recibe los datos ya filtrados */}
               <PersonnelTable
-  personnel={filteredPersonnel}
-  onViewProfile={handleViewProfile}
-  onEditPersonnel={handleEditPersonnel}
-  onAssignPPE={handleAssignPPE}
-/>
-
+                personnel={filteredPersonnel}
+                onViewProfile={handleViewProfile}
+                onEditPersonnel={handleEditPersonnel}
+                onAssignPPE={handleAssignPPE}
+              />
             </div>
           ) : (
             <ComplianceDashboard
               complianceData={mockComplianceData}
-              onViewDetails={handleViewComplianceDetails}
-              onScheduleTraining={handleScheduleTraining}
+              onViewDetails={(type) => console.log('Detalles:', type)}
+              onScheduleTraining={() => console.log('Programar capacitación')}
             />
           )}
 
-          {/* Modal */}
+          {/* Modal de empleado */}
           <PersonnelModal
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}

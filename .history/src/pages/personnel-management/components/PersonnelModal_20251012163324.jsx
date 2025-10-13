@@ -7,7 +7,7 @@ import { Checkbox } from '../../../components/ui/Checkbox';
 import usePerson from '../../../hooks/usePerson';
 
 const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
-const { createPerson, updatePersonByEmpleadoId } = usePerson();
+  const { createPerson } = usePerson();
 
   // 🔹 Estado inicial del formulario
   const [formData, setFormData] = useState({

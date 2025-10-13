@@ -1,0 +1,142 @@
+import React, { useMemo, useState } from 'react';
+import Icon from '../../../components/AppIcon';
+import Button from '../../../components/ui/Button';
+import Image from '../../../components/AppImage';
+
+const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE }) => {
+  // 🔹 Ordenamiento
+  const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
+
+  // 🔹 Ordenar resultados filtrados
+  const sortedPersonnel = useMemo(() => {
+    const sorted = [...(personnel || [])];
+    if (!sortConfig.key) return sorted;
+    sorted.sort((a, b) => {
+      const aVal = a[sortConfig.key] || '';
+      const bVal = b[sortConfig.key] || '';
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return sorted;
+  }, [personnel, sortConfig]);
+
+  const handleSort = (key) => {
+    setSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
+
+  const getStatusBadge = (status) => {
+    const config = {
+      'Activo': { bg: 'bg-success', text: 'text-success-foreground' },
+      'Inactivo': { bg: 'bg-error', text: 'text-error-foreground' },
+      'Suspendido': { bg: 'bg-warning', text: 'text-warning-foreground' },
+    }[status] || { bg: 'bg-muted', text: 'text-muted-foreground' };
+
+    return (
+      <span className={`px-2 py-1 text-xs font-medium rounded-full ${config.bg} ${config.text}`}>
+        {status}
+      </span>
+    );
+  };
+
+  const getComplianceBadge = (status) => {
+    const config = {
+      'Completo': { bg: 'bg-success', text: 'text-success-foreground', icon: 'CheckCircle' },
+      'Pendiente': { bg: 'bg-warning', text: 'text-warning-foreground', icon: 'Clock' },
+      'Vencido': { bg: 'bg-error', text: 'text-error-foreground', icon: 'AlertCircle' },
+    }[status] || { bg: 'bg-muted', text: 'text-muted-foreground', icon: 'Clock' };
+
+    return (
+      <span className={`inline-flex items-center space-x-1 px-2 py-1 text-xs font-medium rounded-full ${config.bg} ${config.text}`}>
+        <Icon name={config.icon} size={12} />
+        <span>{status}</span>
+      </span>
+    );
+  };
+
+  const SortableHeader = ({ label, sortKey }) => (
+    <th
+      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted transition-smooth"
+      onClick={() => handleSort(sortKey)}
+    >
+      <div className="flex items-center space-x-1">
+        <span>{label}</span>
+        <Icon
+          name={
+            sortConfig.key === sortKey
+              ? sortConfig.direction === 'asc'
+                ? 'ChevronUp'
+                : 'ChevronDown'
+              : 'ChevronsUpDown'
+          }
+          size={14}
+        />
+      </div>
+    </th>
+  );
+
+  if (!personnel || personnel.length === 0) {
+    return (
+      <div className="text-center py-10 text-muted-foreground">
+        <Icon name="Users" className="inline-block mr-2" size={18} />
+        No hay empleados que coincidan con los filtros seleccionados.
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-card rounded-lg border border-border overflow-hidden">
+      <div className="hidden lg:block overflow-x-auto">
+        <table className="min-w-full divide-y divide-border">
+          <thead className="bg-muted">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Empleado</th>
+              <SortableHeader label="Departamento" sortKey="department" />
+              <SortableHeader label="Puesto" sortKey="position" />
+              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Estado</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Estudios Médicos</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">EPP</th>
+              <SortableHeader label="Fecha de Ingreso" sortKey="hireDate" />
+              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Acciones</th>
+            </tr>
+          </thead>
+          <tbody className="bg-card divide-y divide-border">
+            {sortedPersonnel.map(emp => (
+              <tr key={emp.id} className="hover:bg-muted/50 transition-smooth">
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-muted">
+                      <Image src={emp.avatar || '/default-avatar.png'} alt={emp.name} className="w-full h-full object-cover" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-foreground">{emp.name}</div>
+                      <div className="text-sm text-muted-foreground">{emp.employeeId}</div>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-6 py-4 text-sm">{emp.department || '-'}</td>
+                <td className="px-6 py-4 text-sm">{emp.position || '-'}</td>
+                <td className="px-6 py-4">{getStatusBadge(emp.status)}</td>
+                <td className="px-6 py-4">{getComplianceBadge(emp.medicalCompliance)}</td>
+                <td className="px-6 py-4">{getComplianceBadge(emp.ppeCompliance)}</td>
+                <td className="px-6 py-4 text-sm text-muted-foreground">{emp.hireDate}</td>
+                <td className="px-6 py-4">
+                  <div className="flex items-center space-x-2">
+                    <Button variant="ghost" size="sm" onClick={() => onViewProfile(emp)} iconName="Eye" iconSize={16}>Ver</Button>
+                    <Button variant="ghost" size="sm" onClick={() => onEditPersonnel(emp)} iconName="Edit" iconSize={16}>Editar</Button>
+                    <Button variant="ghost" size="sm" onClick={() => onAssignPPE(emp)} iconName="Shield" iconSize={16}>EPP</Button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+export default PersonnelTable;

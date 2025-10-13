@@ -89,6 +89,7 @@ const PersonnelManagement = () => {
   });
 }, [persons, filters]);
 
+
   // ✅ Acciones UI
   const handleViewProfile = (employee) => {
     setSelectedEmployee(employee);

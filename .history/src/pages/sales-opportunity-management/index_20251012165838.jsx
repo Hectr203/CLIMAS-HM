@@ -1,5 +1,4 @@
-// SalesOpportunityManagement.jsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
 import Sidebar from '../../components/ui/Sidebar';
@@ -11,16 +10,9 @@ import QuotationRequestPanel from './components/QuotationRequestPanel';
 import WorkOrderPanel from './components/WorkOrderPanel';
 import ChangeManagementPanel from './components/ChangeManagementPanel';
 import NewOpportunityModal from './components/NewOpportunityModal';
-import { useOpportunity } from '../../hooks/useOpportunity';
 
-/**
- * Componente principal: Gestión de Oportunidades de Venta
- * - Responsive: Desktop = Kanban horizontal; Mobile = columnas apiladas + slide-over para controles
- * - Se asume TailwindCSS y componentes UI ya existentes
- */
 const SalesOpportunityManagement = () => {
-  const { oportunidades, loading, error, crearOportunidad, fetchOportunidades } = useOpportunity();
-  // Elimina el estado local de oportunidades, usa el hook
+  const [opportunities, setOpportunities] = useState([]);
   const [selectedOpportunity, setSelectedOpportunity] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showControls, setShowControls] = useState(false);
@@ -28,8 +20,8 @@ const SalesOpportunityManagement = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
 
-  // Etapas del flujo de ventas
-  const salesStages = useMemo(() => [
+  // Sales workflow stages based on the Spanish diagram
+  const salesStages = [
     {
       id: 'initial-contact',
       name: 'Contacto Inicial',
@@ -65,10 +57,10 @@ const SalesOpportunityManagement = () => {
       color: 'bg-green-500',
       icon: 'CheckCircle2'
     }
-  ], []);
+  ];
 
-  // Mock inicial (puedes reemplazar por fetch real)
-  const mockOpportunities = useMemo(() => ([
+  // Mock sales opportunity data following the workflow
+  const mockOpportunities = [
     {
       id: "SALES-001",
       clientName: "Corporación ABC",
@@ -294,28 +286,24 @@ const SalesOpportunityManagement = () => {
       ],
       notes: "¡Oportunidad cerrada exitosamente! Orden de trabajo generada."
     }
-  ]), []);
+  ];
 
   useEffect(() => {
-    let mounted = true;
-    const load = async () => {
+    const loadOpportunities = async () => {
       setIsLoading(true);
-      // Simula fetch
-      await new Promise((r) => setTimeout(r, 600));
-      if (!mounted) return;
+      await new Promise(resolve => setTimeout(resolve, 1000));
       setOpportunities(mockOpportunities);
       setIsLoading(false);
     };
-    load();
-    return () => {
-      mounted = false;
-    };
-  }, [mockOpportunities]);
 
-  // --- Handlers ---
+    loadOpportunities();
+  }, []);
+
   const handleCreateOpportunity = (newOpportunity) => {
     setOpportunities(prev => [newOpportunity, ...prev]);
     setShowNewOpportunityModal(false);
+    
+    // Show success message or notification
     console.log('Nueva oportunidad creada:', newOpportunity);
   };
 
@@ -325,16 +313,13 @@ const SalesOpportunityManagement = () => {
     setSelectedOpportunity(null);
   };
 
+  // Existing handlers
   const handleStageTransition = (opportunityId, newStage) => {
-    setOpportunities(prev => prev?.map(opp =>
-      opp?.id === opportunityId
+    setOpportunities(prev => prev?.map(opp => 
+      opp?.id === opportunityId 
         ? { ...opp, stage: newStage, stageDuration: 0 }
         : opp
     ));
-    // actualizar selección si es la misma oportunidad visible
-    if (selectedOpportunity?.id === opportunityId) {
-      setSelectedOpportunity(prev => ({ ...prev, stage: newStage, stageDuration: 0 }));
-    }
   };
 
   const handleOpportunitySelect = (opportunity) => {
@@ -343,72 +328,55 @@ const SalesOpportunityManagement = () => {
   };
 
   const handleClientRegistration = (opportunityId, clientData) => {
-    setOpportunities(prev => prev?.map(opp =>
-      opp?.id === opportunityId
+    setOpportunities(prev => prev?.map(opp => 
+      opp?.id === opportunityId 
         ? { ...opp, contactInfo: { ...opp?.contactInfo, ...clientData } }
         : opp
     ));
-    if (selectedOpportunity?.id === opportunityId) {
-      setSelectedOpportunity(prev => ({ ...prev, contactInfo: { ...prev?.contactInfo, ...clientData } }));
-    }
   };
 
   const handleCommunicationAdd = (opportunityId, communication) => {
-    setOpportunities(prev => prev?.map(opp =>
-      opp?.id === opportunityId
-        ? {
-            ...opp,
+    setOpportunities(prev => prev?.map(opp => 
+      opp?.id === opportunityId 
+        ? { 
+            ...opp, 
             communications: [...(opp?.communications || []), communication]
           }
         : opp
     ));
-    if (selectedOpportunity?.id === opportunityId) {
-      setSelectedOpportunity(prev => ({ ...prev, communications: [...(prev?.communications || []), communication] }));
-    }
   };
 
   const handleQuotationUpdate = (opportunityId, quotationData) => {
-    setOpportunities(prev => prev?.map(opp =>
-      opp?.id === opportunityId
+    setOpportunities(prev => prev?.map(opp => 
+      opp?.id === opportunityId 
         ? { ...opp, quotationData }
         : opp
     ));
-    if (selectedOpportunity?.id === opportunityId) {
-      setSelectedOpportunity(prev => ({ ...prev, quotationData }));
-    }
   };
 
   const handleWorkOrderGeneration = (opportunityId, workOrderData) => {
-    setOpportunities(prev => prev?.map(opp =>
-      opp?.id === opportunityId
-        ? {
-            ...opp,
+    setOpportunities(prev => prev?.map(opp => 
+      opp?.id === opportunityId 
+        ? { 
+            ...opp, 
             workOrderGenerated: true,
             workOrderRef: workOrderData?.reference
           }
         : opp
     ));
-    if (selectedOpportunity?.id === opportunityId) {
-      setSelectedOpportunity(prev => ({ ...prev, workOrderGenerated: true, workOrderRef: workOrderData?.reference }));
-    }
   };
 
   const getOpportunitiesByStage = (stageId) => {
-    if (!oportunidades) return [];
-    // Si la etapa es 'initial-contact', incluir las que no tienen etapa
-    if (stageId === 'initial-contact') {
-      return oportunidades.filter(opp => !opp.stage || opp.stage === 'initial-contact');
-    }
-    return oportunidades.filter(opp => opp.stage === stageId);
+    return opportunities?.filter(opp => opp?.stage === stageId) || [];
   };
 
   const getPriorityColor = (priority) => {
     switch (priority) {
-      case 'urgent': return 'border-l-4 border-red-600 bg-red-50';
-      case 'high': return 'border-l-4 border-orange-500 bg-orange-50';
-      case 'medium': return 'border-l-4 border-yellow-500 bg-yellow-50';
-      case 'low': return 'border-l-4 border-green-500 bg-green-50';
-      default: return 'border-l-4 border-gray-400 bg-gray-50';
+      case 'urgent': return 'border-l-red-600 bg-red-50';
+      case 'high': return 'border-l-orange-500 bg-orange-50';
+      case 'medium': return 'border-l-yellow-500 bg-yellow-50';
+      case 'low': return 'border-l-green-500 bg-green-50';
+      default: return 'border-l-gray-400 bg-gray-50';
     }
   };
 
@@ -418,7 +386,7 @@ const SalesOpportunityManagement = () => {
     return 'text-red-600';
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex">
         <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
@@ -435,17 +403,16 @@ const SalesOpportunityManagement = () => {
     );
   }
 
-  // --- Render ---
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
-
+      
       <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
         <Header onMenuToggle={() => setHeaderMenuOpen(!headerMenuOpen)} isMenuOpen={headerMenuOpen} />
-
-        <main className="pt-16">
+        
+        <div className="pt-16">
           <div className="container mx-auto px-4 py-8">
-            {/* Encabezado */}
+            {/* Header */}
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
               <div>
                 <h1 className="text-3xl font-bold text-foreground mb-2">Gestión de Oportunidades de Venta</h1>
@@ -453,7 +420,7 @@ const SalesOpportunityManagement = () => {
                   Flujo completo de ventas desde contacto inicial hasta cierre de oportunidad
                 </p>
               </div>
-
+              
               <div className="flex items-center space-x-4 mt-4 lg:mt-0">
                 <Button
                   variant="outline"
@@ -473,88 +440,85 @@ const SalesOpportunityManagement = () => {
               </div>
             </div>
 
-            {/* Kanban + Panel derecho */}
             <div className="relative flex transition-all duration-300">
-              {/* Kanban container */}
+  {/* Kanban Board */}
+  <div
+    className={`flex-1 overflow-x-auto overflow-y-hidden pb-6 transition-all duration-300 ${
+      showControls ? 'mr-[26rem]' : ''
+    }`}
+  >
+    {/* Contenedor de columnas (scroll solo aquí) */}
+    <div className="flex gap-6 min-w-max px-6">
+      {salesStages.map((stage) => (
+        <div
+          key={stage.id}
+          className="flex flex-col w-[280px] bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
+        >
+          {/* Header de la etapa */}
+          <div className={`${stage.color} p-4 text-white flex flex-col rounded-t-2xl`}>
+            <div className="flex items-center space-x-2">
+              <Icon name={stage.icon} size={20} />
+              <h3 className="font-semibold text-base">{stage.name}</h3>
+            </div>
+            <p className="text-xs mt-1 opacity-90">{stage.description}</p>
+            <span className="text-xs mt-2 bg-white/20 rounded px-2 py-1 w-fit">
+              {getOpportunitiesByStage(stage.id)?.length} oportunidades
+            </span>
+          </div>
+
+          {/* Contenido (tarjetas) */}
+          <div className="p-4 space-y-3 bg-gray-50 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+
+
+            {getOpportunitiesByStage(stage.id)?.map((opportunity) => (
               <div
-                className={`flex-1 pb-6 transition-all duration-300 ${showControls ? 'mr-[26rem]' : ''}`}
+                key={opportunity.id}
+                onClick={() => handleOpportunitySelect(opportunity)}
+                className={`p-3 rounded-xl border-l-4 cursor-pointer hover:scale-[1.02] transform transition-all ${getPriorityColor(opportunity.priority)}`}
               >
-                {/* Scroll horizontal en desktop; en mobile se apilan columnas (flex-col) */}
-                <div className="lg:overflow-x-auto lg:overflow-y-hidden">
-                  <div className="flex gap-6 min-w-max px-0 lg:px-6
-                                  flex-col lg:flex-row">
-                    {salesStages.map((stage) => (
-                      <div
-                        key={stage.id}
-                        className="flex flex-col w-full lg:w-[280px] bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
-                      >
-                        {/* Header etapa */}
-                        <div className={`${stage.color} p-4 text-white flex flex-col rounded-t-2xl`}>
-                          <div className="flex items-center space-x-2">
-                            <Icon name={stage.icon} size={20} />
-                            <h3 className="font-semibold text-base">{stage.name}</h3>
-                          </div>
-                          <p className="text-xs mt-1 opacity-90">{stage.description}</p>
-                          <span className="text-xs mt-2 bg-white/20 rounded px-2 py-1 w-fit">
-                            {getOpportunitiesByStage(stage.id)?.length} oportunidades
-                          </span>
-                        </div>
+                <div className="flex items-start justify-between mb-2">
+                  <h4 className="font-medium text-sm text-gray-900 line-clamp-2">
+                    {opportunity.clientName}
+                  </h4>
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full ${
+                      opportunity.priority === 'urgent'
+                        ? 'bg-red-100 text-red-800'
+                        : opportunity.priority === 'high'
+                        ? 'bg-orange-100 text-orange-800'
+                        : opportunity.priority === 'medium'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-green-100 text-green-800'
+                    }`}
+                  >
+                    {opportunity.priority === 'urgent'
+                      ? 'Urgente'
+                      : opportunity.priority === 'high'
+                      ? 'Alta'
+                      : opportunity.priority === 'medium'
+                      ? 'Media'
+                      : 'Baja'}
+                  </span>
+                </div>
 
-                        {/* Contenido tarjetas */}
-                        <div className="p-4 space-y-3 bg-gray-50 overflow-y-auto max-h-[60vh] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
-                          {getOpportunitiesByStage(stage.id)?.map((opportunity) => (
-                            <article
-                              key={opportunity.id}
-                              onClick={() => handleOpportunitySelect(opportunity)}
-                              role="button"
-                              tabIndex={0}
-                              onKeyDown={(e) => { if (e.key === 'Enter') handleOpportunitySelect(opportunity); }}
-                              className={`p-3 rounded-xl cursor-pointer hover:scale-[1.02] transform transition-all ${getPriorityColor(opportunity.priority)}`}
-                              aria-label={`${opportunity.clientName} - ${opportunity.id}`}
-                            >
-                              <div className="flex items-start justify-between mb-2">
-                                <h4 className="font-medium text-sm text-gray-900 line-clamp-2">
-                                  {opportunity.clientName}
-                                </h4>
-                                <span
-                                  className={`text-xs px-2 py-1 rounded-full ${
-                                    opportunity.priority === 'urgent'
-                                      ? 'bg-red-100 text-red-800'
-                                      : opportunity.priority === 'high'
-                                      ? 'bg-orange-100 text-orange-800'
-                                      : opportunity.priority === 'medium'
-                                      ? 'bg-yellow-100 text-yellow-800'
-                                      : 'bg-green-100 text-green-800'
-                                  }`}
-                                >
-                                  {opportunity.priority === 'urgent'
-                                    ? 'Urgente'
-                                    : opportunity.priority === 'high'
-                                    ? 'Alta'
-                                    : opportunity.priority === 'medium'
-                                    ? 'Media'
-                                    : 'Baja'}
-                                </span>
-                              </div>
-
-                              <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                                <div className="flex items-center space-x-2">
-                                  <Icon
-                                    name={opportunity.contactChannel === 'whatsapp' ? 'MessageCircle' : 'Mail'}
-                                    size={12}
-                                  />
-                                  <span className="capitalize">{opportunity.contactChannel}</span>
-                                  <span
-                                    className={`px-2 py-0.5 rounded text-xs ${
-                                      opportunity.projectType === 'project'
-                                        ? 'bg-blue-100 text-blue-800'
-                                        : 'bg-purple-100 text-purple-800'
-                                    }`}
-                                  >
-                                    {opportunity.projectType === 'project' ? 'Proyecto' : 'Pieza'}
-                                  </span>
-                                </div>
-                              </div>
+                <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                  <div className="flex items-center space-x-2">
+                    <Icon
+                      name={opportunity.contactChannel === 'whatsapp' ? 'MessageCircle' : 'Mail'}
+                      size={12}
+                    />
+                    <span className="capitalize">{opportunity.contactChannel}</span>
+                    <span
+                      className={`px-2 py-0.5 rounded ${
+                        opportunity.projectType === 'project'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-purple-100 text-purple-800'
+                      }`}
+                    >
+                      {opportunity.projectType === 'project' ? 'Proyecto' : 'Pieza'}
+                    </span>
+                  </div>
+                </div>
 
                 <div className="flex items-center space-x-2 mb-1">
                   <Icon name="User" size={12} />
@@ -584,68 +548,41 @@ const SalesOpportunityManagement = () => {
               </div>
             ))}
 
-                          {getOpportunitiesByStage(stage.id)?.length === 0 && (
-                            <div className="text-center py-8 text-gray-400">
-                              <Icon name="Inbox" size={28} className="mx-auto mb-2" />
-                              <p className="text-sm">Sin oportunidades</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+            {getOpportunitiesByStage(stage.id)?.length === 0 && (
+              <div className="text-center py-8 text-gray-400">
+                <Icon name="Inbox" size={28} className="mx-auto mb-2" />
+                <p className="text-sm">Sin oportunidades</p>
               </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
 
-              {/* Panel derecho - Desktop: fixed right panel; Mobile: slide-over full screen */}
-              {showControls && (
-                <>
-                  {/* Overlay para mobile (aparece solo en pantallas pequeñas) */}
-                  <div
-                    className="lg:hidden fixed inset-0 bg-black/40 z-30"
-                    onClick={() => setShowControls(false)}
-                    aria-hidden="true"
-                  />
-
-                  {showControls && (
-  <>
-    {/* Fondo semitransparente */}
-    <div
-      className="fixed inset-0 bg-black/30 z-40 lg:hidden"
-      onClick={() => setShowControls(false)}
-    />
-
-    <aside
-      className={`fixed top-16 right-4 w-11/12 max-w-xs h-[80vh] bg-white z-50 rounded-l-2xl shadow-xl overflow-y-auto
-                  transform transition-transform duration-300
-                  ${showControls ? 'translate-x-0' : 'translate-x-full'}
-                  lg:top-[6rem] lg:right-0 lg:w-[25rem] lg:h-[calc(100vh-6rem)] lg:translate-x-0 lg:rounded-l-2xl lg:shadow-xl lg:border-l`}
-      role="region"
-      aria-label="Controles de oportunidad"
-    >
-      {/* Header sticky */}
-      <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center z-50">
-        <h3 className="font-semibold text-gray-800 text-lg">Controles de Oportunidad</h3>
+  {/* Panel lateral (fuera del scroll) */}
+  {showControls && (
+    <div className="fixed top-[6rem] right-0 w-[25rem] h-[calc(100vh-6rem)] bg-white rounded-l-2xl shadow-xl border-l z-20 overflow-y-auto">
+      <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
+        <h3 className="font-semibold text-gray-800">Controles de Oportunidad</h3>
         <Button
           variant="ghost"
           size="sm"
           iconName="X"
           onClick={() => setShowControls(false)}
-          ariaLabel="Cerrar controles"
         />
       </div>
 
-      {/* Contenido */}
       <div className="p-4 space-y-6">
-        {selectedOpportunity ? (
+        {selectedOpportunity && (
           <div className="space-y-4">
             <div>
-              <h4 className="font-medium mb-2 text-sm sm:text-base">{selectedOpportunity?.clientName}</h4>
-              <p className="text-xs text-muted-foreground">{selectedOpportunity?.id}</p>
+              <h4 className="font-medium mb-2">{selectedOpportunity?.clientName}</h4>
+              <p className="text-sm text-muted-foreground">{selectedOpportunity?.id}</p>
             </div>
 
             {/* Paneles según etapa */}
-            {(selectedOpportunity?.stage === 'initial-contact' || !selectedOpportunity?.stage) && (
+            {selectedOpportunity?.stage === 'initial-contact' && (
               <ClientRegistrationPanel
                 opportunity={selectedOpportunity}
                 onRegister={(clientData) =>
@@ -697,7 +634,9 @@ const SalesOpportunityManagement = () => {
                 {salesStages?.map((stage) => (
                   <Button
                     key={stage?.id}
-                    variant={selectedOpportunity?.stage === stage?.id ? 'default' : 'outline'}
+                    variant={
+                      selectedOpportunity?.stage === stage?.id ? 'default' : 'outline'
+                    }
                     size="sm"
                     onClick={() =>
                       handleStageTransition(selectedOpportunity?.id, stage?.id)
@@ -712,30 +651,21 @@ const SalesOpportunityManagement = () => {
               </div>
             </div>
           </div>
-        ) : (
-          <div className="text-center text-gray-500 py-6">
-            <p className="mb-2">Selecciona una oportunidad para ver controles</p>
-            <Button onClick={() => setShowControls(false)}>Cerrar</Button>
-          </div>
         )}
       </div>
-    </aside>
-  </>
-)}
+    </div>
+  )}
+</div>
+</div>
+</div>
+</div>
 
-                </>
-              )}
-            </div>
-          </div>
-        </main>
-
-        {/* Modal para nueva oportunidad */}
-        <NewOpportunityModal
-          isOpen={showNewOpportunityModal}
-          onClose={() => setShowNewOpportunityModal(false)}
-          onCreateOpportunity={handleCreateOpportunity}
-        />
-      </div>
+      {/* New Opportunity Modal */}
+      <NewOpportunityModal
+        isOpen={showNewOpportunityModal}
+        onClose={() => setShowNewOpportunityModal(false)}
+        onCreateOpportunity={handleCreateOpportunity}
+      />
     </div>
   );
 };

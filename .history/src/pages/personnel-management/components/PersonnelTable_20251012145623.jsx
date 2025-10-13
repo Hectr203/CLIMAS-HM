@@ -3,27 +3,27 @@ import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Image from '../../../components/AppImage';
 import usePerson from '../../../hooks/usePerson';
+import FilterToolbar from './FilterToolbar';
 
 const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE }) => {
   const { persons, loading, error, getPersons } = usePerson();
   const [sortConfig, setSortConfig] = useState({ key: 'nombreCompleto', direction: 'asc' });
 
-  // 🔹 Cargar empleados al montar
+  // 🔹 Cargar empleados del backend solo si no se recibe prop `personnel`
   useEffect(() => {
-    getPersons();
-  }, []);
-
-  // 🔹 Seleccionar fuente de datos (props filtradas o hook)
-  const dataSource = useMemo(() => {
-    if (!personnel || personnel.length === 0) {
-      return persons || [];
+    if (!personnel) {
+      getPersons();
     }
-    return personnel;
+  }, [personnel]);
+
+  // 🔹 Determinar origen de datos (props o hook)
+  const dataSource = useMemo(() => {
+    return personnel && personnel.length ? personnel : persons || [];
   }, [personnel, persons]);
 
   // 🔹 Ordenar datos
   const sortedPersonnel = useMemo(() => {
-    const sorted = [...(dataSource || [])];
+    const sorted = [...dataSource];
     if (!sortConfig.key) return sorted;
     sorted.sort((a, b) => {
       const aVal = a[sortConfig.key] || '';
@@ -41,6 +41,8 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
     }));
   };
+
+  // ... 🔹 el resto de tu código queda exactamente igual ...
 
   // 🔹 Badges de estado
   const getStatusBadge = (status) => {
@@ -93,7 +95,6 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
     </th>
   );
 
-  // 🔹 Estados de carga y error
   if (loading) return (
     <div className="flex justify-center items-center py-10">
       <Icon name="Loader2" className="animate-spin mr-2" size={18} />
@@ -115,7 +116,6 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
     </div>
   );
 
-  // 🔹 Render principal
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
       {/* Tabla Desktop */}

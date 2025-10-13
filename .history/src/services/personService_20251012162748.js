@@ -21,13 +21,13 @@ const personService = {
     }
   },
 
-  // 🔹 NUEVA FUNCIÓN PARA ACTUALIZAR EMPLEADO EXISTENTE
-  async updatePersonByEmpleadoId(empleadoId, payload) {
+  // 🔹 Nuevo método para actualizar empleado por su empleadoId
+  async updatePerson(empleadoId, payload) {
     try {
       const response = await httpService.put(`/empleados/byEmpleadoId/${empleadoId}`, payload);
       return response;
     } catch (error) {
-      console.error("Error al actualizar empleado:", error);
+      console.error(`Error al actualizar empleado ${empleadoId}:`, error);
       throw error;
     }
   },
