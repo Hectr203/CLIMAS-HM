@@ -53,7 +53,19 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error, opened
   // 🔹 Cargar datos del empleado seleccionado al abrir el modal
   useEffect(() => {
     if (employee) {
-      console.log('Datos recibidos en modal:', employee);
+      // Extraer el primer elemento si viene como arreglo
+      const medicalStudies = Array.isArray(employee.examenesMedicos)
+        ? employee.examenesMedicos[0] || { lastExam: '', nextExam: '', status: 'Pendiente', documents: [] }
+        : employee.medicalStudies || { lastExam: '', nextExam: '', status: 'Pendiente', documents: [] };
+
+      const ppe = Array.isArray(employee.equipos)
+        ? employee.equipos[0] || { helmet: false, vest: false, boots: false, gloves: false, glasses: false, mask: false }
+        : employee.ppe || { helmet: false, vest: false, boots: false, gloves: false, glasses: false, mask: false };
+
+      const emergencyContact = Array.isArray(employee.contactoEmergencia)
+        ? employee.contactoEmergencia[0] || { name: '', phone: '', relationship: '' }
+        : employee.emergencyContact || { name: '', phone: '', relationship: '' };
+
       setFormData({
         name: employee.nombreCompleto || '',
         employeeId: employee.empleadoId || '',
@@ -63,26 +75,10 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error, opened
         position: employee.puesto || '',
         hireDate: employee.fechaIngreso || '',
         status: employee.estado || 'Activo',
-        medicalStudies: employee.medicalStudies || {
-          lastExam: '',
-          nextExam: '',
-          status: 'Pendiente',
-          documents: []
-        },
-        ppe: employee.ppe || {
-          helmet: false,
-          vest: false,
-          boots: false,
-          gloves: false,
-          glasses: false,
-          mask: false
-        },
+        medicalStudies,
+        ppe,
         certifications: employee.certifications || [],
-        emergencyContact: employee.emergencyContact || {
-          name: '',
-          phone: '',
-          relationship: ''
-        }
+        emergencyContact
       });
     } else {
       // Si es creación, reinicia el formulario
@@ -430,6 +426,25 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error, opened
                   disabled={mode === 'view'}
                 />
               </div>
+              <div className="border border-border rounded-lg p-4">
+                <h4 className="text-sm font-medium text-foreground mb-3">Documentos Médicos</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <Icon name="FileText" size={16} />
+                      <span className="text-sm text-foreground">Examen médico general</span>
+                    </div>
+                    <Button variant="ghost" size="sm" iconName="Download" iconSize={14}>
+                      Descargar
+                    </Button>
+                  </div>
+                  {mode !== 'view' && (
+                    <Button variant="outline" size="sm" iconName="Upload" iconPosition="left" iconSize={14}>
+                      Subir Documento
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -437,20 +452,50 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error, opened
           {isEPPOnly ? (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h4 className="text-sm font-medium text-foreground mb-2">
-                    Equipo de Protección Personal
-                  </h4>
-                  <div className="space-y-2">
-                    {Object.keys(formData.ppe).map((key) => (
-                      <Checkbox
-                        key={key}
-                        label={ppeLabels[key]}
-                        checked={mode === 'view' ? (employee?.ppe?.[key] ?? false) : formData.ppe[key]}
-                        onChange={(e) => handlePPEChange(key, e.target.checked)}
-                        disabled={mode === 'view'}
-                      />
-                    ))}
+                <div className="space-y-4">
+                  <h4 className="text-sm font-medium text-foreground">Equipo de Protección Personal</h4>
+                  <div className="space-y-3">
+                    <Checkbox
+                      label="Casco de Seguridad"
+                      checked={formData.ppe.helmet || false}
+                      onChange={(e) => handlePPEChange('helmet', e.target.checked)}
+                      disabled={mode === 'view'}
+                    />
+                    <Checkbox
+                      label="Chaleco Reflectivo"
+                      checked={formData.ppe.vest || false}
+                      onChange={(e) => handlePPEChange('vest', e.target.checked)}
+                      disabled={mode === 'view'}
+                    />
+                    <Checkbox
+                      label="Botas de Seguridad"
+                      checked={formData.ppe.boots || false}
+                      onChange={(e) => handlePPEChange('boots', e.target.checked)}
+                      disabled={mode === 'view'}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <h4 className="text-sm font-medium text-foreground">Equipo Adicional</h4>
+                  <div className="space-y-3">
+                    <Checkbox
+                      label="Guantes de Trabajo"
+                      checked={formData.ppe.gloves || false}
+                      onChange={(e) => handlePPEChange('gloves', e.target.checked)}
+                      disabled={mode === 'view'}
+                    />
+                    <Checkbox
+                      label="Gafas de Seguridad"
+                      checked={formData.ppe.glasses || false}
+                      onChange={(e) => handlePPEChange('glasses', e.target.checked)}
+                      disabled={mode === 'view'}
+                    />
+                    <Checkbox
+                      label="Mascarilla"
+                      checked={formData.ppe.mask || false}
+                      onChange={(e) => handlePPEChange('mask', e.target.checked)}
+                      disabled={mode === 'view'}
+                    />
                   </div>
                 </div>
               </div>
@@ -459,20 +504,50 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error, opened
             step === 2 && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h4 className="text-sm font-medium text-foreground mb-2">
-                      Equipo de Protección Personal
-                    </h4>
-                    <div className="space-y-2">
-                      {Object.keys(formData.ppe).map((key) => (
-                        <Checkbox
-                          key={key}
-                          label={ppeLabels[key]}
-                          checked={mode === 'view' ? (employee?.ppe?.[key] ?? false) : formData.ppe[key]}
-                          onChange={(e) => handlePPEChange(key, e.target.checked)}
-                          disabled={mode === 'view'}
-                        />
-                      ))}
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-medium text-foreground">Equipo de Protección Personal</h4>
+                    <div className="space-y-3">
+                      <Checkbox
+                        label="Casco de Seguridad"
+                        checked={mode === 'view' ? (employee?.ppe?.helmet ?? false) : formData.ppe.helmet}
+                        onChange={(e) => handlePPEChange('helmet', e.target.checked)}
+                        disabled={mode === 'view'}
+                      />
+                      <Checkbox
+                        label="Chaleco Reflectivo"
+                        checked={mode === 'view' ? (employee?.ppe?.vest ?? false) : formData.ppe.vest}
+                        onChange={(e) => handlePPEChange('vest', e.target.checked)}
+                        disabled={mode === 'view'}
+                      />
+                      <Checkbox
+                        label="Botas de Seguridad"
+                        checked={mode === 'view' ? (employee?.ppe?.boots ?? false) : formData.ppe.boots}
+                        onChange={(e) => handlePPEChange('boots', e.target.checked)}
+                        disabled={mode === 'view'}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-medium text-foreground">Equipo Adicional</h4>
+                    <div className="space-y-3">
+                      <Checkbox
+                        label="Guantes de Trabajo"
+                        checked={mode === 'view' ? (employee?.ppe?.gloves ?? false) : formData.ppe.gloves}
+                        onChange={(e) => handlePPEChange('gloves', e.target.checked)}
+                        disabled={mode === 'view'}
+                      />
+                      <Checkbox
+                        label="Gafas de Seguridad"
+                        checked={mode === 'view' ? (employee?.ppe?.glasses ?? false) : formData.ppe.glasses}
+                        onChange={(e) => handlePPEChange('glasses', e.target.checked)}
+                        disabled={mode === 'view'}
+                      />
+                      <Checkbox
+                        label="Mascarilla"
+                        checked={mode === 'view' ? (employee?.ppe?.mask ?? false) : formData.ppe.mask}
+                        onChange={(e) => handlePPEChange('mask', e.target.checked)}
+                        disabled={mode === 'view'}
+                      />
                     </div>
                   </div>
                 </div>
