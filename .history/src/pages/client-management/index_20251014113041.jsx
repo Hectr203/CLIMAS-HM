@@ -5,6 +5,7 @@ import Sidebar from '../../components/ui/Sidebar';
 import Breadcrumb from '../../components/ui/Breadcrumb';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
+
 import ClientCard from './components/ClientCard';
 import ClientTable from './components/ClientTable';
 import ClientFilters from './components/ClientFilters';
@@ -22,11 +23,6 @@ const ClientManagement = () => {
   const [showNewClientModal, setShowNewClientModal] = useState(false);
   const { clients, getClients, createClient, editClient, loading, error } = useClient();
 
-  useEffect(() => {
-    getClients();
-    // eslint-disable-next-line
-  }, []);
-
   const [filters, setFilters] = useState({
     search: '',
     industry: '',
@@ -38,179 +34,58 @@ const ClientManagement = () => {
     minValue: ''
   });
 
-  const handleSidebarToggle = () => {
-    setSidebarCollapsed(!sidebarCollapsed);
-  };
+  const [filteredClients, setFilteredClients] = useState([]);
 
-  const handleMobileMenuToggle = () => {
-    setMobileMenuOpen(!mobileMenuOpen);
-  };
+  useEffect(() => {
+    getClients();
+    // eslint-disable-next-line
+  }, []);
 
-  // Mock data for communications
-  const mockCommunications = [
-    {
-      id: 1,
-      type: "email",
-      subject: "Propuesta de Mantenimiento Anual",
-      description: "Envío de propuesta para contrato de mantenimiento anual de sistemas HVAC. Incluye revisiones trimestrales y soporte 24/7.",
-      contactPerson: "Carlos Hernández",
-      date: "2024-09-28T10:30:00",
-      hasAttachments: true
-    },
-    {
-      id: 2,
-      type: "phone",
-      subject: "Seguimiento de Proyecto Torre B",
-      description: "Llamada telefónica para revisar avances del proyecto de instalación en Torre B. Cliente satisfecho con el progreso.",
-      contactPerson: "María González",
-      date: "2024-09-25T14:15:00",
-      hasAttachments: false
-    },
-    {
-      id: 3,
-      type: "meeting",
-      subject: "Reunión de Cierre de Proyecto",
-      description: "Reunión presencial para la entrega final del proyecto de climatización del hotel. Firma de acta de aceptación.",
-      contactPerson: "Roberto Martínez",
-      date: "2024-09-20T09:00:00",
-      hasAttachments: true
-    },
-    {
-      id: 4,
-      type: "contract",
-      subject: "Renovación de Contrato de Servicio",
-      description: "Proceso de renovación del contrato de servicio técnico para el próximo año académico.",
-      contactPerson: "Ana Rodríguez",
-      date: "2024-09-18T16:45:00",
-      hasAttachments: true
-    }
-  ];
-
-  // Mock data for documents
-  const mockDocuments = [
-    {
-      id: 1,
-      name: "RFC - Grupo Industrial Monterrey",
-      type: "RFC",
-      status: "Completo",
-      uploadDate: "2024-03-15",
-      expirationDate: null,
-      notes: "Documento fiscal actualizado"
-    },
-    {
-      id: 2,
-      name: "Contrato de Servicios 2024",
-      type: "Contrato",
-      status: "Completo",
-      uploadDate: "2024-01-10",
-      expirationDate: "2024-12-31",
-      notes: "Contrato anual de mantenimiento"
-    },
-    {
-      id: 3,
-      name: "Garantía Equipos HVAC",
-      type: "Garantía",
-      status: "Pendiente",
-      uploadDate: "2024-06-20",
-      expirationDate: "2025-06-20",
-      notes: "Pendiente firma del cliente"
-    },
-    {
-      id: 4,
-      name: "Información Fiscal",
-      type: "Facturación",
-      status: "En Revisión",
-      uploadDate: "2024-09-01",
-      expirationDate: null,
-      notes: "Actualización de datos fiscales"
-    }
-  ];
-
-  // Mock data for contracts
-  const mockContracts = [
-    {
-      id: 1,
-      contractNumber: "CONT-2024-001",
-      clientName: "Grupo Industrial Monterrey",
-      startDate: "2024-01-01",
-      expirationDate: "2024-12-31",
-      value: 850000,
-      description: "Contrato de mantenimiento anual para sistemas HVAC industriales"
-    },
-    {
-      id: 2,
-      contractNumber: "CONT-2024-002",
-      clientName: "Hotel Ejecutivo Guadalajara",
-      startDate: "2024-03-15",
-      expirationDate: "2024-10-15",
-      value: 450000,
-      description: "Instalación y mantenimiento de sistema de climatización"
-    },
-    {
-      id: 3,
-      contractNumber: "CONT-2023-015",
-      clientName: "Clínica Médica Especializada",
-      startDate: "2023-11-01",
-      expirationDate: "2024-09-25",
-      value: 320000,
-      description: "Sistema de ventilación especializada para áreas médicas"
-    }
-  ];
-
-  const [filteredClients, setFilteredClients] = useState(clients);
-
+  // 🔹 Actualizar filteredClients cada vez que clients o filters cambien
   useEffect(() => {
     let filtered = clients;
 
-    // Filtro de búsqueda (empresa, contacto, email)
     if (filters?.search) {
       const search = filters.search.toLowerCase();
-      filtered = filtered?.filter(client =>
+      filtered = filtered.filter(client =>
         client?.empresa?.toLowerCase()?.includes(search) ||
         client?.contacto?.toLowerCase()?.includes(search) ||
         client?.email?.toLowerCase()?.includes(search)
       );
     }
 
-    // Industria
     if (filters?.industry) {
-      filtered = filtered?.filter(client => client?.industria === filters?.industry);
+      filtered = filtered.filter(client => client?.industria === filters?.industry);
     }
 
-    // Estado
     if (filters?.status) {
-      filtered = filtered?.filter(client => client?.estado === filters?.status);
+      filtered = filtered.filter(client => client?.estado === filters?.status);
     }
 
-    // Relación
     if (filters?.relationshipHealth) {
-      filtered = filtered?.filter(client => client?.relacion === filters?.relationshipHealth);
+      filtered = filtered.filter(client => client?.relacion === filters?.relationshipHealth);
     }
 
-    // Ubicación
     if (filters?.location) {
-      filtered = filtered?.filter(client => client?.ubicacionEmpre === filters?.location || client?.ubicacion?.ciudad === filters?.location);
+      filtered = filtered.filter(client => client?.ubicacionEmpre === filters?.location || client?.ubicacion?.ciudad === filters?.location);
     }
 
-    // RFC
     if (filters?.rfc) {
-      filtered = filtered?.filter(client =>
+      filtered = filtered.filter(client =>
         client?.rfc?.toLowerCase()?.includes(filters?.rfc?.toLowerCase())
       );
     }
 
-    // Proyectos mínimos
     if (filters?.minProjects) {
-      filtered = filtered?.filter(client => (parseInt(client?.totalProjects) || 0) >= parseInt(filters?.minProjects));
+      filtered = filtered.filter(client => (parseInt(client?.totalProjects) || 0) >= parseInt(filters?.minProjects));
     }
 
-    // Valor mínimo
     if (filters?.minValue) {
-      filtered = filtered?.filter(client => (parseInt(client?.totalValue) || 0) >= parseInt(filters?.minValue));
+      filtered = filtered.filter(client => (parseInt(client?.totalValue) || 0) >= parseInt(filters?.minValue));
     }
 
     setFilteredClients(filtered);
-  }, [filters, clients]);
+  }, [clients, filters]);
 
   const handleFiltersChange = (newFilters) => {
     setFilters(newFilters);
@@ -292,8 +167,11 @@ const ClientManagement = () => {
   const handleSubmitEditClient = async (updatedClient) => {
   if (!updatedClient?.id) return;
   const response = await editClient(updatedClient.id, updatedClient);
-  if (response?.success) {
-    await getClients(); // 🔁 Recargar lista actualizada
+  if (response && response.success) {
+    // Actualizar el cliente editado en el estado filtrado
+    setFilteredClients(prev =>
+      prev.map(c => (c.id === updatedClient.id ? { ...c, ...updatedClient } : c))
+    );
     setEditModalState({ open: false, client: null });
   }
 };
@@ -314,10 +192,11 @@ const ClientManagement = () => {
 
   const handleSubmitNewClient = async (clientData) => {
   const response = await createClient(clientData);
-  if (response?.success) {
-    await getClients(); // 🔁 Recargar lista de clientes
-    setShowNewClientModal(false);
+  if (response && response.success && response.data) {
+    // Agregar el nuevo cliente al estado filtrado también
+    setFilteredClients(prev => [...prev, response.data]);
   }
+  setShowNewClientModal(false);
 };
 
 

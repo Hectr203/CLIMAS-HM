@@ -310,7 +310,7 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
     type="tel"
     inputMode="numeric"
     label="Teléfono"
-    placeholder="Ej. 2214853240"
+    placeholder="Ej. 22148"
     value={formData?.phone}
     onChange={(e) => {
       const value = e.target.value;

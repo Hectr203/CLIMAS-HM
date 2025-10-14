@@ -5,6 +5,7 @@ import Sidebar from '../../components/ui/Sidebar';
 import Breadcrumb from '../../components/ui/Breadcrumb';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
+import usePerson from '../../hooks/usePerson';
 import ClientCard from './components/ClientCard';
 import ClientTable from './components/ClientTable';
 import ClientFilters from './components/ClientFilters';

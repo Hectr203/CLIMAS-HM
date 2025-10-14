@@ -5,6 +5,7 @@ import Sidebar from '../../components/ui/Sidebar';
 import Breadcrumb from '../../components/ui/Breadcrumb';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
+
 import ClientCard from './components/ClientCard';
 import ClientTable from './components/ClientTable';
 import ClientFilters from './components/ClientFilters';
@@ -293,11 +294,10 @@ const ClientManagement = () => {
   if (!updatedClient?.id) return;
   const response = await editClient(updatedClient.id, updatedClient);
   if (response?.success) {
-    await getClients(); // 🔁 Recargar lista actualizada
+    await getClients(); // 🔄 Recargar lista después de editar
     setEditModalState({ open: false, client: null });
   }
 };
-
 
   const handleViewProjects = (client) => {
     console.log('Ver proyectos del cliente:', client);
@@ -312,14 +312,14 @@ const ClientManagement = () => {
     setShowNewClientModal(true);
   };
 
-  const handleSubmitNewClient = async (clientData) => {
+const handleSubmitNewClient = async (clientData) => {
   const response = await createClient(clientData);
   if (response?.success) {
-    await getClients(); // 🔁 Recargar lista de clientes
+    await getClients();
     setShowNewClientModal(false);
+    setRefreshTrigger(prev => prev + 1); // 🔁 fuerza refresco visual inmediato
   }
 };
-
 
   const handleAddCommunication = () => {
     console.log('Agregando nueva comunicación...');

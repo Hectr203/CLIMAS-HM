@@ -5,6 +5,7 @@ import Sidebar from '../../components/ui/Sidebar';
 import Breadcrumb from '../../components/ui/Breadcrumb';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
+
 import ClientCard from './components/ClientCard';
 import ClientTable from './components/ClientTable';
 import ClientFilters from './components/ClientFilters';
@@ -312,10 +313,10 @@ const ClientManagement = () => {
     setShowNewClientModal(true);
   };
 
-  const handleSubmitNewClient = async (clientData) => {
+const handleSubmitNewClient = async (clientData) => {
   const response = await createClient(clientData);
-  if (response?.success) {
-    await getClients(); // 🔁 Recargar lista de clientes
+  if (response?.success && response?.data) {
+    setClients(prev => [...prev, response.data]); // 👈 Agrega al final
     setShowNewClientModal(false);
   }
 };

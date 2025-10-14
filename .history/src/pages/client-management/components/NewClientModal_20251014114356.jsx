@@ -7,7 +7,14 @@ import Select from '../../../components/ui/Select';
 import { useNotifications } from '../../../context/NotificationContext.jsx';
 
 const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialData = null }) => {
-  const { createClient, editClient } = useClient();
+const NewClientModal = ({
+  isOpen,
+  onClose,
+  onSubmit,
+  mode = 'create',
+  initialData = null
+}) => {
+
   const { showSuccess, showError } = useNotifications();
   const [formData, setFormData] = useState({
     companyName: '',
@@ -310,7 +317,7 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
     type="tel"
     inputMode="numeric"
     label="Teléfono"
-    placeholder="Ej. 2214853240"
+    placeholder="Ej. 2214298532"
     value={formData?.phone}
     onChange={(e) => {
       const value = e.target.value;

@@ -5,6 +5,7 @@ import Sidebar from '../../components/ui/Sidebar';
 import Breadcrumb from '../../components/ui/Breadcrumb';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
+
 import ClientCard from './components/ClientCard';
 import ClientTable from './components/ClientTable';
 import ClientFilters from './components/ClientFilters';
@@ -290,14 +291,13 @@ const ClientManagement = () => {
   };
 
   const handleSubmitEditClient = async (updatedClient) => {
-  if (!updatedClient?.id) return;
-  const response = await editClient(updatedClient.id, updatedClient);
-  if (response?.success) {
-    await getClients(); // 🔁 Recargar lista actualizada
-    setEditModalState({ open: false, client: null });
-  }
-};
-
+    if (!updatedClient?.id) return;
+    const response = await editClient(updatedClient.id, updatedClient);
+    // Espera a que el estado se actualice antes de cerrar el modal
+    if (response && response.success) {
+      setEditModalState({ open: false, client: null });
+    }
+  };
 
   const handleViewProjects = (client) => {
     console.log('Ver proyectos del cliente:', client);
