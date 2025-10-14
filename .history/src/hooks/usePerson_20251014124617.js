@@ -71,11 +71,9 @@ const usePerson = () => {
   try {
     const response = await personService.updatePersonById(id, payload);
     if (response.success) {
-      // ✅ Usamos "id" (no empleadoId) para actualizar correctamente
       setPersons((prev) =>
         prev.map((p) => (p.id === id ? { ...p, ...response.data } : p))
       );
-
       showOperationSuccess("Empleado actualizado exitosamente");
       return response.data;
     }
@@ -90,7 +88,6 @@ const usePerson = () => {
 };
 
 
-
 return {
   persons,
   departmentPersons,
@@ -99,8 +96,10 @@ return {
   getPersons,
   getPersonsByDepartment,
   createPerson,
-  updatePersonById, // ✅ nuevo nombre
+  updatePersonById,
+  updatePersonByEmpleadoId: updatePersonById, // ✅ alias temporal
 };
+
 };
 
 export default usePerson;

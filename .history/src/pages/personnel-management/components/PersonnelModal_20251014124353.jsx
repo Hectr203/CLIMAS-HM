@@ -9,7 +9,7 @@ import usePerson from '../../../hooks/usePerson';
 
 const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error }) => {
   const [localError, setLocalError] = useState(null);
-  const { createPerson, updatePersonById } = usePerson();
+  const { createPerson, updatePersonByEmpleadoId } = usePerson();
   const { showSuccess } = useNotifications();
  
   const [formData, setFormData] = useState({
@@ -187,22 +187,20 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error }) => {
     setLocalError(null);
     try {
       const payload = {
-  nombreCompleto: formData.name,
-  email: formData.email,
-  telefono: formData.phone,
-  departamento: formData.department,
-  puesto: formData.position,
-  fechaIngreso: formData.hireDate,
-  estado: formData.status,
-  empleadoId: formData.employeeId, // ✅ AGREGAR
-};
-
+        nombreCompleto: formData.name,
+        email: formData.email,
+        telefono: formData.phone,
+        departamento: formData.department,
+        puesto: formData.position,
+        fechaIngreso: formData.hireDate,
+        estado: formData.status,
+      };
 
       console.log("Payload enviado:", payload);
 
       let result;
       if (mode === 'edit' && formData.employeeId) {
-        result = await updatePersonById(employee.id, payload);
+        result = await await updatePersonById(persona.id, payload);(formData.employeeId, payload);
         showSuccess('Empleado actualizado correctamente ✅');
       } else {
         result = await createPerson({ ...payload, empleadoId: formData.employeeId, activo: true });

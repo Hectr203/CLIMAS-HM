@@ -187,16 +187,14 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error }) => {
     setLocalError(null);
     try {
       const payload = {
-  nombreCompleto: formData.name,
-  email: formData.email,
-  telefono: formData.phone,
-  departamento: formData.department,
-  puesto: formData.position,
-  fechaIngreso: formData.hireDate,
-  estado: formData.status,
-  empleadoId: formData.employeeId, // ✅ AGREGAR
-};
-
+        nombreCompleto: formData.name,
+        email: formData.email,
+        telefono: formData.phone,
+        departamento: formData.department,
+        puesto: formData.position,
+        fechaIngreso: formData.hireDate,
+        estado: formData.status,
+      };
 
       console.log("Payload enviado:", payload);
 
