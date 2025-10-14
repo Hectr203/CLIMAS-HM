@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { useNotifications } from '../context/NotificationContext';
-import personService from '../services/personService';
+import { useState } from "react";
+import { useNotifications } from "../context/NotificationContext";
+import personService from "../services/personService";
 
 const usePerson = () => {
   const { showOperationSuccess, showHttpError } = useNotifications();
@@ -51,14 +51,13 @@ const usePerson = () => {
     try {
       const response = await personService.createPerson(payload);
       if (response.success) {
-        setPersons(prev => [...prev, response.data]);
-        showOperationSuccess('Empleado guardado exitosamente');
+        setPersons((prev) => [...prev, response.data]);
+        showOperationSuccess("Empleado guardado exitosamente");
         return response.data;
       }
     } catch (err) {
       console.error("Error en usePerson.createPerson:", err);
       setError(err);
-      showHttpError('Error al guardar empleado');
       throw err;
     } finally {
       setLoading(false);
@@ -70,25 +69,39 @@ const usePerson = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await personService.updatePersonByEmpleadoId(empleadoId, payload);
+      const response = await personService.updatePersonByEmpleadoId(
+        empleadoId,
+        payload
+      );
       if (response.success) {
-        setPersons(prev =>
-          prev.map(p => (p.empleadoId === empleadoId ? { ...p, ...response.data } : p))
+        setPersons((prev) =>
+          prev.map((p) =>
+            p.empleadoId === empleadoId ? { ...p, ...response.data } : p
+          )
         );
-        showOperationSuccess('Empleado actualizado exitosamente');
+        showOperationSuccess("Empleado actualizado exitosamente");
         return response.data;
       }
     } catch (err) {
       console.error("Error en usePerson.updatePersonByEmpleadoId:", err);
       setError(err);
-      showHttpError('Error al actualizar empleado');
+      showHttpError("Error al actualizar empleado");
       throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  return { persons, departmentPersons, loading, error, getPersons, getPersonsByDepartment, createPerson, updatePersonByEmpleadoId };
+  return {
+    persons,
+    departmentPersons,
+    loading,
+    error,
+    getPersons,
+    getPersonsByDepartment,
+    createPerson,
+    updatePersonByEmpleadoId,
+  };
 };
 
 export default usePerson;

@@ -315,9 +315,25 @@ const SalesOpportunityManagement = () => {
 
   // --- Handlers ---
   const handleCreateOpportunity = (newOpportunity) => {
-    setOpportunities(prev => [newOpportunity, ...prev]);
-    setShowNewOpportunityModal(false);
-    console.log('Nueva oportunidad creada:', newOpportunity);
+    // Asegurar que la nueva oportunidad tenga la etapa inicial
+    const oportunidadConEtapa = {
+      ...newOpportunity,
+      stage: 'initial-contact',
+      stageDuration: 0
+    };
+    crearOportunidad(oportunidadConEtapa)
+      .then(response => {
+        console.log('Respuesta backend oportunidad:', response);
+        // Si el backend responde con éxito, actualiza el estado local
+        if (response && response.success && response.data) {
+          setOpportunities(prev => [response.data, ...prev]);
+        }
+        setShowNewOpportunityModal(false);
+      })
+      .catch(error => {
+        // Manejo de error opcional
+        console.error('Error al guardar oportunidad:', error);
+      });
   };
 
   const handleNewOpportunityClick = () => {
@@ -731,6 +747,7 @@ const SalesOpportunityManagement = () => {
           isOpen={showNewOpportunityModal}
           onClose={() => setShowNewOpportunityModal(false)}
           onCreateOpportunity={handleCreateOpportunity}
+          error={error}
         />
       </div>
     </div>

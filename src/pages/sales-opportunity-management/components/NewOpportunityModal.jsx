@@ -6,7 +6,7 @@ import Select from '../../../components/ui/Select';
 import useClient from '../../../hooks/useClient';
 import usePerson from '../../../hooks/usePerson';
 
-const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity }) => {
+const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity, error }) => {
   const [formData, setFormData] = useState({
     clientId: '',
     contactChannel: 'whatsapp',
@@ -119,20 +119,20 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity }) => {
 
       const selectedClient = clients?.find(c => c.id === formData?.clientId || c._id === formData?.clientId);
       const newOpportunity = {
-        clienteId: formData?.clientId,
-        nombreCliente: selectedClient?.nombre || selectedClient?.name || '',
-        canalContacto: formData?.contactChannel,
-        tipoProyecto: formData?.projectType,
-        prioridad: formData?.priority,
-        personaContacto: formData?.contactPerson?.trim(),
-        telefono: formData?.phone?.trim(),
-        email: formData?.email?.trim(),
-        descripcionProyecto: formData?.projectDescription?.trim(),
-        ubicacion: formData?.location?.trim(),
-        presupuestoEstimado: formData?.estimatedBudget?.trim(),
-        cronogramaEsperado: formData?.timeline?.trim(),
-        ejecutivoVentas: formData?.salesRep,
-        notasAdicionales: formData?.notes?.trim() || `Nueva oportunidad registrada por ${formData?.salesRep}`
+  clienteId: formData?.clientId,
+  nombreCliente: selectedClient?.companyName || selectedClient?.empresa || selectedClient?.nombre || selectedClient?.name || '',
+  canalContacto: formData?.contactChannel,
+  tipoProyecto: formData?.projectType,
+  prioridad: formData?.priority,
+  personaContacto: formData?.contactPerson?.trim(),
+  telefono: formData?.phone?.trim(),
+  email: formData?.email?.trim(),
+  descripcionProyecto: formData?.projectDescription?.trim(),
+  ubicacion: formData?.location?.trim(),
+  presupuestoEstimado: formData?.estimatedBudget?.trim(),
+  cronogramaEsperado: formData?.timeline?.trim(),
+  ejecutivoVentas: departmentPersons?.find(emp => (emp.nombreCompleto || emp.nombre || emp.name || emp.fullName || emp.email) === formData?.salesRep)?.nombreCompleto || formData?.salesRep,
+  notasAdicionales: formData?.notes?.trim() || `Nueva oportunidad registrada por ${formData?.salesRep}`
       };
 
       onCreateOpportunity?.(newOpportunity);
@@ -312,6 +312,12 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity }) => {
                     error={errors?.email}
                     placeholder="contacto@empresa.com"
                   />
+                  {error?.status === 409 && error?.data?.error?.includes('correo') && (
+                    <p className="text-xs text-destructive mt-1">Correo registrado</p>
+                  )}
+                  {error?.status === 409 && error?.data?.error?.includes('correo') && (
+                    <p className="text-xs text-destructive mt-1">Correo registrado</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -391,7 +397,7 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity }) => {
                     error={errorSalesReps}
                     placeholder={loadingSalesReps ? 'Cargando ejecutivos...' : (salesRepOptions.length === 0 ? 'No hay ejecutivos de ventas' : 'Selecciona ejecutivo')}
                     searchable
-                  />
+                   />
                 </div>
 
                 <div>
