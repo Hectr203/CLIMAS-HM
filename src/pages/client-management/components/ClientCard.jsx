@@ -33,7 +33,7 @@ const ClientCard = ({ client, onViewDetails, onEditClient, onViewProjects, onVie
   };
 
   return (
-  <div className="bg-card border border-border rounded-lg p-6 card-shadow hover:shadow-md transition-smooth flex flex-col h-full min-w-[340px] max-w-[440px] max-h-[480px] min-h-[340px] overflow-hidden">
+    <div className="bg-card border border-border rounded-lg p-6 card-shadow hover:shadow-md transition-smooth flex flex-col h-full min-w-[340px] max-w-[440px] max-h-[480px] min-h-[340px] overflow-hidden">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center space-x-4 min-w-0">
           <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
@@ -62,51 +62,51 @@ const ClientCard = ({ client, onViewDetails, onEditClient, onViewProjects, onVie
         </Button>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-    <div className="space-y-2 min-w-0">
-      <div className="flex items-center space-x-2">
-        <Icon name="User" size={16} className="text-muted-foreground" />
-        <span className="text-sm text-foreground truncate max-w-full">{String(client?.contactPerson || '')}</span>
-      </div>
-      <div className="flex items-center space-x-2">
-        <Icon name="Mail" size={16} className="text-muted-foreground" />
-        <span className="text-sm text-foreground truncate max-w-full">{String(client?.email || '')}</span>
-      </div>
-      <div className="flex items-center space-x-2">
-        <Icon name="Phone" size={16} className="text-muted-foreground" />
-        <span className="text-sm text-foreground truncate max-w-full">{String(client?.phone || '')}</span>
-      </div>
-    </div>
+        <div className="space-y-2 min-w-0">
+          <div className="flex items-center space-x-2">
+            <Icon name="User" size={16} className="text-muted-foreground" />
+            <span className="text-sm text-foreground truncate max-w-full">{String(client?.contactPerson || '')}</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Icon name="Mail" size={16} className="text-muted-foreground" />
+            <span className="text-sm text-foreground truncate max-w-full">{String(client?.email || '')}</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Icon name="Phone" size={16} className="text-muted-foreground" />
+            <span className="text-sm text-foreground truncate max-w-full">{String(client?.phone || '')}</span>
+          </div>
+        </div>
         <div className="space-y-2">
-      <div className="flex items-center space-x-2">
-        <Icon name="MapPin" size={16} className="text-muted-foreground" />
-        <span className="text-sm text-foreground truncate max-w-full">{String(client?.location || '')}</span>
-      </div>
-      <div className="flex items-center space-x-2">
-        <Icon name="Calendar" size={16} className="text-muted-foreground" />
-        <span className="text-sm text-foreground truncate max-w-full">Cliente desde: {String(client?.clientSince || '')}</span>
-      </div>
-      <div className="flex items-center space-x-2">
-        <Icon name="FileText" size={16} className="text-muted-foreground" />
-        <span className="text-sm text-foreground truncate max-w-full">RFC: {String(client?.rfc || '')}</span>
-      </div>
+          <div className="flex items-center space-x-2">
+            <Icon name="MapPin" size={16} className="text-muted-foreground" />
+            <span className="text-sm text-foreground truncate max-w-full">{String(client?.location || '')}</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Icon name="Calendar" size={16} className="text-muted-foreground" />
+            <span className="text-sm text-foreground truncate max-w-full">Cliente desde: {String(client?.clientSince || '')}</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Icon name="FileText" size={16} className="text-muted-foreground" />
+            <span className="text-sm text-foreground truncate max-w-full">RFC: {String(client?.rfc || '').substring(0, 18)}{client?.rfc && client?.rfc.length > 18 ? '...' : ''}</span>
+          </div>
         </div>
       </div>
-      <div className="flex items-center justify-between pt-4 border-t border-border">
-    <div className="grid grid-cols-3 gap-4 min-w-0">
-      <div className="flex flex-col items-center">
-        <div className="text-lg font-semibold text-foreground">{Number(client?.totalProjects) || 0}</div>
-        <div className="text-xs text-muted-foreground">Proyectos</div>
-      </div>
-      <div className="flex flex-col items-center">
-        <div className="text-lg font-semibold text-foreground">{Number(client?.activeContracts) || 0}</div>
-        <div className="text-xs text-muted-foreground">Contratos</div>
-      </div>
-      <div className="flex flex-col items-center">
-        <div className="text-lg font-semibold text-success">${Number(client?.totalValue) ? Number(client?.totalValue).toLocaleString('es-MX') : '0'}</div>
-        <div className="text-xs text-muted-foreground">Valor Total</div>
-      </div>
-    </div>
-        <div className="flex items-center space-x-2">
+      <div className="flex flex-col md:flex-row md:items-center justify-between pt-4 border-t border-border gap-4">
+        <div className="grid grid-cols-3 gap-4 min-w-0 w-full">
+          <div className="flex flex-col items-center">
+            <div className="text-lg font-semibold text-foreground">{Number(client?.totalProjects) || 0}</div>
+            <div className="text-xs text-muted-foreground">Proyectos</div>
+          </div>
+          <div className="flex flex-col items-center">
+            <div className="text-lg font-semibold text-foreground">{Number(client?.activeContracts) || 0}</div>
+            <div className="text-xs text-muted-foreground">Contratos</div>
+          </div>
+          <div className="flex flex-col items-center">
+            <div className="text-lg font-semibold text-success">${Number(client?.totalValue) ? Number(client?.totalValue).toLocaleString('es-MX', {minimumFractionDigits: 2}) : '0.00'}</div>
+            <div className="text-xs text-muted-foreground">Valor Total</div>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 mt-2 md:mt-0">
           <Button
             variant="outline"
             size="sm"

@@ -14,11 +14,13 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const loadUserFromStorage = async () => {
-  const token = localStorage.getItem("authToken");
+      const token = localStorage.getItem("authToken");
+      const expiresAt = localStorage.getItem("tokenExpiresAt");
+      const now = Date.now();
       // Puede venir como 'userRole', 'role' o 'rol'
       const userRole = localStorage.getItem("userRole") || localStorage.getItem("role") || localStorage.getItem("rol");
       const userEmail = localStorage.getItem("userEmail");
-      if (token) {
+      if (token && expiresAt && now < Number(expiresAt)) {
         const userData = {
           token,
           rol: userRole,
@@ -26,13 +28,16 @@ export const AuthProvider = ({ children }) => {
         };
         setUser(userData);
         setIsAuthenticated(true);
-        // Opcional: verificar token con el backend
-        // try {
-        //   const result = await authService.getProfile();
-        //   if (result.success) {
-        //     setUser({ ...result.user, token, rol: result.user.rol || result.user.role || userRole, email: result.user.email || userEmail });
-        //   }
-        // } catch {}
+      } else {
+        // Si el token no existe o expiró, limpiar localStorage
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("tokenExpiresAt");
+        localStorage.removeItem("userRole");
+        localStorage.removeItem("role");
+        localStorage.removeItem("rol");
+        localStorage.removeItem("userEmail");
+        setUser(null);
+        setIsAuthenticated(false);
       }
       setIsLoading(false);
     };
