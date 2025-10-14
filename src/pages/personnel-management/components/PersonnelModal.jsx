@@ -7,7 +7,7 @@ import Select from '../../../components/ui/Select';
 import { Checkbox } from '../../../components/ui/Checkbox';
 import usePerson from '../../../hooks/usePerson';
 
-const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error }) => {
+const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error, openedFromEPP }) => {
   const [localError, setLocalError] = useState(null);
   const { createPerson, updatePersonByEmpleadoId } = usePerson();
   const { showSuccess } = useNotifications();
@@ -43,11 +43,17 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error }) => {
     }
   });
 
-  const [activeTab, setActiveTab] = useState('general');
+  // Secuencia de pasos
+  const steps = ['general', 'medical', 'ppe', 'emergency'];
+  const [step, setStep] = useState(openedFromEPP ? 2 : 0); // Si openedFromEPP, inicia en EPP
+
+  // Si openedFromEPP, bloquear navegación y mostrar solo EPP
+  const isEPPOnly = openedFromEPP === true;
 
   // 🔹 Cargar datos del empleado seleccionado al abrir el modal
   useEffect(() => {
     if (employee) {
+      console.log('Datos recibidos en modal:', employee);
       setFormData({
         name: employee.nombreCompleto || '',
         employeeId: employee.empleadoId || '',
@@ -111,7 +117,8 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error }) => {
         }
       });
     }
-  }, [employee, isOpen]);
+    setStep(openedFromEPP ? 2 : 0);
+  }, [employee, isOpen, openedFromEPP]);
 
   if (!isOpen) return null;
 
@@ -194,6 +201,10 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error }) => {
         puesto: formData.position,
         fechaIngreso: formData.hireDate,
         estado: formData.status,
+        examenesMedicos: [formData.medicalStudies],
+        equipos: [formData.ppe],
+        contactoEmergencia: [formData.emergencyContact],
+        certifications: formData.certifications ?? [],
       };
 
       console.log("Payload enviado:", payload);
@@ -218,13 +229,23 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error }) => {
   };
 
 
-  // 🔹 Tabs del modal
+  // 🔹 Tabs del modal (solo para mostrar, deshabilitados)
   const tabs = [
     { id: 'general', label: 'Información General', icon: 'User' },
     { id: 'medical', label: 'Estudios Médicos', icon: 'Heart' },
     { id: 'ppe', label: 'EPP', icon: 'Shield' },
     { id: 'emergency', label: 'Contacto de Emergencia', icon: 'Phone' }
   ];
+
+  // Traducción de EPP
+  const ppeLabels = {
+    helmet: 'Casco',
+    vest: 'Chaleco',
+    boots: 'Botas',
+    gloves: 'Guantes',
+    glasses: 'Gafas',
+    mask: 'Mascarilla'
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-1050 flex items-center justify-center p-4">
@@ -234,7 +255,9 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error }) => {
           <div className="flex items-center space-x-3">
             <Icon
               name={
-                mode === 'create'
+                openedFromEPP
+                  ? 'Shield'
+                  : mode === 'create'
                   ? 'UserPlus'
                   : mode === 'edit'
                   ? 'Edit'
@@ -245,14 +268,18 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error }) => {
             />
             <div>
               <h2 className="text-xl font-semibold text-foreground">
-                {mode === 'create'
+                {openedFromEPP
+                  ? 'Editar Equipo de Protección Personal'
+                  : mode === 'create'
                   ? 'Nuevo Empleado'
                   : mode === 'edit'
                   ? 'Editar Empleado'
                   : 'Perfil del Empleado'}
               </h2>
               <p className="text-sm text-muted-foreground">
-                {mode === 'create'
+                {openedFromEPP
+                  ? 'Modificar información de EPP del empleado'
+                  : mode === 'create'
                   ? 'Agregar nuevo empleado al sistema'
                   : mode === 'edit'
                   ? 'Modificar información del empleado'
@@ -265,53 +292,53 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error }) => {
           </Button>
         </div>
 
-        {/* Tabs */}
-        <div className="border-b border-border">
-          <nav className="flex space-x-8 px-6">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-smooth ${
-                  activeTab === tab.id
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <Icon name={tab.icon} size={16} />
-                <span>{tab.label}</span>
-              </button>
-            ))}
-          </nav>
-        </div>
+        {/* Tabs: solo mostrar si no es flujo EPP */}
+        {!isEPPOnly && (
+          <div className="border-b border-border">
+            <nav className="flex space-x-8 px-6">
+              {tabs.map((tab, idx) => (
+                <button
+                  key={tab.id}
+                  disabled={mode === 'create'}
+                  onClick={mode !== 'create' ? () => setStep(idx) : undefined}
+                  className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-smooth ${
+                    step === idx
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-muted-foreground'
+                  } ${mode === 'create' ? 'cursor-not-allowed opacity-60' : ''}`}
+                >
+                  <Icon name={tab.icon} size={16} />
+                  <span>{tab.label}</span>
+                </button>
+              ))}
+            </nav>
+          </div>
+        )}
 
-        {/* Contenido */}
+        {/* Contenido: solo mostrar EPP si es flujo EPP */}
         <div className="p-6 overflow-y-auto max-h-[60vh]">
-          {activeTab === 'general' && (
+          {/* Información General */}
+          {!isEPPOnly && step === 0 && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input
                   label="Nombre Completo"
-                  value={formData.name}
-                  onChange={(e) =>
-                    handleInputChange('name', e.target.value)
-                  }
+                  value={mode === 'view' ? (employee?.nombreCompleto ?? '') : formData.name}
+                  onChange={(e) => handleInputChange('name', e.target.value)}
                   required
                   disabled={mode === 'view'}
                 />
                 <Input
                   label="ID de Empleado"
-                  value={formData.employeeId}
-                  onChange={(e) =>
-                    handleInputChange('employeeId', e.target.value)
-                  }
+                  value={mode === 'view' ? (employee?.empleadoId ?? '') : formData.employeeId}
+                  onChange={(e) => handleInputChange('employeeId', e.target.value)}
                   required
                   disabled={mode === 'view'}
                 />
                 <Input
                   label="Correo Electrónico"
                   type="email"
-                  value={formData.email}
+                  value={mode === 'view' ? (employee?.email ?? '') : formData.email}
                   onChange={(e) => {
                     handleInputChange('email', e.target.value);
                     if (localError) setLocalError(null);
@@ -323,106 +350,91 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error }) => {
                   <span className="block text-xs text-red-600 mt-1">Este correo ya está registrado</span>
                 )}
                 <Input
-  label="Teléfono"
-  type="tel"
-  value={formData.phone}
-  onChange={(e) => {
-    const value = e.target.value;
-    // Permitir solo números y limitar a 10 dígitos
-    if (/^\d{0,10}$/.test(value)) {
-      handleInputChange('phone', value);
-    }
-  }}
-  onBlur={(e) => {
-    // Validar que tenga exactamente 10 dígitos al salir del input
-    if (e.target.value.length !== 10) {
-      alert('El número de teléfono debe tener exactamente 10 dígitos.');
-    }
-  }}
-  inputMode="numeric"
-  maxLength={10}
-  pattern="\d{10}"
-  placeholder="Ingresa 10 dígitos"
-  required
-  disabled={mode === 'view'}
-/>
-
+                  label="Teléfono"
+                  type="tel"
+                  value={mode === 'view' ? (employee?.telefono ?? '') : formData.phone}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (/^\d{0,10}$/.test(value)) {
+                      handleInputChange('phone', value);
+                    }
+                  }}
+                  onBlur={(e) => {
+                    if (e.target.value.length !== 10) {
+                      alert('El número de teléfono debe tener exactamente 10 dígitos.');
+                    }
+                  }}
+                  inputMode="numeric"
+                  maxLength={10}
+                  pattern="\d{10}"
+                  placeholder="Ingresa 10 dígitos"
+                  required
+                  disabled={mode === 'view'}
+                />
                 <Select
                   label="Departamento"
                   options={departmentOptions}
-                  value={formData.department}
-                  onChange={(value) =>
-                    handleInputChange('department', value)
-                  }
+                  value={mode === 'view' ? (employee?.departamento ?? '') : formData.department}
+                  onChange={(value) => handleInputChange('department', value)}
                   disabled={mode === 'view'}
                 />
                 <Select
                   label="Puesto"
                   options={positionOptions}
-                  value={formData.position}
-                  onChange={(value) =>
-                    handleInputChange('position', value)
-                  }
+                  value={mode === 'view' ? (employee?.puesto ?? '') : formData.position}
+                  onChange={(value) => handleInputChange('position', value)}
                   disabled={mode === 'view'}
                 />
                 <Input
                   label="Fecha de Ingreso"
                   type="date"
-                  value={formData.hireDate}
-                  onChange={(e) =>
-                    handleInputChange('hireDate', e.target.value)
-                  }
+                  value={mode === 'view' ? (employee?.fechaIngreso ?? '') : formData.hireDate}
+                  onChange={(e) => handleInputChange('hireDate', e.target.value)}
                   required
                   disabled={mode === 'view'}
                 />
                 <Select
                   label="Estado"
                   options={statusOptions}
-                  value={formData.status}
-                  onChange={(value) =>
-                    handleInputChange('status', value)
-                  }
+                  value={mode === 'view' ? (employee?.estado ?? '') : formData.status}
+                  onChange={(value) => handleInputChange('status', value)}
                   disabled={mode === 'view'}
                 />
               </div>
             </div>
           )}
 
-          {activeTab === 'medical' && (
+          {/* Estudios Médicos */}
+          {!isEPPOnly && step === 1 && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input
                   label="Último Examen Médico"
                   type="date"
-                  value={formData.medicalStudies.lastExam || ''}
-                  onChange={(e) =>
-                    handleInputChange('medicalStudies.lastExam', e.target.value)
-                  }
+                  value={mode === 'view' ? (employee?.medicalStudies?.lastExam ?? '') : formData.medicalStudies.lastExam}
+                  onChange={(e) => handleInputChange('medicalStudies.lastExam', e.target.value)}
                   disabled={mode === 'view'}
                 />
                 <Input
                   label="Próximo Examen Médico"
                   type="date"
-                  value={formData.medicalStudies.nextExam || ''}
-                  onChange={(e) =>
-                    handleInputChange('medicalStudies.nextExam', e.target.value)
-                  }
+                  value={mode === 'view' ? (employee?.medicalStudies?.nextExam ?? '') : formData.medicalStudies.nextExam}
+                  onChange={(e) => handleInputChange('medicalStudies.nextExam', e.target.value)}
                   disabled={mode === 'view'}
                 />
                 <Select
                   label="Estado de Estudios Médicos"
                   options={medicalStatusOptions}
-                  value={formData.medicalStudies.status || 'Pendiente'}
-                  onChange={(value) =>
-                    handleInputChange('medicalStudies.status', value)
-                  }
+                  value={mode === 'view' ? (employee?.medicalStudies?.status ?? 'Pendiente') : formData.medicalStudies.status}
+                  onChange={(value) => handleInputChange('medicalStudies.status', value)}
                   disabled={mode === 'view'}
                 />
               </div>
             </div>
           )}
 
-          {activeTab === 'ppe' && (
+          {/* EPP */}
+          {isEPPOnly ? (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -433,14 +445,9 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error }) => {
                     {Object.keys(formData.ppe).map((key) => (
                       <Checkbox
                         key={key}
-                        label={
-                          key.charAt(0).toUpperCase() +
-                          key.slice(1).replace(/([A-Z])/g, ' $1')
-                        }
-                        checked={formData.ppe[key]}
-                        onChange={(e) =>
-                          handlePPEChange(key, e.target.checked)
-                        }
+                        label={ppeLabels[key]}
+                        checked={mode === 'view' ? (employee?.ppe?.[key] ?? false) : formData.ppe[key]}
+                        onChange={(e) => handlePPEChange(key, e.target.checked)}
                         disabled={mode === 'view'}
                       />
                     ))}
@@ -448,35 +455,53 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error }) => {
                 </div>
               </div>
             </div>
+          ) : (
+            step === 2 && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="text-sm font-medium text-foreground mb-2">
+                      Equipo de Protección Personal
+                    </h4>
+                    <div className="space-y-2">
+                      {Object.keys(formData.ppe).map((key) => (
+                        <Checkbox
+                          key={key}
+                          label={ppeLabels[key]}
+                          checked={mode === 'view' ? (employee?.ppe?.[key] ?? false) : formData.ppe[key]}
+                          onChange={(e) => handlePPEChange(key, e.target.checked)}
+                          disabled={mode === 'view'}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
           )}
 
-          {activeTab === 'emergency' && (
+          {/* Contacto de Emergencia */}
+          {!isEPPOnly && step === 3 && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input
                   label="Nombre del Contacto"
-                  value={formData.emergencyContact.name || ''}
-                  onChange={(e) =>
-                    handleInputChange('emergencyContact.name', e.target.value)
-                  }
+                  value={mode === 'view' ? (employee?.emergencyContact?.name ?? '') : formData.emergencyContact.name}
+                  onChange={(e) => handleInputChange('emergencyContact.name', e.target.value)}
                   disabled={mode === 'view'}
                 />
                 <Input
                   label="Teléfono de Contacto"
                   type="tel"
-                  value={formData.emergencyContact.phone || ''}
-                  onChange={(e) =>
-                    handleInputChange('emergencyContact.phone', e.target.value)
-                  }
+                  value={mode === 'view' ? (employee?.emergencyContact?.phone ?? '') : formData.emergencyContact.phone}
+                  onChange={(e) => handleInputChange('emergencyContact.phone', e.target.value)}
                   disabled={mode === 'view'}
                 />
                 <Select
                   label="Relación"
                   options={relationshipOptions}
-                  value={formData.emergencyContact.relationship || ''}
-                  onChange={(value) =>
-                    handleInputChange('emergencyContact.relationship', value)
-                  }
+                  value={mode === 'view' ? (employee?.emergencyContact?.relationship ?? '') : formData.emergencyContact.relationship}
+                  onChange={(value) => handleInputChange('emergencyContact.relationship', value)}
                   disabled={mode === 'view'}
                 />
               </div>
@@ -490,14 +515,102 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error }) => {
             <Button variant="outline" onClick={onClose}>
               Cancelar
             </Button>
-            <Button 
-              onClick={handleSave} 
-              iconName="Save" 
-              iconPosition="left"
-              disabled={localError?.status === 409 && localError?.data?.error?.includes('correo')}
-            >
-              {mode === 'create' ? 'Crear Empleado' : 'Guardar Cambios'}
-            </Button>
+            {/* Botón Anterior: solo si no es flujo EPP y no estamos en el primer paso */}
+            {!openedFromEPP && step > 0 && (
+              <Button
+                variant="secondary"
+                onClick={() => setStep((prev) => prev - 1)}
+                iconName="ArrowLeft"
+                iconPosition="left"
+              >
+                Anterior
+              </Button>
+            )}
+            {/* Botón especial Guardar EPP */}
+            {openedFromEPP && step === 2 ? (
+              <Button
+                onClick={async () => {
+                  setLocalError(null);
+                  try {
+                    // Solo actualiza EPP
+                    const payload = {
+                      ppe: formData.ppe
+                    };
+                    let result;
+                    if (mode === 'edit' && formData.employeeId) {
+                      result = await updatePersonByEmpleadoId(formData.employeeId, payload);
+                      showSuccess('EPP actualizado correctamente ✅');
+                    }
+                    if (onSave) onSave(result);
+                    onClose();
+                  } catch (error) {
+                    console.error("Error al guardar EPP:", error);
+                    if (error?.status === 409 && error?.data?.error?.includes('correo')) {
+                      setLocalError(error);
+                    }
+                  }
+                }}
+                iconName="Save"
+                iconPosition="left"
+                disabled={localError?.status === 409 && localError?.data?.error?.includes('correo')}
+              >
+                Guardar EPP
+              </Button>
+            ) : (
+              step < steps.length - 1 ? (
+                <Button
+                  onClick={() => setStep((prev) => prev + 1)}
+                  iconName="ArrowRight"
+                  iconPosition="right"
+                  disabled={localError?.status === 409 && localError?.data?.error?.includes('correo')}
+                >
+                  Siguiente
+                </Button>
+              ) : (
+                <Button
+                  onClick={async () => {
+                    setLocalError(null);
+                    try {
+                      // Unificar todos los datos para guardar
+                      const payload = {
+                        nombreCompleto: formData.name,
+                        empleadoId: formData.employeeId,
+                        email: formData.email,
+                        telefono: formData.phone,
+                        departamento: formData.department,
+                        puesto: formData.position,
+                        fechaIngreso: formData.hireDate,
+                        estado: formData.status,
+                        medicalStudies: formData.medicalStudies,
+                        ppe: formData.ppe,
+                        certifications: formData.certifications,
+                        emergencyContact: formData.emergencyContact
+                      };
+                      let result;
+                      if (mode === 'edit' && formData.employeeId) {
+                        result = await updatePersonByEmpleadoId(formData.employeeId, payload);
+                        showSuccess('Empleado actualizado correctamente ✅');
+                      } else {
+                        result = await createPerson({ ...payload, activo: true });
+                        showSuccess('Empleado registrado correctamente ✅');
+                      }
+                      if (onSave) onSave(result);
+                      onClose();
+                    } catch (error) {
+                      console.error("Error al guardar:", error);
+                      if (error?.status === 409 && error?.data?.error?.includes('correo')) {
+                        setLocalError(error);
+                      }
+                    }
+                  }}
+                  iconName="Save"
+                  iconPosition="left"
+                  disabled={localError?.status === 409 && localError?.data?.error?.includes('correo')}
+                >
+                  {mode === 'create' ? 'Crear Empleado' : 'Guardar Cambios'}
+                </Button>
+              )
+            )}
           </div>
         )}
       </div>
