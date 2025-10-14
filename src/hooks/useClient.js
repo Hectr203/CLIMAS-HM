@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useNotifications } from '../context/NotificationContext';
 import clientService from '../services/clientService';
 
 const useClient = () => {
+  const { showOperationSuccess, showHttpError } = useNotifications();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
@@ -12,12 +14,12 @@ const useClient = () => {
     setError(null);
     try {
   const response = await clientService.getClients();
-  console.log('Respuesta del backend (clientes):', response);
   setClients(Array.isArray(response) ? response : response?.data || []);
   return response;
     } catch (err) {
       setError(err);
       setClients([]);
+      // No mostrar notificación, solo actualizar el estado de error
       return null;
     } finally {
       setLoading(false);
@@ -31,14 +33,15 @@ const useClient = () => {
     try {
       const response = await clientService.createClient(clientData);
       setSuccess(true);
-      // Agrega el nuevo cliente al estado local sin refrescar toda la lista
       if (response && response.success && response.data) {
         setClients(prevClients => [...prevClients, response.data]);
+        showOperationSuccess('Cliente guardado exitosamente');
       }
       return response;
     } catch (err) {
       setError(err);
       setSuccess(false);
+      showHttpError('Error al guardar cliente');
       return null;
     } finally {
       setLoading(false);
@@ -52,24 +55,26 @@ const useClient = () => {
     try {
       const response = await clientService.updateClient(id, clientData);
       setSuccess(true);
-      // Si el backend devuelve el cliente actualizado, úsalo para actualizar el estado local
       if (response && response.success && response.data) {
         setClients(prevClients => prevClients.map(c =>
           (c.id === id || c._id === id)
             ? { ...c, ...response.data, id: c.id || c._id }
             : c
         ));
+        showOperationSuccess('Cliente actualizado exitosamente');
       } else if (response && response.success) {
         setClients(prevClients => prevClients.map(c =>
           (c.id === id || c._id === id)
             ? { ...c, ...clientData, id: c.id || c._id }
             : c
         ));
+        showOperationSuccess('Cliente actualizado exitosamente');
       }
       return response;
     } catch (err) {
       setError(err);
       setSuccess(false);
+      showHttpError('Error al actualizar cliente');
       return null;
     } finally {
       setLoading(false);

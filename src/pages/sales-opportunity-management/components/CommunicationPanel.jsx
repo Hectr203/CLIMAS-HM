@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import useCommunication from '../../../hooks/useCommunication';
         import Icon from '../../../components/AppIcon';
         import Button from '../../../components/ui/Button';
         
 
         const CommunicationPanel = ({ opportunity, onAddCommunication }) => {
+          const { createCommunication, loading, error, success } = useCommunication();
           const [newCommunication, setNewCommunication] = useState({
             type: 'whatsapp',
             content: '',
@@ -12,24 +14,42 @@ import React, { useState } from 'react';
           });
 
           const [showHistory, setShowHistory] = useState(false);
+          const [localHistory, setLocalHistory] = useState(opportunity?.communications || []);
 
           const handleInputChange = (field, value) => {
             setNewCommunication(prev => ({ ...prev, [field]: value }));
           };
 
-          const handleAddCommunication = () => {
+          const handleAddCommunication = async () => {
             if (!newCommunication?.content?.trim()) return;
 
-            const communication = {
-              id: `comm-${Date.now()}`,
-              type: newCommunication?.type,
-              date: new Date()?.toISOString()?.split('T')?.[0],
-              content: newCommunication?.content,
-              urgency: newCommunication?.urgency,
-              hasAttachments: newCommunication?.hasAttachments
+            // Mapea los datos al formato del backend
+            const commData = {
+              id: `${Date.now()}`,
+              tipoComunicacion: newCommunication?.type || 'whatsapp',
+              nivelUrgencia: newCommunication?.urgency === 'urgent' ? 'alta' : 'normal',
+              asunto: 'Comunicación automática',
+              mensaje: newCommunication?.content,
+              destinatario: opportunity?.clientId || opportunity?.clienteId || 'cliente777',
+              medioDifusion: newCommunication?.type || 'whatsapp',
+              estado: 'pendiente',
+              fechaCreacion: new Date()?.toISOString(),
+              creadoPor: 'test-user',
+              indicadorUrgencia: newCommunication?.urgency === 'urgent' ? 'Alta🟡' : 'Normal🟢',
             };
 
-            onAddCommunication?.(communication);
+            await createCommunication(commData);
+            // Actualiza el historial local
+            setLocalHistory(prev => [
+              {
+                id: commData.id,
+                type: commData.tipoComunicacion,
+                date: commData.fechaCreacion.split('T')[0],
+                content: commData.mensaje,
+                urgency: commData.nivelUrgencia === 'alta' ? 'urgent' : 'normal',
+              },
+              ...prev
+            ]);
             setNewCommunication({ type: 'whatsapp', content: '', urgency: 'normal', hasAttachments: false });
           };
 
@@ -61,7 +81,7 @@ import React, { useState } from 'react';
               {/* Communication History */}
               {showHistory && (
                 <div className="max-h-48 overflow-y-auto space-y-2 bg-muted/30 rounded-lg p-3">
-                  {opportunity?.communications?.map((comm) => (
+                  {localHistory.map((comm) => (
                     <div key={comm?.id} className="flex items-start space-x-2 text-sm">
                       <Icon 
                         name={comm?.type === 'whatsapp' ? 'MessageCircle' : 'Mail'} 
@@ -79,7 +99,7 @@ import React, { useState } from 'react';
                       </div>
                     </div>
                   ))}
-                  {(!opportunity?.communications || opportunity?.communications?.length === 0) && (
+                  {localHistory.length === 0 && (
                     <p className="text-sm text-muted-foreground text-center py-4">Sin comunicaciones registradas</p>
                   )}
                 </div>
@@ -136,13 +156,15 @@ import React, { useState } from 'react';
 
                 <Button
                   onClick={handleAddCommunication}
-                  disabled={!newCommunication?.content?.trim()}
+                  disabled={!newCommunication?.content?.trim() || loading}
                   className="w-full"
                   iconName="Send"
                   iconPosition="left"
                 >
-                  Enviar Comunicación
+                  {loading ? 'Enviando...' : 'Enviar Comunicación'}
                 </Button>
+                {error && <div className="text-xs text-destructive mt-2">Error al enviar comunicación</div>}
+                {success && <div className="text-xs text-green-600 mt-2">Comunicación enviada correctamente</div>}
               </div>
 
               {/* Quick Actions */}

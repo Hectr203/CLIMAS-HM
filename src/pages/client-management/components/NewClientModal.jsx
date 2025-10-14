@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
+import useClient from '../../../hooks/useClient';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import { useNotifications } from '../../../context/NotificationContext.jsx';
 
-const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialData = null, createClient, editClient }) => {
+const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialData = null }) => {
+  const { createClient, editClient } = useClient();
   const { showSuccess, showError } = useNotifications();
   const [formData, setFormData] = useState({
     companyName: '',

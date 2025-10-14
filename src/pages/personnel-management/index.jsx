@@ -325,6 +325,7 @@ const PersonnelManagement = () => {
             employee={selectedEmployee}
             mode={modalMode}
             onSave={handleSavePersonnel}
+            error={error}
           />
         </div>
       </div>
