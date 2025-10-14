@@ -9,7 +9,7 @@ import usePerson from '../../../hooks/usePerson';
 
 const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error, openedFromEPP }) => {
   const [localError, setLocalError] = useState(null);
-  const { createPerson, updatePersonByEmpleadoId } = usePerson();
+  const { createPerson, updatePersonById } = usePerson();
   const { showSuccess } = useNotifications();
  
   const [formData, setFormData] = useState({
@@ -207,7 +207,7 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error, opened
 
       let result;
       if (mode === 'edit' && formData.employeeId) {
-        result = await updatePersonByEmpleadoId(formData.employeeId, payload);
+        result = await updatePersonById(employee.id, payload);
         showSuccess('Empleado actualizado correctamente ✅');
       } else {
         result = await createPerson({ ...payload, empleadoId: formData.employeeId, activo: true });
