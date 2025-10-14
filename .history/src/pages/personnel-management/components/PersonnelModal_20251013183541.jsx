@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useNotifications } from '../../../context/NotificationContext';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
@@ -7,11 +6,10 @@ import Select from '../../../components/ui/Select';
 import { Checkbox } from '../../../components/ui/Checkbox';
 import usePerson from '../../../hooks/usePerson';
 
-const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error }) => {
-  const [localError, setLocalError] = useState(null);
-  const { createPerson, updatePersonByEmpleadoId } = usePerson();
-  const { showSuccess } = useNotifications();
- 
+const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave }) => {
+const { createPerson, updatePersonByEmpleadoId } = usePerson();
+
+  // 🔹 Estado inicial del formulario
   const [formData, setFormData] = useState({
     name: '',
     employeeId: '',
@@ -180,42 +178,39 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error }) => {
   };
 
   // 🔹 Guardar nuevo empleado
-
-  // (Ya está declarada al inicio, se elimina duplicado)
-
   const handleSave = async () => {
-    setLocalError(null);
-    try {
-      const payload = {
-        nombreCompleto: formData.name,
-        email: formData.email,
-        telefono: formData.phone,
-        departamento: formData.department,
-        puesto: formData.position,
-        fechaIngreso: formData.hireDate,
-        estado: formData.status,
-      };
+  try {
+    const payload = {
+      nombreCompleto: formData.name,
+      email: formData.email,
+      telefono: formData.phone,
+      departamento: formData.department,
+      puesto: formData.position,
+      fechaIngreso: formData.hireDate,
+      estado: formData.status,
+    };
 
-      console.log("Payload enviado:", payload);
+    console.log("Payload enviado:", payload);
 
-      let result;
-      if (mode === 'edit' && formData.employeeId) {
-        result = await updatePersonByEmpleadoId(formData.employeeId, payload);
-        showSuccess('Empleado actualizado correctamente ✅');
-      } else {
-        result = await createPerson({ ...payload, empleadoId: formData.employeeId, activo: true });
-        showSuccess('Empleado registrado correctamente ✅');
-      }
-
-      if (onSave) onSave(result);
-      onClose();
-    } catch (error) {
-      console.error("Error al guardar:", error);
-      if (error?.status === 409 && error?.data?.error?.includes('correo')) {
-        setLocalError(error);
-      }
+    let result;
+    if (mode === 'edit' && formData.employeeId) {
+      // 🔹 Si es edición, actualiza solo lo modificado
+      result = await updatePersonByEmpleadoId(formData.employeeId, payload);
+      alert("Empleado actualizado correctamente ✅");
+    } else {
+      // 🔹 Si es creación, registra nuevo
+      result = await createPerson({ ...payload, empleadoId: formData.employeeId, activo: true });
+      alert("Empleado registrado correctamente ✅");
     }
-  };
+
+    if (onSave) await onSave(result);
+        if (onSave) await onSave(result);
+    onClose();
+  } catch (error) {
+    console.error("Error al guardar:", error);
+    alert("Hubo un error al guardar el empleado. Revisa la consola.");
+  }
+};
 
 
   // 🔹 Tabs del modal
@@ -312,16 +307,12 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error }) => {
                   label="Correo Electrónico"
                   type="email"
                   value={formData.email}
-                  onChange={(e) => {
-                    handleInputChange('email', e.target.value);
-                    if (localError) setLocalError(null);
-                  }}
+                  onChange={(e) =>
+                    handleInputChange('email', e.target.value)
+                  }
                   required
                   disabled={mode === 'view'}
                 />
-                {(localError?.status === 409 && localError?.data?.error?.includes('correo')) && (
-                  <span className="block text-xs text-red-600 mt-1">Este correo ya está registrado</span>
-                )}
                 <Input
   label="Teléfono"
   type="tel"
@@ -490,12 +481,7 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error }) => {
             <Button variant="outline" onClick={onClose}>
               Cancelar
             </Button>
-            <Button 
-              onClick={handleSave} 
-              iconName="Save" 
-              iconPosition="left"
-              disabled={localError?.status === 409 && localError?.data?.error?.includes('correo')}
-            >
+            <Button onClick={handleSave} iconName="Save" iconPosition="left">
               {mode === 'create' ? 'Crear Empleado' : 'Guardar Cambios'}
             </Button>
           </div>
