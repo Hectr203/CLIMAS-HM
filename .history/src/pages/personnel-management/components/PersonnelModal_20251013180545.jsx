@@ -203,7 +203,7 @@ const { createPerson, updatePersonByEmpleadoId } = usePerson();
       alert("Empleado registrado correctamente ✅");
     }
 
-    if (onSave) await onSave(result);
+    if (onSave) onSave(result);
     onClose();
   } catch (error) {
     console.error("Error al guardar:", error);

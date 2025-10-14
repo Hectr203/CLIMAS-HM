@@ -204,6 +204,7 @@ const { createPerson, updatePersonByEmpleadoId } = usePerson();
     }
 
     if (onSave) await onSave(result);
+        if (onSave) await onSave(result);
     onClose();
   } catch (error) {
     console.error("Error al guardar:", error);
