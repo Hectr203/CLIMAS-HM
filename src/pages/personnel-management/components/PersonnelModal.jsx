@@ -227,10 +227,10 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error, opened
 
   // 🔹 Tabs del modal (solo para mostrar, deshabilitados)
   const tabs = [
-    { id: 'general', label: 'Información General', icon: 'User' },
-    { id: 'medical', label: 'Estudios Médicos', icon: 'Heart' },
-    { id: 'ppe', label: 'EPP', icon: 'Shield' },
-    { id: 'emergency', label: 'Contacto de Emergencia', icon: 'Phone' }
+  { id: 'general', label: 'Información General', icon: 'User' },
+  { id: 'medical', label: 'Archivos', icon: 'FileText' },
+  { id: 'ppe', label: 'EPP', icon: 'Shield' },
+  { id: 'emergency', label: 'Contacto de Emergencia', icon: 'Phone' }
   ];
 
   // Traducción de EPP
