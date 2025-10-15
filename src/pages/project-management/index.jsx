@@ -44,7 +44,7 @@ const ProjectManagement = () => {
       startDate: "2024-01-15",
       endDate: "2024-04-30",
       progress: 65,
-      department: "Ingeniería",
+      department: "engineering",
       location: "Ciudad de México, CDMX",
       image: "https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=400",
       assignedPersonnel: [
@@ -76,7 +76,7 @@ const ProjectManagement = () => {
       startDate: "2024-02-01",
       endDate: "2024-03-15",
       progress: 100,
-      department: "Mantenimiento",
+      department: "maintenance",
       location: "Guadalajara, JAL",
       image: "https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=400",
       assignedPersonnel: [
@@ -106,7 +106,7 @@ const ProjectManagement = () => {
       startDate: "2024-03-01",
       endDate: "2024-05-30",
       progress: 25,
-      department: "Ventas",
+      department: "sales",
       location: "Monterrey, NL",
       image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400",
       assignedPersonnel: [
@@ -135,7 +135,7 @@ const ProjectManagement = () => {
       startDate: "2024-04-01",
       endDate: "2024-07-15",
       progress: 10,
-      department: "Administración",
+      department: "administration",
       location: "Puebla, PUE",
       image: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400",
       assignedPersonnel: [
@@ -165,7 +165,7 @@ const ProjectManagement = () => {
       startDate: "2024-03-15",
       endDate: "2024-04-15",
       progress: 85,
-      department: "Mantenimiento",
+      department: "maintenance",
       location: "Tijuana, BC",
       image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400",
       assignedPersonnel: [
@@ -180,13 +180,28 @@ const ProjectManagement = () => {
   ];
 
   useEffect(() => {
-    // Simulate loading
     const loadProjects = async () => {
       setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      // setProjects(mockProjects);
-      // setFilteredProjects(mockProjects);
-      setIsLoading(false);
+      try {
+        const proyectoService = await import('services/proyectoService').then(m => m.default);
+        const data = await proyectoService.obtenerProyectos();
+
+        if (data && Array.isArray(data) && data.length > 0) {
+          setProjects(data);
+          setFilteredProjects(data);
+        } else if (Array.isArray(data?.data) && data.data.length > 0) {
+          setProjects(data.data);
+          setFilteredProjects(data.data);
+        } else {
+          setProjects([]);
+          setFilteredProjects([]);
+        }
+      } catch (error) {
+        setProjects([]);
+        setFilteredProjects([]);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     loadProjects();
@@ -195,36 +210,121 @@ const ProjectManagement = () => {
   const handleFiltersChange = (filters) => {
     let filtered = [...projects];
 
-    // Search filter
+    // Search filter - buscar en código y nombre de proyecto
     if (filters?.search) {
-      const searchTerm = filters?.search?.toLowerCase();
-      filtered = filtered?.filter(project => 
-        project?.name?.toLowerCase()?.includes(searchTerm) ||
-        project?.code?.toLowerCase()?.includes(searchTerm) ||
-        project?.client?.name?.toLowerCase()?.includes(searchTerm)
-      );
+      const searchTerm = filters.search.toLowerCase().trim();
+      filtered = filtered.filter(project => {
+        const name = (project?.nombreProyecto || '').toLowerCase();
+        const code = (project?.codigo || '').toLowerCase();
+        return name.includes(searchTerm) || code.includes(searchTerm);
+      });
     }
 
-    // Status filter
-    if (filters?.status) {
-      filtered = filtered?.filter(project => project?.status === filters?.status);
-    }
-
-    // Department filter
+    // Department filter - comparar con los valores reales del backend
     if (filters?.department) {
-      filtered = filtered?.filter(project => 
-        project?.department?.toLowerCase()?.includes(filters?.department?.toLowerCase())
-      );
+      const deptMap = {
+        'sales': 'Ventas',
+        'engineering': 'Ingeniería',
+        'installation': 'Instalación',
+        'maintenance': 'Mantenimiento',
+        'administration': 'Administración'
+      };
+
+      const targetDept = deptMap[filters.department] || filters.department;
+      filtered = filtered.filter(project => {
+        const dept = project?.departamento || '';
+        return dept === targetDept;
+      });
     }
 
-    // Client type filter
-    if (filters?.clientType) {
-      filtered = filtered?.filter(project => project?.client?.type === filters?.clientType);
-    }
-
-    // Priority filter
+    // Priority filter - comparar con valores del backend
     if (filters?.priority) {
-      filtered = filtered?.filter(project => project?.priority === filters?.priority);
+      const priorityMap = {
+        'low': 'Baja',
+        'medium': 'Media',
+        'high': 'Alta',
+        'urgent': 'Urgente'
+      };
+
+      const targetPriority = priorityMap[filters.priority] || filters.priority;
+      filtered = filtered.filter(project => {
+        const priority = project?.prioridad || '';
+        return priority === targetPriority;
+      });
+    }
+
+    // Date range filter
+    if (filters?.dateRange) {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+      filtered = filtered.filter(project => {
+        const startDateStr = project?.cronograma?.fechaInicio;
+        if (!startDateStr) return false;
+
+        const startDate = new Date(startDateStr);
+        if (isNaN(startDate.getTime())) return false;
+
+        switch (filters.dateRange) {
+          case 'today':
+            return startDate.toDateString() === today.toDateString();
+          case 'week':
+            const weekAgo = new Date(today);
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            return startDate >= weekAgo && startDate <= now;
+          case 'month':
+            return startDate.getMonth() === now.getMonth() &&
+              startDate.getFullYear() === now.getFullYear();
+          case 'quarter':
+            const quarter = Math.floor(now.getMonth() / 3);
+            const projectQuarter = Math.floor(startDate.getMonth() / 3);
+            return projectQuarter === quarter &&
+              startDate.getFullYear() === now.getFullYear();
+          case 'year':
+            return startDate.getFullYear() === now.getFullYear();
+          default:
+            return true;
+        }
+      });
+    }
+
+    // Budget filters
+    if (filters?.minBudget) {
+      const minBudget = Number(filters.minBudget);
+      filtered = filtered.filter(project => {
+        const budget = project?.totalPresupuesto || 0;
+        return budget >= minBudget;
+      });
+    }
+
+    if (filters?.maxBudget) {
+      const maxBudget = Number(filters.maxBudget);
+      filtered = filtered.filter(project => {
+        const budget = project?.totalPresupuesto || 0;
+        return budget <= maxBudget;
+      });
+    }
+
+    // Start date filter
+    if (filters?.startDate) {
+      const filterStartDate = new Date(filters.startDate);
+      filtered = filtered.filter(project => {
+        const startDateStr = project?.cronograma?.fechaInicio;
+        if (!startDateStr) return false;
+        const projectStartDate = new Date(startDateStr);
+        return projectStartDate >= filterStartDate;
+      });
+    }
+
+    // End date filter
+    if (filters?.endDate) {
+      const filterEndDate = new Date(filters.endDate);
+      filtered = filtered.filter(project => {
+        const endDateStr = project?.cronograma?.fechaFin;
+        if (!endDateStr) return false;
+        const projectEndDate = new Date(endDateStr);
+        return projectEndDate <= filterEndDate;
+      });
     }
 
     setFilteredProjects(filtered);
@@ -237,13 +337,13 @@ const ProjectManagement = () => {
   };
 
   const handleStatusUpdate = (projectId, newStatus) => {
-    setProjects(prev => prev?.map(project => 
-      project?.id === projectId 
+    setProjects(prev => prev?.map(project =>
+      project?.id === projectId
         ? { ...project, status: newStatus }
         : project
     ));
-    setFilteredProjects(prev => prev?.map(project => 
-      project?.id === projectId 
+    setFilteredProjects(prev => prev?.map(project =>
+      project?.id === projectId
         ? { ...project, status: newStatus }
         : project
     ));
@@ -264,9 +364,9 @@ const ProjectManagement = () => {
         type: "commercial"
       },
       statusLabel: "Planificación",
-      priorityLabel: projectData?.priority === 'low' ? 'Baja' : 
-                    projectData?.priority === 'medium' ? 'Media' :
-                    projectData?.priority === 'high' ? 'Alta' : 'Urgente',
+      priorityLabel: projectData?.priority === 'low' ? 'Baja' :
+        projectData?.priority === 'medium' ? 'Media' :
+          projectData?.priority === 'high' ? 'Alta' : 'Urgente',
       assignedPersonnel: projectData?.assignedPersonnel?.map(id => ({
         name: id?.replace('-', ' ')?.replace(/\b\w/g, l => l?.toUpperCase()),
         role: "Asignado"
@@ -327,17 +427,17 @@ const ProjectManagement = () => {
   const handleUpdateProject = async (updatedProject) => {
     try {
       // Update in both projects arrays
-      setProjects(prevProjects => 
-        prevProjects?.map(p => 
+      setProjects(prevProjects =>
+        prevProjects?.map(p =>
           p?.id === updatedProject?.id ? updatedProject : p
         )
       );
-      setFilteredProjects(prevProjects => 
-        prevProjects?.map(p => 
+      setFilteredProjects(prevProjects =>
+        prevProjects?.map(p =>
           p?.id === updatedProject?.id ? updatedProject : p
         )
       );
-      
+
       console.log(`Proyecto ${updatedProject?.code} actualizado exitosamente`);
       setSelectedProject(null);
     } catch (error) {
@@ -347,7 +447,7 @@ const ProjectManagement = () => {
 
   const handleDeleteProject = (project) => {
     if (window.confirm(`¿Está seguro de que desea eliminar el proyecto "${project?.name || project?.code}"?\n\nEsta acción no se puede deshacer.`)) {
-      setProjects(prevProjects => 
+      setProjects(prevProjects =>
         prevProjects?.filter(p => p?.id !== project?.id)
       );
       console.log(`Proyecto ${project?.code} eliminado exitosamente`);
@@ -357,17 +457,17 @@ const ProjectManagement = () => {
   const handleImageUpload = async () => {
     try {
       setIsUploadingImage(true);
-      
+
       // Create file input element
       const fileInput = document.createElement('input');
       fileInput.type = 'file';
       fileInput.accept = 'image/*';
       fileInput.multiple = false;
-      
+
       // Handle file selection
       fileInput.onchange = async (event) => {
         const file = event?.target?.files?.[0];
-        
+
         if (file) {
           // Validate file type
           if (!file?.type?.startsWith('image/')) {
@@ -375,7 +475,7 @@ const ProjectManagement = () => {
             setIsUploadingImage(false);
             return;
           }
-          
+
           // Validate file size (5MB limit)
           const maxSize = 5 * 1024 * 1024; // 5MB
           if (file?.size > maxSize) {
@@ -383,7 +483,7 @@ const ProjectManagement = () => {
             setIsUploadingImage(false);
             return;
           }
-          
+
           // Create file preview
           const reader = new FileReader();
           reader.onload = (e) => {
@@ -395,23 +495,23 @@ const ProjectManagement = () => {
               url: e?.target?.result,
               lastModified: file?.lastModified
             };
-            
+
             setSelectedImage(imagePreview);
             console.log('Imagen seleccionada:', imagePreview);
-            
+
             // Show success notification
             alert(`Imagen "${file?.name}" cargada exitosamente\n\nTamaño: ${(file?.size / 1024 / 1024)?.toFixed(2)} MB\nTipo: ${file?.type}`);
           };
-          
+
           reader?.readAsDataURL(file);
         }
-        
+
         setIsUploadingImage(false);
       };
-      
+
       // Trigger file picker
       fileInput?.click();
-      
+
     } catch (error) {
       console.error('Error al seleccionar imagen:', error);
       alert('Error al seleccionar la imagen. Por favor, inténtelo de nuevo.');
@@ -451,10 +551,10 @@ const ProjectManagement = () => {
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
-      
+
       <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
         <Header onMenuToggle={() => setHeaderMenuOpen(!headerMenuOpen)} isMenuOpen={headerMenuOpen} />
-        
+
         <div className="pt-16">
           <div className="container mx-auto px-4 py-8">
             {/* Header */}
@@ -465,7 +565,7 @@ const ProjectManagement = () => {
                   Administre el ciclo completo de proyectos HVAC desde la planificación hasta el cierre
                 </p>
               </div>
-              
+
               <div className="flex items-center space-x-4 mt-4 lg:mt-0">
                 {/* View Toggle */}
                 <div className="flex bg-muted rounded-lg p-1">
@@ -473,11 +573,10 @@ const ProjectManagement = () => {
                     <button
                       key={option?.value}
                       onClick={() => setActiveView(option?.value)}
-                      className={`flex items-center space-x-2 px-3 py-2 rounded-md transition-smooth ${
-                        activeView === option?.value
+                      className={`flex items-center space-x-2 px-3 py-2 rounded-md transition-smooth ${activeView === option?.value
                           ? 'bg-primary text-primary-foreground'
                           : 'text-muted-foreground hover:text-foreground'
-                      }`}
+                        }`}
                     >
                       <Icon name={option?.icon} size={16} />
                       <span className="hidden sm:inline text-sm">{option?.label}</span>
@@ -510,7 +609,7 @@ const ProjectManagement = () => {
                     Eliminar
                   </Button>
                 </div>
-                
+
                 <div className="flex flex-col lg:flex-row lg:items-start space-y-4 lg:space-y-0 lg:space-x-6">
                   <div className="flex-shrink-0">
                     <img
@@ -519,7 +618,7 @@ const ProjectManagement = () => {
                       className="w-32 h-32 object-cover rounded-lg border"
                     />
                   </div>
-                  
+
                   <div className="flex-1 space-y-2">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
@@ -552,6 +651,23 @@ const ProjectManagement = () => {
             {activeView !== 'stats' && (
               <ProjectStats projects={filteredProjects} />
             )}
+            {/* ✅ Mensaje cuando no hay proyectos */}
+            {filteredProjects?.length === 0 && !isLoading && (
+              <div className="text-center py-12">
+                <Icon
+                  name="FolderOpen"
+                  size={64}
+                  className="text-muted-foreground mx-auto mb-4"
+                />
+                <h3 className="text-lg font-medium text-foreground mb-2">
+                  No se encuentra proyecto con tus especificaciones
+                </h3>
+                <p className="text-muted-foreground mb-6">
+                  Intenta con otros filtros o parámetros de búsqueda
+                </p>
+              </div>
+            )}
+
 
             {/* Filters */}
             {activeView === 'table' && (
@@ -591,24 +707,6 @@ const ProjectManagement = () => {
                 </div>
               )}
             </div>
-
-            {/* Empty State */}
-            {filteredProjects?.length === 0 && !isLoading && (
-              <div className="text-center py-12">
-                <Icon name="FolderOpen" size={64} className="text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-foreground mb-2">No se encontraron proyectos</h3>
-                <p className="text-muted-foreground mb-6">
-                  No hay proyectos que coincidan con los filtros seleccionados
-                </p>
-                <Button
-                  onClick={() => setIsCreateModalOpen(true)}
-                  iconName="Plus"
-                  iconPosition="left"
-                >
-                  Crear Primer Proyecto
-                </Button>
-              </div>
-            )}
 
             {/* Create Project Modal */}
             <CreateProjectModal
