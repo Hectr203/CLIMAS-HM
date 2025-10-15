@@ -485,7 +485,7 @@ const SalesOpportunityManagement = () => {
             <div className="relative flex transition-all duration-300">
               {/* Kanban container */}
               <div
-                className={`flex-1 pb-6 transition-all duration-300 ${showControls ? 'mr-[26rem]' : ''}`}
+                className={`flex-1 pb-6 transition-all duration-300 ${showControls ? 'mr-[32rem]' : ''}`}
               >
                 {/* Scroll horizontal en desktop; en mobile se apilan columnas (flex-col) */}
                 <div className="lg:overflow-x-auto lg:overflow-y-hidden">
@@ -609,21 +609,21 @@ const SalesOpportunityManagement = () => {
               {/* Panel derecho - Desktop: fixed right panel; Mobile: slide-over full screen */}
               {showControls && (
                 <>
-                  {/* Overlay para mobile (aparece solo en pantallas pequeñas) */}
+                  {/* Overlay solo para mobile */}
                   <div
                     className="lg:hidden fixed inset-0 bg-black/40 z-30"
                     onClick={() => setShowControls(false)}
                     aria-hidden="true"
                   />
 
-                  {/* Fondo semitransparente para mobile */}
+                  {/* Fondo semitransparente solo para mobile */}
                   <div
                     className="fixed inset-0 bg-black/30 z-40 lg:hidden"
                     onClick={() => setShowControls(false)}
                   />
 
                   <aside
-                    className={`fixed top-16 right-4 w-11/12 max-w-xs h-[80vh] bg-white z-50 rounded-l-2xl shadow-xl overflow-y-auto
+                    className={`fixed top-16 right-4 w-11/12 max-w-xs h-[80vh] bg-white z-[60] rounded-l-2xl shadow-xl overflow-y-auto
                   transform transition-transform duration-300
                   ${showControls ? 'translate-x-0' : 'translate-x-full'}
                   lg:top-[6rem] lg:right-0 lg:w-[25rem] lg:h-[calc(100vh-6rem)] lg:translate-x-0 lg:rounded-l-2xl lg:shadow-xl lg:border-l`}
@@ -669,24 +669,57 @@ const SalesOpportunityManagement = () => {
                           />
 
                           {(selectedOpportunity?.stage === 'quotation-development' ||
-                            selectedOpportunity?.quotationData) && (
+                            selectedOpportunity?.stage === 'client-review' ||
+                            selectedOpportunity?.stage === 'closure') && (
                             <QuotationRequestPanel
-                              opportunity={selectedOpportunity}
+                              opportunity={{
+                                ...selectedOpportunity,
+                                quotationData: selectedOpportunity?.quotationData || {
+                                  scope: '',
+                                  assumptions: [],
+                                  timeline: '',
+                                  conditions: '',
+                                  materials: [],
+                                  riskAssessment: 'low',
+                                  extraCosts: [],
+                                  totalAmount: 0,
+                                  validity: '30 días'
+                                }
+                              }}
                               onUpdate={(quotationData) =>
                                 handleQuotationUpdate(selectedOpportunity?.id, quotationData)
                               }
                             />
                           )}
 
-                          {selectedOpportunity?.stage === 'closure' &&
-                            selectedOpportunity?.quotationData?.approved && (
-                              <WorkOrderPanel
-                                opportunity={selectedOpportunity}
-                                onGenerateWorkOrder={(workOrderData) =>
-                                  handleWorkOrderGeneration(selectedOpportunity?.id, workOrderData)
-                                }
-                              />
-                            )}
+                          {/* Panel de revisión del cliente */}
+                          {selectedOpportunity?.stage === 'client-review' && selectedOpportunity?.quotationStatus && (
+                            <div className="border rounded-lg p-4 bg-muted/10">
+                              <h4 className="font-medium mb-2 flex items-center">
+                                <Icon name="Eye" size={16} className="mr-2 text-yellow-600" />
+                                Revisión del Cliente
+                              </h4>
+                              <div className="text-sm mb-2">
+                                <strong>Enviado:</strong> {selectedOpportunity.quotationStatus.sent ? 'Sí' : 'No'}<br />
+                                <strong>Fecha de envío:</strong> {selectedOpportunity.quotationStatus.sentDate}<br />
+                                <strong>Método:</strong> {selectedOpportunity.quotationStatus.method}<br />
+                                <strong>Adjuntos:</strong> {selectedOpportunity.quotationStatus.attachments?.join(', ') || 'Ninguno'}<br />
+                                <strong>Feedback del cliente:</strong> {selectedOpportunity.quotationStatus.clientFeedback || 'Sin comentarios'}
+                              </div>
+                            </div>
+                          )}
+
+
+                          {/* Panel de orden de trabajo en cierre */}
+
+                          {selectedOpportunity?.stage === 'closure' && (
+                            <WorkOrderPanel
+                              opportunity={selectedOpportunity}
+                              onGenerateWorkOrder={(workOrderData) =>
+                                handleWorkOrderGeneration(selectedOpportunity?.id, workOrderData)
+                              }
+                            />
+                          )}
 
                           {selectedOpportunity?.stage !== 'initial-contact' && (
                             <ChangeManagementPanel

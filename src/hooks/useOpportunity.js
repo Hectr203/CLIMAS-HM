@@ -34,6 +34,26 @@ export function useOpportunity() {
           estimatedBudget: opp.presupuestoEstimado,
           timeline: opp.cronogramaEsperado,
         },
+        quotationData: opp.quotationData || {
+          scope: '',
+          assumptions: [],
+          timeline: '',
+          conditions: '',
+          materials: [],
+          riskAssessment: 'low',
+          extraCosts: [],
+          totalAmount: 0,
+          validity: '30 días'
+        },
+        contractualInfo: opp.contractualInfo || {
+          paymentConditions: '',
+          billingData: {
+            businessName: '',
+            rfc: '',
+            address: ''
+          },
+          deliverySchedule: []
+        },
         notes: opp.notasAdicionales,
         createdAt: opp.createdAt,
         updatedAt: opp.updatedAt,
