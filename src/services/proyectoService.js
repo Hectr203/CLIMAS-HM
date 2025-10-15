@@ -1,33 +1,55 @@
 // services/proyectoService.js
 import httpService from './httpService';
 
-const BASE = 'http://localhost:7071/api/proyectos';
-
 const proyectoService = {
-  // Opcional si cuentas con listado general en tu API
-  async obtenerProyectos() {
-    const { data } = await httpService.get(`${BASE}`);
-    return data;
+  async getProyectos() {
+    try {
+      const data = await httpService.get('/proyectos');
+      return data;
+    } catch (error) {
+      console.error("Error al obtener proyectos:", error);
+      throw error;
+    }
   },
 
-  async obtenerProyecto(id) {
-    const { data } = await httpService.get(`${BASE}/${id}`);
-    return data;
+  async getProyectoById(id) {
+    try {
+      const data = await httpService.get(`/proyectos/${id}`);
+      return data;
+    } catch (error) {
+      console.error(`Error al obtener el proyecto con ID ${id}:`, error);
+      throw error;
+    }
   },
 
-  async crearProyecto(payload) {
-    const { data } = await httpService.post(`${BASE}/crear`, payload);
-    return data;
+  async createProyecto(payload) {
+    try {
+      const data = await httpService.post('/proyectos/crear', payload);
+      return data;
+    } catch (error) {
+      console.error("Error al crear proyecto:", error);
+      throw error;
+    }
   },
 
-  async actualizarProyecto(id, payload) {
-    const { data } = await httpService.put(`${BASE}/${id}`, payload);
-    return data;
+  async updateProyecto(id, payload) {
+    try {
+      const data = await httpService.put(`/proyectos/${id}`, payload);
+      return data;
+    } catch (error) {
+      console.error(`Error al actualizar el proyecto con ID ${id}:`, error);
+      throw error;
+    }
   },
 
-  async eliminarProyecto(id) {
-    const { data } = await httpService.delete(`${BASE}/${id}`);
-    return data;
+  async deleteProyecto(id) {
+    try {
+      const data = await httpService.delete(`/proyectos/${id}`);
+      return data;
+    } catch (error) {
+      console.error(`Error al eliminar el proyecto con ID ${id}:`, error);
+      throw error;
+    }
   },
 };
 
