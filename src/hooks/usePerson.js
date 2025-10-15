@@ -65,42 +65,43 @@ const usePerson = () => {
   };
 
   // 🔹 NUEVA FUNCIÓN PARA ACTUALIZAR EMPLEADO EXISTENTE
-  const updatePersonById = async (id, payload) => {
-  setLoading(true);
-  setError(null);
-  try {
-    const response = await personService.updatePersonById(id, payload);
-    if (response.success) {
-      // ✅ Usamos "id" (no empleadoId) para actualizar correctamente
-      setPersons((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, ...response.data } : p))
+  const updatePersonByEmpleadoId = async (empleadoId, payload) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await personService.updatePersonByEmpleadoId(
+        empleadoId,
+        payload
       );
-
-      showOperationSuccess("Empleado actualizado exitosamente");
-      return response.data;
+      if (response.success) {
+        setPersons((prev) =>
+          prev.map((p) =>
+            p.empleadoId === empleadoId ? { ...p, ...response.data } : p
+          )
+        );
+        showOperationSuccess("Empleado actualizado exitosamente");
+        return response.data;
+      }
+    } catch (err) {
+      console.error("Error en usePerson.updatePersonByEmpleadoId:", err);
+      setError(err);
+      showHttpError("Error al actualizar empleado");
+      throw err;
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    console.error("Error en usePerson.updatePersonById:", err);
-    setError(err);
-    showHttpError("Error al actualizar empleado");
-    throw err;
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
-
-
-return {
-  persons,
-  departmentPersons,
-  loading,
-  error,
-  getPersons,
-  getPersonsByDepartment,
-  createPerson,
-  updatePersonById, // ✅ nuevo nombre
-};
+  return {
+    persons,
+    departmentPersons,
+    loading,
+    error,
+    getPersons,
+    getPersonsByDepartment,
+    createPerson,
+    updatePersonByEmpleadoId,
+  };
 };
 
 export default usePerson;

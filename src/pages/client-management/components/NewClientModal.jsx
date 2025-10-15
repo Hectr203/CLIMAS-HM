@@ -306,23 +306,15 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
             </div>
 
             <div>
-  <Input
-    type="tel"
-    inputMode="numeric"
-    label="Teléfono"
-    placeholder="Ej. 2214853240"
-    value={formData?.phone}
-    onChange={(e) => {
-      const value = e.target.value;
-      const numericValue = value.replace(/\D/g, '').slice(0, 10);
-      handleInputChange('phone', numericValue);
-    }}
-    error={errors?.phone}
-    required
-    maxLength={10}
-  />
-</div>
-
+              <Input
+                label="Teléfono"
+                placeholder="Ej. +52 81 1234-5678"
+                value={formData?.phone}
+                onChange={(e) => handleInputChange('phone', e?.target?.value)}
+                error={errors?.phone}
+                required
+              />
+            </div>
 
             <div>
               <Select

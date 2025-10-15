@@ -21,12 +21,11 @@ const personService = {
     }
   },
 
+  // 🔹 NUEVA FUNCIÓN PARA ACTUALIZAR EMPLEADO EXISTENTE
   async getPersonsByDepartment(department) {
     try {
       const response = await httpService.get(
-        `/obtenerEmpleadosPorDepartamentos?departamentos=${encodeURIComponent(
-          department
-        )}`
+        `/obtenerEmpleadosPorDepartamentos?departamentos=${encodeURIComponent(department)}`
       );
       return response;
     } catch (error) {
@@ -34,12 +33,10 @@ const personService = {
       throw error;
     }
   },
-
-  // ✅ Actualiza empleado usando su "id" real de Cosmos
-  async updatePersonById(id, payload) {
+  async updatePersonByEmpleadoId(empleadoId, payload) {
     try {
       const response = await httpService.put(
-        `/empleados/actualizar/${id}`,
+        `/empleados/byEmpleadoId/${empleadoId}`,
         payload
       );
       return response;

@@ -131,7 +131,7 @@ const PersonnelManagement = () => {
     // Si tienes create/update dentro del hook usePerson, puedes llamarlos así:
     // await savePerson(personnelData);  // Ejemplo: si existe esa función
 
-    // Pero para asegurar que la tabla se actualiza:
+    // 👇 Pero para asegurar que la tabla se actualiza:
     await getPersons(); // 🔄 Refresca la lista actualizada desde el backend
 
     setIsModalOpen(false); // Cierra el modal
