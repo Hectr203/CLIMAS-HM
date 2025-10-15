@@ -62,6 +62,22 @@ export function useOpportunity() {
     } finally {
       setLoading(false);
     }
+    };
+
+    const actualizarOportunidad = async (id, data) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await opportunityService.actualizarOportunidad(id, data);
+        await fetchOportunidades();
+        showOperationSuccess('Oportunidad actualizada exitosamente');
+        return response;
+      } catch (err) {
+        setError(err);
+        showHttpError('Error al actualizar oportunidad');
+      } finally {
+        setLoading(false);
+      }
   };
 
   useEffect(() => {
@@ -74,5 +90,6 @@ export function useOpportunity() {
     error,
     fetchOportunidades,
     crearOportunidad,
+     actualizarOportunidad,
   };
 }

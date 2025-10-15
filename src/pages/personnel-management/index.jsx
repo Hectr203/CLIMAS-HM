@@ -7,7 +7,7 @@ import PersonnelTable from './components/PersonnelTable';
 import FilterToolbar from './components/FilterToolbar';
 import ComplianceDashboard from './components/ComplianceDashboard';
 import PersonnelModal from './components/PersonnelModal';
-import usePerson from '../../hooks/usePerson'; // 🔹 tu hook real
+import usePerson from '../../hooks/usePerson'; 
 
 const PersonnelManagement = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -26,6 +26,8 @@ const PersonnelManagement = () => {
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [modalMode, setModalMode] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [initialStep, setInitialStep] = useState(0); // 0: general, 1: medical, 2: ppe, 3: emergency
+  const [openedFromEPP, setOpenedFromEPP] = useState(false);
 
   // ✅ Hook original
   const { persons, loading, error, getPersons } = usePerson();
@@ -93,26 +95,36 @@ const PersonnelManagement = () => {
   const handleViewProfile = (employee) => {
     setSelectedEmployee(employee);
     setModalMode('view');
+    setInitialStep(0);
+    setOpenedFromEPP(false);
     setIsModalOpen(true);
   };
 
   const handleEditPersonnel = (employee) => {
     setSelectedEmployee(employee);
     setModalMode('edit');
+    setInitialStep(0);
+    setOpenedFromEPP(false);
     setIsModalOpen(true);
   };
 
   const handleCreatePersonnel = () => {
     setSelectedEmployee(null);
     setModalMode('create');
+    setInitialStep(0);
+    setOpenedFromEPP(false);
     setIsModalOpen(true);
   };
 
   const handleAssignPPE = (employee) => {
     setSelectedEmployee(employee);
     setModalMode('edit');
+    setInitialStep(2); // Abrir directamente en el paso de EPP
+    setOpenedFromEPP(true);
     setIsModalOpen(true);
   };
+
+  // Eliminar duplicados: las funciones ya están arriba con initialStep
 
   const handleSavePersonnel = async (personnelData) => {
   try {
@@ -321,9 +333,17 @@ const PersonnelManagement = () => {
           {/* Modal */}
           <PersonnelModal
             isOpen={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
+            onClose={() => {
+              setIsModalOpen(false);
+              setSelectedEmployee(null);
+              setModalMode(null);
+              setInitialStep(0);
+              setOpenedFromEPP(false);
+            }}
             employee={selectedEmployee}
             mode={modalMode}
+            initialStep={initialStep}
+            openedFromEPP={openedFromEPP}
             onSave={handleSavePersonnel}
             error={error}
           />

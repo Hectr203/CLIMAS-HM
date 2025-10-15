@@ -13,13 +13,9 @@ import ChangeManagementPanel from './components/ChangeManagementPanel';
 import NewOpportunityModal from './components/NewOpportunityModal';
 import { useOpportunity } from '../../hooks/useOpportunity';
 
-/**
- * Componente principal: Gestión de Oportunidades de Venta
- * - Responsive: Desktop = Kanban horizontal; Mobile = columnas apiladas + slide-over para controles
- * - Se asume TailwindCSS y componentes UI ya existentes
- */
+
 const SalesOpportunityManagement = () => {
-  const { oportunidades, loading, error, crearOportunidad, fetchOportunidades } = useOpportunity();
+  const { oportunidades, loading, error, crearOportunidad, fetchOportunidades, actualizarOportunidad } = useOpportunity();
   // Estado local de oportunidades para el mock y handlers
   const [opportunities, setOpportunities] = useState([]);
   const [selectedOpportunity, setSelectedOpportunity] = useState(null);
@@ -315,13 +311,7 @@ const SalesOpportunityManagement = () => {
 
   // --- Handlers ---
   const handleCreateOpportunity = (newOpportunity) => {
-    // Asegurar que la nueva oportunidad tenga la etapa inicial
-    const oportunidadConEtapa = {
-      ...newOpportunity,
-      stage: 'initial-contact',
-      stageDuration: 0
-    };
-    crearOportunidad(oportunidadConEtapa)
+    crearOportunidad(newOpportunity)
       .then(response => {
         console.log('Respuesta backend oportunidad:', response);
         // Si el backend responde con éxito, actualiza el estado local
@@ -342,15 +332,16 @@ const SalesOpportunityManagement = () => {
     setSelectedOpportunity(null);
   };
 
-  const handleStageTransition = (opportunityId, newStage) => {
-    setOpportunities(prev => prev?.map(opp =>
-      opp?.id === opportunityId
-        ? { ...opp, stage: newStage, stageDuration: 0 }
-        : opp
-    ));
-    // actualizar selección si es la misma oportunidad visible
-    if (selectedOpportunity?.id === opportunityId) {
-      setSelectedOpportunity(prev => ({ ...prev, stage: newStage, stageDuration: 0 }));
+  const handleStageTransition = async (opportunityId, newStage) => {
+    try {
+      // Actualiza en backend y refresca oportunidades
+      await actualizarOportunidad(opportunityId, { etapa: newStage });
+      // El hook ya refresca oportunidades, solo actualiza selección si corresponde
+      if (selectedOpportunity?.id === opportunityId) {
+        setSelectedOpportunity(prev => ({ ...prev, stage: newStage, stageDuration: 0 }));
+      }
+    } catch (err) {
+      // Manejo de error ya está en el hook
     }
   };
 
