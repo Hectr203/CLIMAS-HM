@@ -13,14 +13,11 @@ import ChangeManagementPanel from './components/ChangeManagementPanel';
 import NewOpportunityModal from './components/NewOpportunityModal';
 import { useOpportunity } from '../../hooks/useOpportunity';
 
-/**
- * Componente principal: Gestión de Oportunidades de Venta
- * - Responsive: Desktop = Kanban horizontal; Mobile = columnas apiladas + slide-over para controles
- * - Se asume TailwindCSS y componentes UI ya existentes
- */
+
 const SalesOpportunityManagement = () => {
-  const { oportunidades, loading, error, crearOportunidad, fetchOportunidades } = useOpportunity();
-  // Elimina el estado local de oportunidades, usa el hook
+  const { oportunidades, loading, error, crearOportunidad, fetchOportunidades, actualizarOportunidad } = useOpportunity();
+  // Estado local de oportunidades para el mock y handlers
+  const [opportunities, setOpportunities] = useState([]);
   const [selectedOpportunity, setSelectedOpportunity] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showControls, setShowControls] = useState(false);
@@ -314,9 +311,19 @@ const SalesOpportunityManagement = () => {
 
   // --- Handlers ---
   const handleCreateOpportunity = (newOpportunity) => {
-    setOpportunities(prev => [newOpportunity, ...prev]);
-    setShowNewOpportunityModal(false);
-    console.log('Nueva oportunidad creada:', newOpportunity);
+    crearOportunidad(newOpportunity)
+      .then(response => {
+        console.log('Respuesta backend oportunidad:', response);
+        // Si el backend responde con éxito, actualiza el estado local
+        if (response && response.success && response.data) {
+          setOpportunities(prev => [response.data, ...prev]);
+        }
+        setShowNewOpportunityModal(false);
+      })
+      .catch(error => {
+        // Manejo de error opcional
+        console.error('Error al guardar oportunidad:', error);
+      });
   };
 
   const handleNewOpportunityClick = () => {
@@ -325,15 +332,16 @@ const SalesOpportunityManagement = () => {
     setSelectedOpportunity(null);
   };
 
-  const handleStageTransition = (opportunityId, newStage) => {
-    setOpportunities(prev => prev?.map(opp =>
-      opp?.id === opportunityId
-        ? { ...opp, stage: newStage, stageDuration: 0 }
-        : opp
-    ));
-    // actualizar selección si es la misma oportunidad visible
-    if (selectedOpportunity?.id === opportunityId) {
-      setSelectedOpportunity(prev => ({ ...prev, stage: newStage, stageDuration: 0 }));
+  const handleStageTransition = async (opportunityId, newStage) => {
+    try {
+      // Actualiza en backend y refresca oportunidades
+      await actualizarOportunidad(opportunityId, { etapa: newStage });
+      // El hook ya refresca oportunidades, solo actualiza selección si corresponde
+      if (selectedOpportunity?.id === opportunityId) {
+        setSelectedOpportunity(prev => ({ ...prev, stage: newStage, stageDuration: 0 }));
+      }
+    } catch (err) {
+      // Manejo de error ya está en el hook
     }
   };
 
@@ -477,7 +485,7 @@ const SalesOpportunityManagement = () => {
             <div className="relative flex transition-all duration-300">
               {/* Kanban container */}
               <div
-                className={`flex-1 pb-6 transition-all duration-300 ${showControls ? 'mr-[26rem]' : ''}`}
+                className={`flex-1 pb-6 transition-all duration-300 ${showControls ? 'mr-[32rem]' : ''}`}
               >
                 {/* Scroll horizontal en desktop; en mobile se apilan columnas (flex-col) */}
                 <div className="lg:overflow-x-auto lg:overflow-y-hidden">
@@ -601,21 +609,21 @@ const SalesOpportunityManagement = () => {
               {/* Panel derecho - Desktop: fixed right panel; Mobile: slide-over full screen */}
               {showControls && (
                 <>
-                  {/* Overlay para mobile (aparece solo en pantallas pequeñas) */}
+                  {/* Overlay solo para mobile */}
                   <div
                     className="lg:hidden fixed inset-0 bg-black/40 z-30"
                     onClick={() => setShowControls(false)}
                     aria-hidden="true"
                   />
 
-                  {/* Fondo semitransparente para mobile */}
+                  {/* Fondo semitransparente solo para mobile */}
                   <div
                     className="fixed inset-0 bg-black/30 z-40 lg:hidden"
                     onClick={() => setShowControls(false)}
                   />
 
                   <aside
-                    className={`fixed top-16 right-4 w-11/12 max-w-xs h-[80vh] bg-white z-50 rounded-l-2xl shadow-xl overflow-y-auto
+                    className={`fixed top-16 right-4 w-11/12 max-w-xs h-[80vh] bg-white z-[60] rounded-l-2xl shadow-xl overflow-y-auto
                   transform transition-transform duration-300
                   ${showControls ? 'translate-x-0' : 'translate-x-full'}
                   lg:top-[6rem] lg:right-0 lg:w-[25rem] lg:h-[calc(100vh-6rem)] lg:translate-x-0 lg:rounded-l-2xl lg:shadow-xl lg:border-l`}
@@ -630,7 +638,7 @@ const SalesOpportunityManagement = () => {
                         size="sm"
                         iconName="X"
                         onClick={() => setShowControls(false)}
-                        ariaLabel="Cerrar controles"
+                        aria-label="Cerrar controles"
                       />
                     </div>
 
@@ -661,24 +669,57 @@ const SalesOpportunityManagement = () => {
                           />
 
                           {(selectedOpportunity?.stage === 'quotation-development' ||
-                            selectedOpportunity?.quotationData) && (
+                            selectedOpportunity?.stage === 'client-review' ||
+                            selectedOpportunity?.stage === 'closure') && (
                             <QuotationRequestPanel
-                              opportunity={selectedOpportunity}
+                              opportunity={{
+                                ...selectedOpportunity,
+                                quotationData: selectedOpportunity?.quotationData || {
+                                  scope: '',
+                                  assumptions: [],
+                                  timeline: '',
+                                  conditions: '',
+                                  materials: [],
+                                  riskAssessment: 'low',
+                                  extraCosts: [],
+                                  totalAmount: 0,
+                                  validity: '30 días'
+                                }
+                              }}
                               onUpdate={(quotationData) =>
                                 handleQuotationUpdate(selectedOpportunity?.id, quotationData)
                               }
                             />
                           )}
 
-                          {selectedOpportunity?.stage === 'closure' &&
-                            selectedOpportunity?.quotationData?.approved && (
-                              <WorkOrderPanel
-                                opportunity={selectedOpportunity}
-                                onGenerateWorkOrder={(workOrderData) =>
-                                  handleWorkOrderGeneration(selectedOpportunity?.id, workOrderData)
-                                }
-                              />
-                            )}
+                          {/* Panel de revisión del cliente */}
+                          {selectedOpportunity?.stage === 'client-review' && selectedOpportunity?.quotationStatus && (
+                            <div className="border rounded-lg p-4 bg-muted/10">
+                              <h4 className="font-medium mb-2 flex items-center">
+                                <Icon name="Eye" size={16} className="mr-2 text-yellow-600" />
+                                Revisión del Cliente
+                              </h4>
+                              <div className="text-sm mb-2">
+                                <strong>Enviado:</strong> {selectedOpportunity.quotationStatus.sent ? 'Sí' : 'No'}<br />
+                                <strong>Fecha de envío:</strong> {selectedOpportunity.quotationStatus.sentDate}<br />
+                                <strong>Método:</strong> {selectedOpportunity.quotationStatus.method}<br />
+                                <strong>Adjuntos:</strong> {selectedOpportunity.quotationStatus.attachments?.join(', ') || 'Ninguno'}<br />
+                                <strong>Feedback del cliente:</strong> {selectedOpportunity.quotationStatus.clientFeedback || 'Sin comentarios'}
+                              </div>
+                            </div>
+                          )}
+
+
+                          {/* Panel de orden de trabajo en cierre */}
+
+                          {selectedOpportunity?.stage === 'closure' && (
+                            <WorkOrderPanel
+                              opportunity={selectedOpportunity}
+                              onGenerateWorkOrder={(workOrderData) =>
+                                handleWorkOrderGeneration(selectedOpportunity?.id, workOrderData)
+                              }
+                            />
+                          )}
 
                           {selectedOpportunity?.stage !== 'initial-contact' && (
                             <ChangeManagementPanel
@@ -730,6 +771,7 @@ const SalesOpportunityManagement = () => {
           isOpen={showNewOpportunityModal}
           onClose={() => setShowNewOpportunityModal(false)}
           onCreateOpportunity={handleCreateOpportunity}
+          error={error}
         />
       </div>
     </div>

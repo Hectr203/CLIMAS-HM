@@ -8,6 +8,9 @@ const opportunityService = {
   },
   obtenerTodasLasOportunidades: async () => {
     return httpService.get(`${API_BASE}/obtenerTodasLasOportunidades`);
+  },
+  actualizarOportunidad: async (id, data) => {
+    return httpService.put(`${API_BASE}/actualizar/${id}`, data);
   }
 };
 

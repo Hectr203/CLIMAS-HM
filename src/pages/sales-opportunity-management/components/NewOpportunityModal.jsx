@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
+import useClient from '../../../hooks/useClient';
+import usePerson from '../../../hooks/usePerson';
 
-const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity }) => {
+const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity, error }) => {
   const [formData, setFormData] = useState({
-    clientName: '',
+    clientId: '',
     contactChannel: 'whatsapp',
     projectType: 'project',
     priority: 'medium',
@@ -21,16 +23,24 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity }) => {
     notes: ''
   });
 
+  const { clients, getClients, loading: loadingClients, error: errorClients } = useClient();
+ 
+  const { departmentPersons, getPersonsByDepartment, loading: loadingSalesReps, error: errorSalesReps } = usePerson();
+
+  useEffect(() => {
+    if (isOpen) {
+      getClients();
+      getPersonsByDepartment('Ventas');
+    }
+  }, [isOpen]);
+
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const salesRepOptions = [
-    'María García',
-    'Roberto Silva', 
-    'Carmen Díaz',
-    'Patricia Morales',
-    'Alejandro Torres'
-  ];
+  // Opciones de ejecutivos de ventas
+  const salesRepOptions = Array.isArray(departmentPersons) && departmentPersons.length > 0
+  ? departmentPersons.map(emp => ({ value: emp.nombreCompleto || emp.nombre || emp.name || emp.fullName || emp.email, label: emp.nombreCompleto || emp.nombre || emp.name || emp.fullName || emp.email }))
+    : [];
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -50,8 +60,8 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity }) => {
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData?.clientName?.trim()) {
-      newErrors.clientName = 'El nombre del cliente es requerido';
+    if (!formData?.clientId?.trim()) {
+      newErrors.clientId = 'El cliente es requerido';
     }
 
     if (!formData?.contactPerson?.trim()) {
@@ -107,20 +117,22 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity }) => {
       // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 1000));
 
+      const selectedClient = clients?.find(c => c.id === formData?.clientId || c._id === formData?.clientId);
       const newOpportunity = {
-        nombreCliente: formData?.clientName?.trim(),
-        canalContacto: formData?.contactChannel,
-        tipoProyecto: formData?.projectType,
-        prioridad: formData?.priority,
-        personaContacto: formData?.contactPerson?.trim(),
-        telefono: formData?.phone?.trim(),
-        email: formData?.email?.trim(),
-        descripcionProyecto: formData?.projectDescription?.trim(),
-        ubicacion: formData?.location?.trim(),
-        presupuestoEstimado: formData?.estimatedBudget?.trim(),
-        cronogramaEsperado: formData?.timeline?.trim(),
-        ejecutivoVentas: formData?.salesRep,
-        notasAdicionales: formData?.notes?.trim() || `Nueva oportunidad registrada por ${formData?.salesRep}`
+  clienteId: formData?.clientId,
+  nombreCliente: selectedClient?.companyName || selectedClient?.empresa || selectedClient?.nombre || selectedClient?.name || '',
+  canalContacto: formData?.contactChannel,
+  tipoProyecto: formData?.projectType,
+  prioridad: formData?.priority,
+  personaContacto: formData?.contactPerson?.trim(),
+  telefono: formData?.phone?.trim(),
+  email: formData?.email?.trim(),
+  descripcionProyecto: formData?.projectDescription?.trim(),
+  ubicacion: formData?.location?.trim(),
+  presupuestoEstimado: formData?.estimatedBudget?.trim(),
+  cronogramaEsperado: formData?.timeline?.trim(),
+  ejecutivoVentas: departmentPersons?.find(emp => (emp.nombreCompleto || emp.nombre || emp.name || emp.fullName || emp.email) === formData?.salesRep)?.nombreCompleto || formData?.salesRep,
+  notasAdicionales: formData?.notes?.trim() || `Nueva oportunidad registrada por ${formData?.salesRep}`
       };
 
       onCreateOpportunity?.(newOpportunity);
@@ -134,7 +146,7 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity }) => {
 
   const handleClose = () => {
     setFormData({
-      clientName: '',
+      clientId: '',
       contactChannel: 'whatsapp',
       projectType: 'project',
       priority: 'medium',
@@ -191,14 +203,32 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity }) => {
                 Información Básica
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Nombre del Cliente"
-                  required
-                  value={formData?.clientName}
-                  onChange={(e) => handleInputChange('clientName', e?.target?.value)}
-                  error={errors?.clientName}
-                  placeholder="Ej. Corporación ABC"
-                />
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Cliente <span className="text-destructive">*</span>
+                  </label>
+                  <Select
+                    value={formData?.clientId}
+                    onChange={(value) => handleInputChange('clientId', value)}
+                    options={
+                      Array.isArray(clients) && clients.length > 0
+                        ? clients.map(c => ({
+                            value: c.id || c._id,
+                            label: c.companyName || c.empresa || 'Sin nombre'
+                          }) )
+                        : []
+                    }
+                    placeholder={
+                      loadingClients
+                        ? 'Cargando clientes...'
+                        : (clients.length === 0 ? 'No hay clientes registrados' : 'Selecciona un cliente')
+                    }
+                    loading={loadingClients}
+                    error={errors?.clientId}
+                    searchable
+                  />
+                  {errorClients && <div className="text-xs text-destructive">Error al cargar clientes</div>}
+                </div>
                 
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">
@@ -282,6 +312,12 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity }) => {
                     error={errors?.email}
                     placeholder="contacto@empresa.com"
                   />
+                  {error?.status === 409 && error?.data?.error?.includes('correo') && (
+                    <p className="text-xs text-destructive mt-1">Correo registrado</p>
+                  )}
+                  {error?.status === 409 && error?.data?.error?.includes('correo') && (
+                    <p className="text-xs text-destructive mt-1">Correo registrado</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -356,8 +392,12 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity }) => {
                   <Select
                     value={formData?.salesRep}
                     onChange={(value) => handleInputChange('salesRep', value)}
-                    options={salesRepOptions?.map(rep => ({ value: rep, label: rep }))}
-                  />
+                    options={salesRepOptions}
+                    loading={loadingSalesReps}
+                    error={errorSalesReps}
+                    placeholder={loadingSalesReps ? 'Cargando ejecutivos...' : (salesRepOptions.length === 0 ? 'No hay ejecutivos de ventas' : 'Selecciona ejecutivo')}
+                    searchable
+                   />
                 </div>
 
                 <div>
