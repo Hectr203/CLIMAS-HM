@@ -5,6 +5,7 @@ import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import proyectoService from 'services/proyectoService';
 import clientService from 'services/clientService';
+import usePerson from 'hooks/usePerson'; // ⬅️ personal real
 
 const priorityOptions = [
   { value: 'low', label: 'Baja' },
@@ -18,25 +19,51 @@ const mapPriorityToEs = (v) => {
   return m[(v || '').toString().toLowerCase()] || v || '';
 };
 
-// Normaliza número -> string para inputs controlados
-const toStr = (v, fallback = '0') => (v === null || v === undefined ? fallback : String(v));
-// Seguro a número
+// ---------- Utils ----------
 const toNum = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
+};
+
+// Formatear con comas (2 decimales visibles en input)
+const formatWithCommas = (v, decimals = 2) => {
+  if (v == null || v === '') return '';
+  const clean = String(v).replace(/[^\d.-]/g, '');
+  const num = parseFloat(clean);
+  if (isNaN(num)) return '';
+  const options = Number.isInteger(num)
+    ? { minimumFractionDigits: 0, maximumFractionDigits: 0 }
+    : { minimumFractionDigits: decimals, maximumFractionDigits: decimals };
+  return num.toLocaleString('es-MX', options);
+};
+
+// Remover comas/símbolos -> número
+const unformatNumber = (v) => {
+  if (v === '' || v === null || v === undefined) return 0;
+  const clean = String(v).replace(/[^\d.-]/g, '');
+  const n = parseFloat(clean);
+  return isNaN(n) ? 0 : n;
 };
 
 const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
   const [loadingProject, setLoadingProject] = useState(false);
-  const [serverProject, setServerProject] = useState(null); // <- proyecto traído por ID
+  const [serverProject, setServerProject] = useState(null);
 
-  // CLIENTES reales
+  // Personal real
+  const { persons, getPersons } = usePerson();
+
+  // Clientes reales
   const [clientOptions, setClientOptions] = useState([]);
   const [loadingClients, setLoadingClients] = useState(false);
 
-  // 1) Traer clientes reales al abrir
+  // === NUEVO: controles USD para Equipos ===
+  const [isEquipmentInUSD, setIsEquipmentInUSD] = useState(false);
+  const [exchangeRate, setExchangeRate] = useState(18); // MXN por USD
+  const [uiEquipmentUSD, setUiEquipmentUSD] = useState(''); // valor visual USD
+
+  // 1) Traer clientes
   useEffect(() => {
     if (!isOpen) return;
     let mounted = true;
@@ -59,19 +86,18 @@ const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
     return () => { mounted = false; };
   }, [isOpen]);
 
-  // 2) Traer el proyecto por ID al abrir (la fuente de la verdad)
+  // 2) Traer proyecto por ID
   useEffect(() => {
     if (!isOpen || !project?.id) return;
     let mounted = true;
     (async () => {
       try {
         setLoadingProject(true);
-        const resp = await proyectoService.obtenerProyecto(project.id);
-        const doc = resp?.data && typeof resp.data === 'object' ? resp.data : resp; // soporta {data} o plano
+        const resp = await proyectoService.getProyectoById(project.id);
+        const doc = resp?.data && typeof resp.data === 'object' ? resp.data : resp;
         if (mounted) setServerProject(doc || null);
       } catch (e) {
         console.error('Error obteniendo proyecto por ID:', e);
-        // fallback a lo que venía de la tabla
         if (mounted) setServerProject(project || null);
       } finally {
         if (mounted) setLoadingProject(false);
@@ -80,7 +106,14 @@ const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
     return () => { mounted = false; };
   }, [isOpen, project?.id]);
 
-  // 3) Normalizador desde el documento del backend
+  // 2.5) Cargar personal
+  useEffect(() => {
+    if (!isOpen) return;
+    getPersons().catch((e) => console.error('Error cargando empleados:', e));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  // 3) Normalizador desde backend
   const normalizedFromDoc = useMemo(() => {
     const doc = serverProject || project || {};
     const p = doc.presupuesto || {};
@@ -88,27 +121,25 @@ const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
 
     const manoObra   = p.manoObra     ?? b.labor          ?? 0;
     const piezas     = p.piezas       ?? b.parts          ?? 0;
-    const equipos    = p.equipos      ?? b.equipment      ?? 0;
+    const equipos    = p.equipos      ?? b.equipment      ?? 0; // almacenado en MXN
     const materiales = p.materiales   ?? b.materials      ?? 0;
     const transporte = p.transporte   ?? b.transportation ?? 0;
     const otros      = p.otros        ?? b.other          ?? 0;
-    console.log(doc, 'd');
-    
+
     return {
       name: doc?.nombreProyecto ?? doc?.name ?? '',
       code: doc?.codigo ?? doc?.code ?? '',
       type: doc?.tipoProyecto ?? doc?.type ?? '',
       client: doc?.cliente?.id || '',
       department: doc?.departamento ?? doc?.department ?? '',
-      // Si quisieras precargar prioridad en EN, puedes mapear aquí ES->EN
       priority: '',
       budgetBreakdown: {
-        labor:          toStr(manoObra),
-        parts:          toStr(piezas),
-        equipment:      toStr(equipos),
-        materials:      toStr(materiales),
-        transportation: toStr(transporte),
-        other:          toStr(otros),
+        labor:          toNum(manoObra),
+        parts:          toNum(piezas),
+        equipment:      toNum(equipos), // MXN
+        materials:      toNum(materiales),
+        transportation: toNum(transporte),
+        other:          toNum(otros),
       },
       location: doc?.ubicacion ?? doc?.location ?? '',
       startDate: doc?.cronograma?.fechaInicio ?? doc?.startDate ?? '',
@@ -117,7 +148,6 @@ const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
         ? doc.personalAsignado
         : (doc?.assignedPersonnel || []),
       description: doc?.descripcion ?? doc?.description ?? '',
-      // extras útiles para payload
       _raw: doc,
     };
   }, [serverProject, project]);
@@ -127,16 +157,85 @@ const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
     if (isOpen) setFormData(normalizedFromDoc);
   }, [normalizedFromDoc, isOpen]);
 
+  // Inicializar UI USD si el backend trae meta de equipos
+  useEffect(() => {
+    if (!isOpen) return;
+    const doc = (serverProject || project || {});
+    const meta = doc?.presupuesto?._metaEquipos;
+    if (meta?.capturadoEn === 'USD') {
+      const rate = Number(meta?.tipoCambio) || exchangeRate || 18;
+      setIsEquipmentInUSD(true);
+      setExchangeRate(rate);
+      const valUSD = Number(meta?.valorUSD) || 0;
+      if (valUSD) setUiEquipmentUSD(formatWithCommas(valUSD, 2));
+      else {
+        // Si no viene valorUSD, lo calculamos desde MXN
+        const mxn = Number(doc?.presupuesto?.equipos ?? doc?.budgetBreakdown?.equipment ?? 0);
+        const usd = rate ? mxn / rate : 0;
+        setUiEquipmentUSD(formatWithCommas(usd, 2));
+      }
+    } else {
+      setIsEquipmentInUSD(false);
+      setUiEquipmentUSD('');
+      // Mantén exchangeRate como esté (quizá el usuario lo quiere setear)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, serverProject, project]);
+
   const handleInputChange = (key, value) => {
     setFormData((s) => ({ ...s, [key]: value }));
     if (errors[key]) setErrors((e) => ({ ...e, [key]: undefined }));
   };
 
-  const handleBudgetChange = (key, value) => {
+  // Manejar partidas numéricas; para "equipment" considerar USD toggle
+  const handleBudgetChange = (key, rawValueOrNumber) => {
+    const cleaned = typeof rawValueOrNumber === 'number'
+      ? rawValueOrNumber
+      : unformatNumber(rawValueOrNumber);
+
+    if (key === 'equipment' && isEquipmentInUSD) {
+      // rawValue es USD; guardamos equipment en MXN
+      setUiEquipmentUSD(typeof rawValueOrNumber === 'number'
+        ? formatWithCommas(rawValueOrNumber, 2)
+        : rawValueOrNumber);
+      const mxn = cleaned * (Number(exchangeRate) || 0);
+      setFormData((s) => ({
+        ...s,
+        budgetBreakdown: { ...s.budgetBreakdown, equipment: mxn },
+      }));
+      return;
+    }
+
     setFormData((s) => ({
       ...s,
-      budgetBreakdown: { ...s.budgetBreakdown, [key]: value },
+      budgetBreakdown: { ...s.budgetBreakdown, [key]: cleaned },
     }));
+  };
+
+  const toggleEquipmentUSD = (checked) => {
+    setIsEquipmentInUSD(checked);
+    if (checked) {
+      // Pasar MXN actual a USD visual
+      const currentMXN = Number(formData?.budgetBreakdown?.equipment || 0);
+      const usd = (Number(exchangeRate) || 0) ? currentMXN / Number(exchangeRate) : 0;
+      setUiEquipmentUSD(usd ? formatWithCommas(usd, 2) : '');
+    } else {
+      setUiEquipmentUSD('');
+      // Estado ya guarda MXN, no hay que convertir nada
+    }
+  };
+
+  const handleExchangeRateChange = (raw) => {
+    const rate = unformatNumber(raw);
+    setExchangeRate(rate);
+    if (isEquipmentInUSD) {
+      const usd = unformatNumber(uiEquipmentUSD);
+      const mxn = usd * (rate || 0);
+      setFormData((s) => ({
+        ...s,
+        budgetBreakdown: { ...s.budgetBreakdown, equipment: mxn },
+      }));
+    }
   };
 
   const validate = () => {
@@ -150,29 +249,68 @@ const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
     if (formData.startDate && formData.endDate && new Date(formData.endDate) < new Date(formData.startDate)) {
       e.endDate = 'La fecha de fin no puede ser anterior al inicio';
     }
+    if (isEquipmentInUSD && !(exchangeRate > 0)) {
+      e.exchangeRate = 'Indique un tipo de cambio válido';
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  // 4) Construcción del payload ES respetando estructura del backend
+  // Opciones de personal
+  const personnelOptionsFinal = useMemo(() => {
+    const existingAssigned = Array.isArray(serverProject?.personalAsignado)
+      ? serverProject.personalAsignado
+      : Array.isArray(project?.personalAsignado)
+        ? project.personalAsignado
+        : [];
+
+    const fromPersons = Array.isArray(persons)
+      ? persons
+          .map((p) => {
+            const nombre =
+              p?.nombreCompleto ||
+              [p?.nombre, p?.apellidoPaterno, p?.apellidoMaterno].filter(Boolean).join(' ') ||
+              p?.nombre ||
+              p?.name ||
+              '—';
+            const puesto = p?.puesto || p?.rol || p?.cargo;
+            const etiqueta = puesto ? `${nombre} — ${puesto}` : nombre;
+            return etiqueta || null;
+          })
+          .filter(Boolean)
+      : [];
+
+    const merged = [...existingAssigned, ...fromPersons];
+    const seen = new Set();
+    const dedupStrings = merged.filter((s) => {
+      if (seen.has(s)) return false;
+      seen.add(s);
+      return true;
+    });
+
+    return dedupStrings.map((s) => ({ value: s, label: s }));
+  }, [persons, serverProject, project]);
+
+  // 4) Payload ES
   const buildPayloadES = () => {
     const base = formData?._raw || serverProject || project || {};
 
-    // Buscar nombre visible (empresa) del cliente seleccionado,
-    // o conservar el actual del doc si no se cambió el select
     const selectedClient = clientOptions.find((o) => o.value === formData.client);
     const clienteId = formData.client || base?.cliente?.id || '';
     const clienteNombre = selectedClient?.label || base?.cliente?.nombre || '';
 
-    const manoObra   = toNum(formData?.budgetBreakdown?.labor);
-    const piezas     = toNum(formData?.budgetBreakdown?.parts);
-    const equipos    = toNum(formData?.budgetBreakdown?.equipment);
-    const materiales = toNum(formData?.budgetBreakdown?.materials);
-    const transporte = toNum(formData?.budgetBreakdown?.transportation);
-    const otros      = toNum(formData?.budgetBreakdown?.other);
+    const manoObra   = Number(formData?.budgetBreakdown?.labor) || 0;
+    const piezas     = Number(formData?.budgetBreakdown?.parts) || 0;
+    const equipos    = Number(formData?.budgetBreakdown?.equipment) || 0; // MXN
+    const materiales = Number(formData?.budgetBreakdown?.materials) || 0;
+    const transporte = Number(formData?.budgetBreakdown?.transportation) || 0;
+    const otros      = Number(formData?.budgetBreakdown?.other) || 0;
     const total      = manoObra + piezas + equipos + materiales + transporte + otros;
-    console.log(base, 'b');
-    
+
+    const metaEquipos = isEquipmentInUSD
+      ? { capturadoEn: 'USD', tipoCambio: Number(exchangeRate || 0), valorUSD: unformatNumber(uiEquipmentUSD) }
+      : (base?.presupuesto?._metaEquipos ?? { capturadoEn: 'MXN' });
+
     return {
       codigo: formData.code ?? base?.codigo ?? base?.code ?? '',
       nombreProyecto: formData.name || base?.nombreProyecto || '',
@@ -189,11 +327,11 @@ const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
         fechaInicio: formData.startDate || base?.cronograma?.fechaInicio || '',
         fechaFin: formData.endDate || base?.cronograma?.fechaFin || '',
       },
-      presupuesto: { manoObra, piezas, equipos, materiales, transporte, otros, total },
+      presupuesto: { manoObra, piezas, equipos, materiales, transporte, otros, total, _metaEquipos: metaEquipos },
       totalPresupuesto: total,
       createdAt: base?.createdAt,
       updatedAt: new Date().toISOString(),
-      id: base?.id, // por si tu backend lo acepta en el body
+      id: base?.id,
     };
   };
 
@@ -203,7 +341,7 @@ const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
     setIsSubmitting(true);
     try {
       const payload = buildPayloadES();
-      await proyectoService.actualizarProyecto((serverProject || project)?.id, payload);
+      await proyectoService.updateProyecto((serverProject || project)?.id, payload);
       onSubmit && onSubmit(payload);
       onClose && onClose();
     } catch (err) {
@@ -216,6 +354,15 @@ const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
   };
 
   if (!isOpen) return null;
+
+  const b = formData.budgetBreakdown || {};
+  const totalCalc =
+    (Number(b.labor) || 0) +
+    (Number(b.parts) || 0) +
+    (Number(b.equipment) || 0) +
+    (Number(b.materials) || 0) +
+    (Number(b.transportation) || 0) +
+    (Number(b.other) || 0);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-1050 p-4">
@@ -307,64 +454,105 @@ const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
               )}
             </div>
 
+            {/* Mano de obra */}
             <Input
               label="Mano de Obra (MXN)"
-              type="number"
+              type="text"
               placeholder="0.00"
-              value={formData?.budgetBreakdown?.labor}
+              value={formatWithCommas(formData?.budgetBreakdown?.labor)}
               onChange={(e) => handleBudgetChange('labor', e?.target?.value)}
-              min="0"
-              step="0.01"
+              inputMode="decimal"
             />
 
+            {/* Piezas */}
             <Input
               label="Piezas (MXN)"
-              type="number"
+              type="text"
               placeholder="0.00"
-              value={formData?.budgetBreakdown?.parts}
+              value={formatWithCommas(formData?.budgetBreakdown?.parts)}
               onChange={(e) => handleBudgetChange('parts', e?.target?.value)}
-              min="0"
-              step="0.01"
+              inputMode="decimal"
             />
 
-            <Input
-              label="Equipos (MXN)"
-              type="number"
-              placeholder="0.00"
-              value={formData?.budgetBreakdown?.equipment}
-              onChange={(e) => handleBudgetChange('equipment', e?.target?.value)}
-              min="0"
-              step="0.01"
-            />
+            {/* ===== Equipos con toggle USD ===== */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-foreground">
+                  Equipos ({isEquipmentInUSD ? 'USD (se convierte a MXN)' : 'MXN'})
+                </label>
+                <label className="inline-flex items-center gap-2 text-sm text-foreground cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={isEquipmentInUSD}
+                    onChange={(e) => toggleEquipmentUSD(e.target.checked)}
+                    className="h-4 w-4 accent-primary cursor-pointer"
+                  />
+                  Precio en dólares
+                </label>
+              </div>
 
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder={isEquipmentInUSD ? '0.00 USD' : '0.00 MXN'}
+                value={
+                  isEquipmentInUSD
+                    ? uiEquipmentUSD
+                    : formatWithCommas(formData?.budgetBreakdown?.equipment)
+                }
+                onChange={(e) => handleBudgetChange('equipment', e?.target?.value)}
+                className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              />
+
+              {isEquipmentInUSD && (
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <Input
+                      label="Tipo de cambio (MXN / USD)"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="Ej: 18.00"
+                      value={formatWithCommas(exchangeRate, 4)}
+                      onChange={(e) => handleExchangeRateChange(e?.target?.value)}
+                      error={errors?.exchangeRate}
+                    />
+                  </div>
+                  <div className="text-sm text-muted-foreground whitespace-nowrap">
+                    Guardado en MXN: <span className="font-semibold">${formatWithCommas(formData?.budgetBreakdown?.equipment, 2)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            {/* ===== Fin Equipos ===== */}
+
+            {/* Materiales */}
             <Input
               label="Materiales (MXN)"
-              type="number"
+              type="text"
               placeholder="0.00"
-              value={formData?.budgetBreakdown?.materials}
+              value={formatWithCommas(formData?.budgetBreakdown?.materials)}
               onChange={(e) => handleBudgetChange('materials', e?.target?.value)}
-              min="0"
-              step="0.01"
+              inputMode="decimal"
             />
 
+            {/* Transporte */}
             <Input
               label="Transporte (MXN)"
-              type="number"
+              type="text"
               placeholder="0.00"
-              value={formData?.budgetBreakdown?.transportation}
+              value={formatWithCommas(formData?.budgetBreakdown?.transportation)}
               onChange={(e) => handleBudgetChange('transportation', e?.target?.value)}
-              min="0"
-              step="0.01"
+              inputMode="decimal"
             />
 
+            {/* Otros */}
             <Input
               label="Otros Gastos (MXN)"
-              type="number"
+              type="text"
               placeholder="0.00"
-              value={formData?.budgetBreakdown?.other}
+              value={formatWithCommas(formData?.budgetBreakdown?.other)}
               onChange={(e) => handleBudgetChange('other', e?.target?.value)}
-              min="0"
-              step="0.01"
+              inputMode="decimal"
             />
 
             {/* Total del Presupuesto */}
@@ -372,25 +560,38 @@ const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
               <div className="bg-muted p-4 rounded-lg">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-foreground">
-                    Total del Presupuesto:
+                    Total del Presupuesto (MXN):
                   </span>
                   <span className="text-lg font-semibold text-primary">
-                    {(() => {
-                      const b = formData.budgetBreakdown || {};
-                      const sum =
-                        toNum(b.labor) +
-                        toNum(b.parts) +
-                        toNum(b.equipment) +
-                        toNum(b.materials) +
-                        toNum(b.transportation) +
-                        toNum(b.other);
-                      return `$${(sum || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN`;
-                    })()}
+                    {`$${(Number(formData?.budgetBreakdown?.labor || 0)
+                      + Number(formData?.budgetBreakdown?.parts || 0)
+                      + Number(formData?.budgetBreakdown?.equipment || 0)
+                      + Number(formData?.budgetBreakdown?.materials || 0)
+                      + Number(formData?.budgetBreakdown?.transportation || 0)
+                      + Number(formData?.budgetBreakdown?.other || 0))
+                      .toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN`}
                   </span>
                 </div>
+                {/* Si quieres ver equivalente del total en USD cuando el toggle está activo */}
+                {isEquipmentInUSD && exchangeRate > 0 && (
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Equivalente aproximado del total en USD (solo equipos convertidos):{' '}
+                    <span className="font-medium">
+                      ${(
+                        (Number(formData?.budgetBreakdown?.labor || 0)
+                        + Number(formData?.budgetBreakdown?.parts || 0)
+                        + Number(formData?.budgetBreakdown?.materials || 0)
+                        + Number(formData?.budgetBreakdown?.transportation || 0)
+                        + Number(formData?.budgetBreakdown?.other || 0)) / (exchangeRate || 1)
+                        + unformatNumber(uiEquipmentUSD || 0) // equipos ya está en USD visual
+                      ).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
+            {/* Ubicación */}
             <Input
               label="Ubicación"
               type="text"
@@ -432,9 +633,7 @@ const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
             <div className="md:col-span-2">
               <Select
                 label="Personal Asignado"
-                options={(serverProject?.personalAsignado || project?.personalAsignado || []).map((s) => ({
-                  value: s, label: s,
-                }))}
+                options={personnelOptionsFinal}
                 value={formData?.assignedPersonnel}
                 onChange={(value) => handleInputChange('assignedPersonnel', value)}
                 multiple

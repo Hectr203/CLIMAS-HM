@@ -1,8 +1,66 @@
 import React, { useState } from 'react';
-import Icon from '../../../components/AppIcon';
-import Button from '../../../components/ui/Button';
-import Input from '../../../components/ui/Input';
-import Select from '../../../components/ui/Select';
+import { Search, X, ChevronUp, ChevronDown, Download } from 'lucide-react';
+
+// Componentes UI simplificados para mantener el estilo original
+const Button = ({ children, variant = 'default', size = 'default', onClick, iconName, iconPosition, className = '' }) => {
+  const Icon = iconName === 'X' ? X : iconName === 'ChevronUp' ? ChevronUp : iconName === 'ChevronDown' ? ChevronDown : iconName === 'Download' ? Download : null;
+  
+  const baseClasses = 'inline-flex items-center justify-center font-medium rounded-md transition-colors';
+  const variantClasses = {
+    default: 'bg-primary text-primary-foreground hover:bg-primary/90',
+    outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
+    ghost: 'hover:bg-accent hover:text-accent-foreground'
+  };
+  const sizeClasses = {
+    default: 'h-10 px-4 py-2',
+    sm: 'h-9 rounded-md px-3 text-sm'
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+    >
+      {Icon && iconPosition === 'left' && <Icon size={16} className="mr-2" />}
+      {children}
+      {Icon && iconPosition === 'right' && <Icon size={16} className="ml-2" />}
+    </button>
+  );
+};
+
+const Input = ({ label, type = 'text', placeholder, value, onChange, className = '' }) => {
+  return (
+    <div className="w-full">
+      {label && <label className="block text-sm font-medium text-foreground mb-2">{label}</label>}
+      <input
+        type={type}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        className={`flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      />
+    </div>
+  );
+};
+
+const Select = ({ label, options, value, onChange, className = '' }) => {
+  return (
+    <div className={className}>
+      {label && <label className="block text-sm font-medium text-foreground mb-2">{label}</label>}
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {options.map(option => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+};
 
 const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) => {
   const [filters, setFilters] = useState({
@@ -11,7 +69,11 @@ const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) =>
     department: '',
     dateRange: '',
     clientType: '',
-    priority: ''
+    priority: '',
+    minBudget: '',
+    maxBudget: '',
+    startDate: '',
+    endDate: ''
   });
 
   const [isExpanded, setIsExpanded] = useState(false);
@@ -63,7 +125,9 @@ const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) =>
   const handleFilterChange = (key, value) => {
     const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
-    onFiltersChange(newFilters);
+    if (onFiltersChange) {
+      onFiltersChange(newFilters);
+    }
   };
 
   const clearAllFilters = () => {
@@ -73,13 +137,17 @@ const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) =>
       department: '',
       dateRange: '',
       clientType: '',
-      priority: ''
+      priority: '',
+      minBudget: '',
+      maxBudget: '',
+      startDate: '',
+      endDate: ''
     };
     setFilters(clearedFilters);
     onFiltersChange(clearedFilters);
   };
 
-  const hasActiveFilters = Object.values(filters)?.some(value => value !== '');
+  const hasActiveFilters = Object.values(filters).some(value => value !== '');
 
   return (
     <div className="bg-card border border-border rounded-lg p-6 mb-6">
@@ -120,12 +188,11 @@ const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) =>
           <Input
             type="search"
             placeholder="Buscar por nombre de proyecto, cliente, código..."
-            value={filters?.search}
-            onChange={(e) => handleFilterChange('search', e?.target?.value)}
+            value={filters.search}
+            onChange={(e) => handleFilterChange('search', e.target.value)}
             className="pl-10"
           />
-          <Icon 
-            name="Search" 
+          <Search 
             size={16} 
             className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
           />
@@ -136,35 +203,35 @@ const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) =>
         <Select
           label="Estado"
           options={statusOptions}
-          value={filters?.status}
+          value={filters.status}
           onChange={(value) => handleFilterChange('status', value)}
           className="w-full"
         />
         <Select
           label="Departamento"
           options={departmentOptions}
-          value={filters?.department}
+          value={filters.department}
           onChange={(value) => handleFilterChange('department', value)}
           className="w-full"
         />
         <Select
           label="Fecha"
           options={dateRangeOptions}
-          value={filters?.dateRange}
+          value={filters.dateRange}
           onChange={(value) => handleFilterChange('dateRange', value)}
           className="w-full"
         />
         <Select
           label="Tipo de Cliente"
           options={clientTypeOptions}
-          value={filters?.clientType}
+          value={filters.clientType}
           onChange={(value) => handleFilterChange('clientType', value)}
           className="w-full"
         />
         <Select
           label="Prioridad"
           options={priorityOptions}
-          value={filters?.priority}
+          value={filters.priority}
           onChange={(value) => handleFilterChange('priority', value)}
           className="w-full"
         />
@@ -188,22 +255,30 @@ const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) =>
               label="Presupuesto Mínimo"
               type="number"
               placeholder="$0"
+              value={filters.minBudget}
+              onChange={(e) => handleFilterChange('minBudget', e.target.value)}
               className="w-full"
             />
             <Input
               label="Presupuesto Máximo"
               type="number"
               placeholder="$999,999"
+              value={filters.maxBudget}
+              onChange={(e) => handleFilterChange('maxBudget', e.target.value)}
               className="w-full"
             />
             <Input
               label="Fecha de Inicio"
               type="date"
+              value={filters.startDate}
+              onChange={(e) => handleFilterChange('startDate', e.target.value)}
               className="w-full"
             />
             <Input
               label="Fecha de Finalización"
               type="date"
+              value={filters.endDate}
+              onChange={(e) => handleFilterChange('endDate', e.target.value)}
               className="w-full"
             />
           </div>
@@ -213,15 +288,16 @@ const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) =>
       {hasActiveFilters && (
         <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border">
           <span className="text-sm text-muted-foreground">Filtros activos:</span>
-          {Object.entries(filters)?.map(([key, value]) => {
+          {Object.entries(filters).map(([key, value]) => {
             if (!value) return null;
             
             let displayValue = value;
-            if (key === 'status') displayValue = statusOptions?.find(opt => opt?.value === value)?.label || value;
-            if (key === 'department') displayValue = departmentOptions?.find(opt => opt?.value === value)?.label || value;
-            if (key === 'dateRange') displayValue = dateRangeOptions?.find(opt => opt?.value === value)?.label || value;
-            if (key === 'clientType') displayValue = clientTypeOptions?.find(opt => opt?.value === value)?.label || value;
-            if (key === 'priority') displayValue = priorityOptions?.find(opt => opt?.value === value)?.label || value;
+            if (key === 'status') displayValue = statusOptions.find(opt => opt.value === value)?.label || value;
+            if (key === 'department') displayValue = departmentOptions.find(opt => opt.value === value)?.label || value;
+            if (key === 'dateRange') displayValue = dateRangeOptions.find(opt => opt.value === value)?.label || value;
+            if (key === 'clientType') displayValue = clientTypeOptions.find(opt => opt.value === value)?.label || value;
+            if (key === 'priority') displayValue = priorityOptions.find(opt => opt.value === value)?.label || value;
+            if (key === 'minBudget' || key === 'maxBudget') displayValue = `$${value}`;
 
             return (
               <div
@@ -233,7 +309,7 @@ const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) =>
                   onClick={() => handleFilterChange(key, '')}
                   className="hover:bg-primary/20 rounded-full p-0.5"
                 >
-                  <Icon name="X" size={12} />
+                  <X size={12} />
                 </button>
               </div>
             );
@@ -245,3 +321,106 @@ const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) =>
 };
 
 export default ProjectFilters;
+
+// Función de filtrado para usar en el componente padre
+export const applyProjectFilters = (projects, filters) => {
+  let filtered = [...projects];
+
+  // Search filter
+  if (filters?.search) {
+    const searchTerm = filters.search.toLowerCase();
+    filtered = filtered.filter(project => 
+      project?.name?.toLowerCase()?.includes(searchTerm) ||
+      project?.code?.toLowerCase()?.includes(searchTerm) ||
+      project?.client?.name?.toLowerCase()?.includes(searchTerm)
+    );
+  }
+
+  // Status filter
+  if (filters?.status) {
+    filtered = filtered.filter(project => project?.status === filters.status);
+  }
+
+  // Department filter
+  if (filters?.department) {
+    filtered = filtered.filter(project => 
+      project?.department?.toLowerCase() === filters.department.toLowerCase()
+    );
+  }
+
+  // Client type filter
+  if (filters?.clientType) {
+    filtered = filtered.filter(project => project?.client?.type === filters.clientType);
+  }
+
+  // Priority filter
+  if (filters?.priority) {
+    filtered = filtered.filter(project => project?.priority === filters.priority);
+  }
+
+  // Date range filter
+  if (filters?.dateRange) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    filtered = filtered.filter(project => {
+      const startDate = new Date(project?.startDate);
+      
+      switch (filters.dateRange) {
+        case 'today':
+          return startDate.toDateString() === today.toDateString();
+        case 'week':
+          const weekAgo = new Date(today);
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          return startDate >= weekAgo && startDate <= now;
+        case 'month':
+          return startDate.getMonth() === now.getMonth() && 
+                 startDate.getFullYear() === now.getFullYear();
+        case 'quarter':
+          const quarter = Math.floor(now.getMonth() / 3);
+          const projectQuarter = Math.floor(startDate.getMonth() / 3);
+          return projectQuarter === quarter && 
+                 startDate.getFullYear() === now.getFullYear();
+        case 'year':
+          return startDate.getFullYear() === now.getFullYear();
+        default:
+          return true;
+      }
+    });
+  }
+
+  // Budget filters
+  if (filters?.minBudget) {
+    const minBudget = Number(filters.minBudget);
+    filtered = filtered.filter(project => 
+      project?.budget >= minBudget
+    );
+  }
+
+  if (filters?.maxBudget) {
+    const maxBudget = Number(filters.maxBudget);
+    filtered = filtered.filter(project => 
+      project?.budget <= maxBudget
+    );
+  }
+
+  // Start date filter
+  if (filters?.startDate) {
+    const filterStartDate = new Date(filters.startDate);
+    filtered = filtered.filter(project => {
+      const projectStartDate = new Date(project?.startDate);
+      return projectStartDate >= filterStartDate;
+    });
+  }
+
+  // End date filter
+  if (filters?.endDate) {
+    const filterEndDate = new Date(filters.endDate);
+    filtered = filtered.filter(project => {
+      const projectEndDate = new Date(project?.endDate);
+      return projectEndDate <= filterEndDate;
+    });
+  }
+
+  return filtered;
+};
