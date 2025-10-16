@@ -144,7 +144,7 @@ const ProjectTable = ({
         setLoading(true);
         setErrorMsg('');
         // Si no tienes endpoint de listado, elimina esta llamada
-        const data = await proyectoService.obtenerProyectos().catch(() => []);
+        const data = await proyectoService.getProyectos().catch(() => []);
         if (!isMounted) return;
         setRemoteDocs(Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []));
       } catch (err) {
@@ -221,7 +221,7 @@ const ProjectTable = ({
     const ok = window.confirm(`¿Eliminar el proyecto "${project?.name || project?.nombreProyecto || project?.code}"? Esta acción no se puede deshacer.`);
     if (!ok) return;
     try {
-      await proyectoService.eliminarProyecto(project.id);
+      await proyectoService.deleteProyecto(project.id);
       if (Array.isArray(remoteDocs) && (!projects || projects.length === 0)) {
         setRemoteDocs(prev => prev.filter(d => (d.id || d._id) !== project.id));
       }
@@ -239,7 +239,7 @@ const ProjectTable = ({
     if (!ok) return;
     try {
       for (const id of selectedProjects) {
-        await proyectoService.eliminarProyecto(id);
+        await proyectoService.deleteProyecto(id);
       }
       if (Array.isArray(remoteDocs) && (!projects || projects.length === 0)) {
         setRemoteDocs(prev => prev.filter(d => !selectedProjects.includes(d.id || d._id)));

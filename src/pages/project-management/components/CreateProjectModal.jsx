@@ -5,6 +5,7 @@ import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import proyectoService from 'services/proyectoService';
 import clientService from 'services/clientService';
+import usePerson from 'hooks/usePerson'; // ⬅️ agregado: para obtener empleados reales
 
 const projectTypes = [
   { value: 'Instalación', label: 'Instalación' },
@@ -38,34 +39,63 @@ const mapPriorityToEs = (v) => {
   return m[(v || '').toString().toLowerCase()] || v || '';
 };
 
+/* ===================== Helpers de números con comas ===================== */
+// Formato visual con comas; decide decimales según sea entero o no.
+const formatWithCommas = (v, decimals = 2) => {
+  if (v === '' || v == null) return '';
+  const num = Number(v);
+  if (!Number.isFinite(num)) return '';
+  const options = Number.isInteger(num)
+    ? { minimumFractionDigits: 0, maximumFractionDigits: 0 }
+    : { minimumFractionDigits: decimals, maximumFractionDigits: decimals };
+  return num.toLocaleString('es-MX', options);
+};
+
+// Limpia un string con comas/símbolos → número JS
+const unformatNumber = (raw) => {
+  if (raw === '' || raw == null) return 0;
+  const clean = String(raw).replace(/[^\d.-]/g, '');
+  const n = parseFloat(clean);
+  return Number.isFinite(n) ? n : 0;
+};
+/* ======================================================================= */
+
 const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // Estado del formulario (nombres en inglés solo para UI; al enviar se mapea a ES)
+  // ⬇️ hook de personal
+  const { persons, getPersons } = usePerson();
+
+  // Estado del formulario (guardamos NÚMEROS en budgetBreakdown)
   const [formData, setFormData] = useState({
     name: '',
     code: '',
     type: '',
-    client: '', // guardamos el id del cliente
+    client: '', // id del cliente
     department: '',
     priority: '',
     budgetBreakdown: {
-      labor: '',
-      parts: '',
-      equipment: '',
-      materials: '',
-      transportation: '',
-      other: '',
+      labor: 0,
+      parts: 0,
+      equipment: 0, // SIEMPRE almacenado en MXN
+      materials: 0,
+      transportation: 0,
+      other: 0,
     },
     location: '',
     startDate: '',
     endDate: '',
-    assignedPersonnel: [], // arreglo de strings "Nombre - Rol"
+    assignedPersonnel: [], // arreglo de strings "Nombre — Rol"
     description: '',
   });
 
-  // CLIENTES: se cargan reales y se mapean a options { value, label }
+  // === NUEVO: Control para USD en Equipos ===
+  const [isEquipmentInUSD, setIsEquipmentInUSD] = useState(false);
+  const [exchangeRate, setExchangeRate] = useState(18); // MXN por 1 USD (editable)
+  const [uiEquipmentUSD, setUiEquipmentUSD] = useState(''); // valor visual cuando está en USD
+
+  // CLIENTES: reales → options { value, label }
   const [clientOptions, setClientOptions] = useState([]);
   const [loadingClients, setLoadingClients] = useState(false);
 
@@ -91,7 +121,43 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
     return () => { mounted = false; };
   }, [isOpen]);
 
-  // Total presupuesto
+  // Cargar empleados al abrir
+  useEffect(() => {
+    if (!isOpen) return;
+    getPersons().catch((e) => console.error('Error cargando empleados:', e));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  // Construir opciones desde persons, deduplicadas
+  const personnelOptionsFinal = useMemo(() => {
+    if (!Array.isArray(persons) || persons.length === 0) {
+      return personnelOptions; // fallback
+    }
+    const built = persons
+      .map((p) => {
+        const nombre =
+          p?.nombreCompleto ||
+          [p?.nombre, p?.apellidoPaterno, p?.apellidoMaterno].filter(Boolean).join(' ') ||
+          p?.nombre ||
+          p?.name ||
+          '—';
+        const puesto = p?.puesto || p?.rol || p?.cargo;
+        const etiqueta = puesto ? `${nombre} — ${puesto}` : nombre;
+        return etiqueta ? { value: etiqueta, label: etiqueta } : null;
+      })
+      .filter(Boolean);
+
+    const seen = new Set();
+    const dedup = [];
+    for (const opt of built) {
+      if (seen.has(opt.value)) continue;
+      seen.add(opt.value);
+      dedup.push(opt);
+    }
+    return dedup.length ? dedup : personnelOptions;
+  }, [persons]);
+
+  // Total presupuesto (siempre en MXN)
   const totalBudget = useMemo(() => {
     const b = formData.budgetBreakdown || {};
     const sum = ['labor','parts','equipment','materials','transportation','other']
@@ -107,11 +173,55 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
     if (errors[key]) setErrors((e) => ({ ...e, [key]: undefined }));
   };
 
-  const handleBudgetChange = (key, value) => {
+  // ⬇️ Manejo genérico de partidas en MXN
+  const handleBudgetChange = (key, rawValue) => {
+    const cleanedNumber = unformatNumber(rawValue);
+    // Si la clave es "equipment" y estamos en USD, convertir a MXN
+    if (key === 'equipment' && isEquipmentInUSD) {
+      const usd = cleanedNumber;
+      setUiEquipmentUSD(rawValue); // conservar visual en USD
+      const mxn = Number(usd) * Number(exchangeRate || 0);
+      setFormData((s) => ({
+        ...s,
+        budgetBreakdown: { ...s.budgetBreakdown, equipment: mxn },
+      }));
+      return;
+    }
+
+    // Resto de claves o equipment en MXN normal
     setFormData((s) => ({
       ...s,
-      budgetBreakdown: { ...s.budgetBreakdown, [key]: value },
+      budgetBreakdown: { ...s.budgetBreakdown, [key]: cleanedNumber },
     }));
+  };
+
+  // Cuando se activa/desactiva el modo USD para Equipos
+  const toggleEquipmentUSD = (checked) => {
+    setIsEquipmentInUSD(checked);
+    if (checked) {
+      // Pasamos el valor MXN actual a USD visual
+      const currentMXN = Number(formData?.budgetBreakdown?.equipment || 0);
+      const usd = exchangeRate ? currentMXN / Number(exchangeRate) : 0;
+      setUiEquipmentUSD(usd ? formatWithCommas(usd, 2) : '');
+    } else {
+      // Al volver a MXN, copiamos el valor visual (si existiera) convirtiéndolo a MXN? No: ya guardamos MXN.
+      // Solo limpiamos el visual USD
+      setUiEquipmentUSD('');
+    }
+  };
+
+  // Cambio del tipo de cambio: re-calcular MXN si estamos en USD
+  const handleExchangeRateChange = (raw) => {
+    const rate = unformatNumber(raw);
+    setExchangeRate(rate);
+    if (isEquipmentInUSD) {
+      const usd = unformatNumber(uiEquipmentUSD);
+      const mxn = usd * (rate || 0);
+      setFormData((s) => ({
+        ...s,
+        budgetBreakdown: { ...s.budgetBreakdown, equipment: mxn },
+      }));
+    }
   };
 
   const validate = () => {
@@ -127,22 +237,31 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
     if (new Date(formData.endDate) < new Date(formData.startDate)) {
       e.endDate = 'La fecha de fin no puede ser anterior al inicio';
     }
+    // Validación adicional si está en USD y no hay tipo de cambio
+    if (isEquipmentInUSD && !(exchangeRate > 0)) {
+      e.exchangeRate = 'Indique un tipo de cambio válido';
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
   const buildPayloadES = () => {
-    // buscar nombre del cliente (empresa) desde options
+    // nombre del cliente desde options
     const clienteFound = clientOptions.find((o) => o.value === formData.client);
     const clienteNombre = clienteFound?.label || '';
 
     const manoObra = Number(formData?.budgetBreakdown?.labor || 0);
     const piezas = Number(formData?.budgetBreakdown?.parts || 0);
-    const equipos = Number(formData?.budgetBreakdown?.equipment || 0);
+    const equipos = Number(formData?.budgetBreakdown?.equipment || 0); // MXN
     const materiales = Number(formData?.budgetBreakdown?.materials || 0);
     const transporte = Number(formData?.budgetBreakdown?.transportation || 0);
     const otros = Number(formData?.budgetBreakdown?.other || 0);
     const total = manoObra + piezas + equipos + materiales + transporte + otros;
+
+    // (Opcional) Puedes incluir metadatos de cómo se capturó equipos
+    const metaEquipos = isEquipmentInUSD
+      ? { capturadoEn: 'USD', tipoCambio: Number(exchangeRate || 0), valorUSD: unformatNumber(uiEquipmentUSD) }
+      : { capturadoEn: 'MXN' };
 
     return {
       codigo: formData.code || '',
@@ -163,6 +282,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
       },
       presupuesto: {
         manoObra, piezas, equipos, materiales, transporte, otros, total,
+        _metaEquipos: metaEquipos, // <- no rompe nada si tu backend lo ignora
       },
       totalPresupuesto: total,
       createdAt: new Date().toISOString(),
@@ -176,7 +296,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
     setIsSubmitting(true);
     try {
       const payload = buildPayloadES();
-      await proyectoService.crearProyecto(payload);
+      await proyectoService.createProyecto(payload);
       onSubmit && onSubmit(payload);
       onClose && onClose();
     } catch (err) {
@@ -188,6 +308,8 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
   };
 
   if (!isOpen) return null;
+
+  const b = formData.budgetBreakdown || {};
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-1050 p-4">
@@ -248,6 +370,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
               error={errors?.client}
               searchable
               required
+              loading={loadingClients}
             />
 
             <Select
@@ -268,7 +391,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
               required
             />
 
-            {/* Budget Breakdown Section */}
+            {/* Desglose de Presupuesto */}
             <div className="md:col-span-2 mt-6">
               <h3 className="text-lg font-medium text-foreground mb-4">Desglose de Presupuesto</h3>
               {errors?.budget && (
@@ -278,71 +401,109 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
 
             <Input
               label="Mano de Obra (MXN)"
-              type="number"
+              type="text"
+              inputMode="decimal"
               placeholder="0.00"
-              value={formData?.budgetBreakdown?.labor}
+              value={formatWithCommas(b?.labor)}
               onChange={(e) => handleBudgetChange('labor', e?.target?.value)}
-              min="0"
-              step="0.01"
             />
 
             <Input
               label="Piezas (MXN)"
-              type="number"
+              type="text"
+              inputMode="decimal"
               placeholder="0.00"
-              value={formData?.budgetBreakdown?.parts}
+              value={formatWithCommas(b?.parts)}
               onChange={(e) => handleBudgetChange('parts', e?.target?.value)}
-              min="0"
-              step="0.01"
             />
 
-            <Input
-              label="Equipos (MXN)"
-              type="number"
-              placeholder="0.00"
-              value={formData?.budgetBreakdown?.equipment}
-              onChange={(e) => handleBudgetChange('equipment', e?.target?.value)}
-              min="0"
-              step="0.01"
-            />
+            {/* ====== Equipos con toggle USD ====== */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-foreground">
+                  Equipos ({isEquipmentInUSD ? 'USD (se convierte a MXN)' : 'MXN'})
+                </label>
+                <label className="inline-flex items-center gap-2 text-sm text-foreground cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={isEquipmentInUSD}
+                    onChange={(e) => toggleEquipmentUSD(e.target.checked)}
+                    className="h-4 w-4 accent-primary cursor-pointer"
+                  />
+                  Precio en dólares
+                </label>
+              </div>
+
+              {/* Input de Equipos: muestra USD o MXN según el toggle */}
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder={isEquipmentInUSD ? '0.00 USD' : '0.00 MXN'}
+                value={
+                  isEquipmentInUSD
+                    ? uiEquipmentUSD
+                    : formatWithCommas(b?.equipment)
+                }
+                onChange={(e) => handleBudgetChange('equipment', e?.target?.value)}
+                className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              />
+
+              {/* Tipo de cambio visible solo en modo USD */}
+              {isEquipmentInUSD && (
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <Input
+                      label="Tipo de cambio (MXN / USD)"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="Ej: 18.00"
+                      value={formatWithCommas(exchangeRate, 4)}
+                      onChange={(e) => handleExchangeRateChange(e?.target?.value)}
+                      error={errors?.exchangeRate}
+                    />
+                  </div>
+                  <div className="text-sm text-muted-foreground whitespace-nowrap">
+                    Guardado en MXN: <span className="font-semibold">${formatWithCommas(b?.equipment, 2)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            {/* ====== Fin Equipos ====== */}
 
             <Input
               label="Materiales (MXN)"
-              type="number"
+              type="text"
+              inputMode="decimal"
               placeholder="0.00"
-              value={formData?.budgetBreakdown?.materials}
+              value={formatWithCommas(b?.materials)}
               onChange={(e) => handleBudgetChange('materials', e?.target?.value)}
-              min="0"
-              step="0.01"
             />
 
             <Input
               label="Transporte (MXN)"
-              type="number"
+              type="text"
+              inputMode="decimal"
               placeholder="0.00"
-              value={formData?.budgetBreakdown?.transportation}
+              value={formatWithCommas(b?.transportation)}
               onChange={(e) => handleBudgetChange('transportation', e?.target?.value)}
-              min="0"
-              step="0.01"
             />
 
             <Input
               label="Otros Gastos (MXN)"
-              type="number"
+              type="text"
+              inputMode="decimal"
               placeholder="0.00"
-              value={formData?.budgetBreakdown?.other}
+              value={formatWithCommas(b?.other)}
               onChange={(e) => handleBudgetChange('other', e?.target?.value)}
-              min="0"
-              step="0.01"
             />
 
-            {/* Total Budget Display */}
+            {/* Total */}
             <div className="md:col-span-2">
               <div className="bg-muted p-4 rounded-lg">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-foreground">Total del Presupuesto:</span>
+                  <span className="text-sm font-medium text-foreground">Total del Presupuesto (MXN):</span>
                   <span className="text-lg font-semibold text-primary">
-                    ${calculateTotalBudget()?.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN
+                    ${formatWithCommas(calculateTotalBudget(), 2)} MXN
                   </span>
                 </div>
               </div>
@@ -358,7 +519,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
               required
             />
 
-            {/* Timeline */}
+            {/* Cronograma */}
             <div className="md:col-span-2 mt-6">
               <h3 className="text-lg font-medium text-foreground mb-4">Cronograma</h3>
             </div>
@@ -381,7 +542,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
               required
             />
 
-            {/* Personnel Assignment */}
+            {/* Personal */}
             <div className="md:col-span-2 mt-6">
               <h3 className="text-lg font-medium text-foreground mb-4">Asignación de Personal</h3>
             </div>
@@ -389,7 +550,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
             <div className="md:col-span-2">
               <Select
                 label="Personal Asignado"
-                options={personnelOptions}
+                options={personnelOptionsFinal}
                 value={formData?.assignedPersonnel}
                 onChange={(value) => handleInputChange('assignedPersonnel', value)}
                 multiple
@@ -398,7 +559,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
               />
             </div>
 
-            {/* Description */}
+            {/* Descripción */}
             <div className="md:col-span-2 mt-6">
               <label className="block text-sm font-medium text-foreground mb-2">
                 Descripción del Proyecto
@@ -413,7 +574,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
             </div>
           </div>
 
-          {/* Actions */}
+          {/* Acciones */}
           <div className="flex items-center justify-end space-x-4 mt-8 pt-6 border-t border-border">
             <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
               Cancelar

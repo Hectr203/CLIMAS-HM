@@ -7,7 +7,7 @@ const useProyecto = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // 🔹 Obtener todos los proyectos
+  // Obtener todos los proyectos
   const getProyectos = async () => {
     setLoading(true);
     setError(null);
@@ -26,7 +26,7 @@ const useProyecto = () => {
     }
   };
 
-  // 🔹 Obtener un proyecto por ID
+  // Obtener un proyecto por ID
   const getProyectoById = async (id) => {
     setLoading(true);
     setError(null);
@@ -44,7 +44,7 @@ const useProyecto = () => {
     }
   };
 
-  // 🔹 Crear un nuevo proyecto
+  // Crear un nuevo proyecto
   const createProyecto = async (payload) => {
     setLoading(true);
     setError(null);
@@ -63,7 +63,7 @@ const useProyecto = () => {
     }
   };
 
-  // 🔹 Actualizar un proyecto existente
+  // Actualizar un proyecto existente
   const updateProyecto = async (id, payload) => {
     setLoading(true);
     setError(null);
@@ -84,7 +84,7 @@ const useProyecto = () => {
     }
   };
 
-  // 🔹 Eliminar un proyecto
+  // Eliminar un proyecto
   const deleteProyecto = async (id) => {
     setLoading(true);
     setError(null);
