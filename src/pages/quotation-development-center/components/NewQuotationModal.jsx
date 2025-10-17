@@ -1,4 +1,9 @@
+import { useNotifications } from '../../../context/NotificationContext';
+import useQuotation from '../../../hooks/useQuotation';
+import useClient from '../../../hooks/useClient';
 import React, { useState } from 'react';
+import useProyecto from '../../../hooks/useProyect';
+import usePerson from '../../../hooks/usePerson';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
@@ -19,18 +24,60 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
     assignedTo: 'María García',
     projectType: 'hvac',
     notes: ''
+    // ...existing code...
   });
+
+  // Proyectos y clientes
+  const { proyectos, getProyectos, loading: loadingProyectos } = useProyecto();
+  const { clients, getClients, loading: loadingClients } = useClient();
+  React.useEffect(() => {
+    getProyectos();
+    getClients();
+  }, []);
+  // Opciones para el select de proyectos (con clientId)
+  const projectOptions = proyectos?.map(p => ({
+    value: p.id || p._id || p.codigo || p.nombreProyecto,
+    label: p.nombreProyecto || p.codigo,
+    clientId: p.cliente?.id || p.cliente?.id || p.cliente || ''
+  })) || [];
+
+  // Función para obtener el nombre del cliente por id
+  const getClientNameById = (id) => {
+    if (!id || !clients) return '';
+    // Buscar por id, _id, y también comparar como string
+    const found = clients.find(c => String(c.id) === String(id) || String(c._id) === String(id));
+    // Mostrar empresa si existe, si no nombre, si no razonSocial, si no name
+    return found?.empresa || found?.nombre || found?.razonSocial || found?.name || id || '';
+  };
+
+  // Cuando cambia el proyecto seleccionado, actualizar el cliente
+  const handleProjectChange = (value) => {
+    const selected = projectOptions.find(opt => opt.value === value);
+    setFormData(prev => ({
+      ...prev,
+      projectName: selected?.label || value,
+      clientName: getClientNameById(selected?.clientId)
+    }));
+    // Limpiar error si lo hay
+    if (errors?.projectName) setErrors(prev => ({ ...prev, projectName: '' }));
+  };
+
+  // Cuando cambia el proyecto seleccionado, actualizar el cliente
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const assignedToOptions = [
-    'María García',
-    'Roberto Silva', 
-    'Carmen Díaz',
-    'Patricia Morales',
-    'Alejandro Torres'
-  ];
+
+  // Hook para cargar empleados
+  const { persons, getPersons, loading: loadingEmployees } = usePerson();
+  React.useEffect(() => { getPersons(); /* solo una vez */ }, []);
+  // Opciones para el select de responsables (corregido)
+  // Opciones para el select de responsables (corregido)
+  const assignedToOptions = persons?.map(emp => ({
+    value: emp.empleadoId || emp.id || emp.nombreCompleto || emp.nombre,
+    label: emp.nombreCompleto || emp.nombre || emp.empleadoId || emp.id,
+    key: emp.empleadoId || emp.id // clave única para React
+  })) || [];
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -98,88 +145,40 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
     return `COT-${new Date()?.getFullYear()}-${timestamp?.toString()?.slice(-3)}${random?.toString()?.padStart(3, '0')}`;
   };
 
+  const { createQuotation, loading: loadingQuotation, error: errorQuotation } = useQuotation();
+  const { showOperationSuccess } = useNotifications();
+
   const handleSubmit = async (e) => {
     e?.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-
+    if (!validateForm()) return;
     setIsSubmitting(true);
-
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      const newQuotation = {
-        id: generateQuotationId(),
+      const quotationPayload = {
         clientName: formData?.clientName?.trim(),
         projectName: formData?.projectName?.trim(),
-        status: 'development',
-        createdDate: new Date()?.toISOString()?.split('T')?.[0],
-        lastModified: new Date()?.toISOString()?.split('T')?.[0],
         assignedTo: formData?.assignedTo,
         priority: formData?.priority,
-        stage: 'scope-definition',
-        quotationData: {
-          scope: formData?.projectDescription?.trim(),
-          assumptions: [
-            "Acceso libre durante horario laboral (8:00-18:00)",
-            "Cliente proporciona conexiones básicas de servicios"
-          ],
-          timeline: formData?.timeline?.trim(),
-          conditions: "50% anticipo, 50% contra entrega",
-          warranty: "24 meses en equipos, 12 meses en instalación",
-          totalAmount: parseFloat(formData?.estimatedBudget) || 0,
-          validity: "45 días"
-        },
-        materials: [],
-        riskAssessment: {
-          overall: "medium",
-          factors: [
-            { factor: "Evaluación inicial", risk: "low", mitigation: "Pendiente inspección técnica" }
-          ],
-          extraCostsPrevention: false
-        },
-        revisions: [
-          {
-            version: "1.0",
-            date: new Date()?.toISOString()?.split('T')?.[0],
-            changes: "Versión inicial de cotización",
-            author: formData?.assignedTo
-          }
-        ],
-        communications: [
-          {
-            id: `comm-${Date.now()}`,
-            type: "email",
-            date: new Date()?.toISOString()?.split('T')?.[0],
-            subject: `Nueva cotización registrada: ${formData?.projectName?.trim()}`,
-            content: `Cotización inicial creada para ${formData?.projectDescription?.trim()}`,
-            urgency: 'normal'
-          }
-        ],
-        internalReview: {
-          status: "pending",
-          reviewAreas: {
-            pricing: { reviewed: false, reviewer: "", comments: "" },
-            scope: { reviewed: false, reviewer: "", comments: "" },
-            timeline: { reviewed: false, reviewer: "", comments: "" },
-            technical: { reviewed: false, reviewer: "", comments: "" }
-          }
-        },
-        additionalWork: [],
-        contactInfo: {
-          phone: formData?.phone?.trim(),
-          email: formData?.email?.trim(),
-          contactPerson: formData?.contactPerson?.trim(),
-          location: formData?.location?.trim()
-        }
+        projectType: formData?.projectType,
+        notes: formData?.notes,
+        contactPerson: formData?.contactPerson?.trim(),
+        phone: formData?.phone?.trim(),
+        email: formData?.email?.trim(),
+        projectDescription: formData?.projectDescription?.trim(),
+        location: formData?.location?.trim(),
+        estimatedBudget: formData?.estimatedBudget,
+        timeline: formData?.timeline,
+        // Puedes agregar más campos si el backend lo requiere
       };
-
-      onCreateQuotation?.(newQuotation);
-      handleClose();
+      const response = await createQuotation(quotationPayload);
+      if (response?.success) {
+        showOperationSuccess('Cotización creada exitosamente');
+        onCreateQuotation?.(response.data || response);
+        handleClose();
+      } else {
+        alert('Error al crear la cotización');
+      }
     } catch (error) {
+      alert('Error al crear la cotización');
       console.error('Error creating quotation:', error);
     } finally {
       setIsSubmitting(false);
@@ -249,19 +248,26 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
                   label="Nombre del Cliente"
                   required
                   value={formData?.clientName}
-                  onChange={(e) => handleInputChange('clientName', e?.target?.value)}
+                  disabled
                   error={errors?.clientName}
-                  placeholder="Ej. Corporación ABC"
+                  placeholder="Cliente del proyecto seleccionado"
                 />
-                
-                <Input
-                  label="Nombre del Proyecto"
-                  required
-                  value={formData?.projectName}
-                  onChange={(e) => handleInputChange('projectName', e?.target?.value)}
-                  error={errors?.projectName}
-                  placeholder="Ej. Instalación HVAC Torre Corporativa"
-                />
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Nombre del Proyecto <span className="text-destructive">*</span>
+                  </label>
+                  <Select
+                    value={projectOptions.find(opt => opt.label === formData?.projectName)?.value || ''}
+                    onChange={handleProjectChange}
+                    options={projectOptions}
+                    isLoading={loadingProyectos}
+                    placeholder={loadingProyectos ? 'Cargando proyectos...' : 'Selecciona un proyecto'}
+                  />
+                  {errors?.projectName && (
+                    <p className="text-sm text-destructive mt-1">{errors?.projectName}</p>
+                  )}
+                </div>
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">
@@ -406,7 +412,9 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
                   <Select
                     value={formData?.assignedTo}
                     onChange={(value) => handleInputChange('assignedTo', value)}
-                    options={assignedToOptions?.map(person => ({ value: person, label: person }))}
+                    options={assignedToOptions}
+                    isLoading={loadingEmployees}
+                    placeholder={loadingEmployees ? 'Cargando empleados...' : 'Selecciona un responsable'}
                   />
                 </div>
 
