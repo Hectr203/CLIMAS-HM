@@ -1,4 +1,5 @@
 import { useState, useEffect, createContext, useContext } from "react";
+import useTokenExpiration from "./useTokenExpiration";
 import { useNavigate } from "react-router-dom";
 import EnvConfig from "../utils/config";
 import authService from "../services/authService";
@@ -14,13 +15,13 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const loadUserFromStorage = async () => {
-      const token = localStorage.getItem("authToken");
+      const token = localStorage.getItem("authToken") || localStorage.getItem("token");
       const expiresAt = localStorage.getItem("tokenExpiresAt");
       const now = Date.now();
       // Puede venir como 'userRole', 'role' o 'rol'
       const userRole = localStorage.getItem("userRole") || localStorage.getItem("role") || localStorage.getItem("rol");
       const userEmail = localStorage.getItem("userEmail");
-      if (token && expiresAt && now < Number(expiresAt)) {
+      if (token && (!expiresAt || now < Number(expiresAt))) {
         const userData = {
           token,
           rol: userRole,
@@ -31,6 +32,7 @@ export const AuthProvider = ({ children }) => {
       } else {
         // Si el token no existe o expiró, limpiar localStorage
         localStorage.removeItem("authToken");
+        localStorage.removeItem("token");
         localStorage.removeItem("tokenExpiresAt");
         localStorage.removeItem("userRole");
         localStorage.removeItem("role");
@@ -43,6 +45,16 @@ export const AuthProvider = ({ children }) => {
     };
     loadUserFromStorage();
   }, []);
+
+  // Integrar el hook de expiración de token
+  useTokenExpiration(user?.token, (newToken) => {
+    setUser((prev) => ({ ...prev, token: newToken }));
+    localStorage.setItem("authToken", newToken);
+    try {
+      const decoded = require('jwt-decode')(newToken);
+      localStorage.setItem("tokenExpiresAt", decoded.exp * 1000);
+    } catch {}
+  });
 
   const login = async (email, password) => {
     setIsLoading(true);

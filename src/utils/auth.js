@@ -283,10 +283,31 @@ export const getDefaultPath = (userRole) => {
 };
 
 // Logout user
-export const logout = () => {
+export const logoutUser = () => {
   localStorage.removeItem('authToken');
   localStorage.removeItem('userRole');
   localStorage.removeItem('userEmail');
   localStorage.removeItem('rememberMe');
   window.location.href = '/login';
-};
+}
+
+import axios from "axios";
+
+export function logout() {
+  localStorage.removeItem("token");
+  window.location.href = "/login";
+}
+
+export async function renewToken(currentToken) {
+  const apiUrl = import.meta.env.VITE_API_URL || "";
+  const res = await axios.get(
+    `${apiUrl}/usuarios/token-info`,
+    {
+      headers: { Authorization: `Bearer ${currentToken}` },
+    }
+  );
+  const { nuevoToken } = res.data;
+  localStorage.setItem("authToken", nuevoToken);
+  return nuevoToken;
+}
+// ...existing code...
