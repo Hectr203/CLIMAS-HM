@@ -241,11 +241,14 @@ import React, { useState, useEffect } from 'react';
 
           if (isLoading) {
             return (
-              <div className="min-h-screen bg-background">
-                <div className="flex items-center justify-center h-96">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                    <p className="text-muted-foreground">Cargando órdenes de trabajo...</p>
+              <div className="min-h-screen bg-background flex">
+                <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
+                <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
+                  <div className="pt-16 flex items-center justify-center h-96">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                      <p className="text-muted-foreground">Cargando proyectos...</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -295,7 +298,7 @@ import React, { useState, useEffect } from 'react';
                     {/* Shift Indicator */}
                     <div className="bg-muted rounded-lg px-4 py-2">
                       <div className="flex items-center space-x-2">
-                        <Icon name="Clock" size={16} className="text-primary" />
+                        <Icon name="Clock" size={1} className="text-primary" />
                         <span className="text-sm font-medium">
                           Turno: {currentShift === 'morning' ? '8:00 - 18:00' : 'Fuera de Horario'}
                         </span>
