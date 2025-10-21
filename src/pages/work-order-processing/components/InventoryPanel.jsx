@@ -8,6 +8,7 @@ const InventoryPanel = ({
   onRequestMaterial,
   onCreateRequisition,
   requisitions: externalRequisitions,
+  onRequisitionUpdated,
 }) => {
   const [activeTab, setActiveTab] = useState('inventory');
   const { requisitions, loading, getRequisitions, updateRequisition } = useRequisi();
@@ -69,7 +70,7 @@ const InventoryPanel = ({
     },
   ];
 
-  // 🔁 Cargar requisiciones al montar
+  // Cargar requisiciones al montar
   useEffect(() => {
     const fetchRequisitions = async () => {
       const data = await getRequisitions();
@@ -78,7 +79,7 @@ const InventoryPanel = ({
     fetchRequisitions();
   }, []);
 
-  // ✅ Actualizar cuando cambian las externas
+  // Actualizar cuando cambian las externas
   useEffect(() => {
     if (externalRequisitions && externalRequisitions.length > 0) {
       setLocalRequisitions(externalRequisitions);
@@ -111,7 +112,7 @@ const InventoryPanel = ({
     }
   };
 
-  // ✅ Funciones para aprobar o rechazar requisiciones (actualiza en tiempo real)
+  // Funciones para aprobar o rechazar requisiciones (actualiza en tiempo real)
 const handleApprove = async (request) => {
   const updated = await updateRequisition(request.id, { estado: 'Aprobada' });
   if (updated) {
@@ -119,7 +120,7 @@ const handleApprove = async (request) => {
       r.id === request.id ? { ...r, estado: 'Aprobada' } : r
     );
     setLocalRequisitions(updatedList);
-    if (typeof onRequisitionUpdated === 'function') onRequisitionUpdated(updatedList);
+    if (onRequisitionUpdated) onRequisitionUpdated(updatedList); //
   }
 };
 
@@ -130,9 +131,10 @@ const handleReject = async (request) => {
       r.id === request.id ? { ...r, estado: 'Rechazada' } : r
     );
     setLocalRequisitions(updatedList);
-    if (typeof onRequisitionUpdated === 'function') onRequisitionUpdated(updatedList);
+    if (onRequisitionUpdated) onRequisitionUpdated(updatedList); 
   }
 };
+
 
 
   return (

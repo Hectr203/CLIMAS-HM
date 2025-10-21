@@ -19,7 +19,7 @@ const WorkOrderProcessing = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // ✅ Estados locales
+  // Estados locales
   const [localOrders, setLocalOrders] = useState([]); // para sincronizar órdenes
   const [localRequisitions, setLocalRequisitions] = useState([]); // para requisiciones
 
@@ -31,7 +31,7 @@ const WorkOrderProcessing = () => {
   const [isRequisitionModalOpen, setIsRequisitionModalOpen] = useState(false);
   const [stats, setStats] = useState({});
 
-  // 🔁 Obtener requisiciones y oportunidades al iniciar
+  // Obtener requisiciones y oportunidades al iniciar
   useEffect(() => {
     const fetchData = async () => {
       const reqData = await getRequisitions();
@@ -44,7 +44,7 @@ const WorkOrderProcessing = () => {
     fetchData();
   }, []);
 
-  // 🔁 Mantener sincronía si cambian los datos del hook
+  // Mantener sincronía si cambian los datos del hook
   useEffect(() => {
     if (oportunities && oportunities.length > 0) {
       setLocalOrders(oportunities);
@@ -58,7 +58,7 @@ const WorkOrderProcessing = () => {
     }
   }, [requisitions]);
 
-  // 🔁 Filtros dinámicos
+  // Filtros dinámicos
   const handleFiltersChange = (filters) => {
     let filtered = [...(localOrders || [])];
 
@@ -117,7 +117,7 @@ const WorkOrderProcessing = () => {
     setFilteredOrders(filtered);
   };
 
-  // 🔁 Actualizar estatus
+  // Actualizar estatus
   const handleStatusUpdate = (order, newStatus) => {
     const updatedOrders = localOrders.map(wo =>
       wo.id === order.id ? { ...wo, estado: newStatus } : wo
@@ -126,7 +126,7 @@ const WorkOrderProcessing = () => {
     setFilteredOrders(updatedOrders);
   };
 
-  // 🧩 CRUD de órdenes
+  // CRUD de órdenes
   const handleSaveOrder = async (savedOrder) => {
     let newOrder = { ...savedOrder };
 
@@ -154,7 +154,7 @@ const WorkOrderProcessing = () => {
     setSelectedOrder(null);
   };
 
-  // ➕ Crear nueva orden
+  // Crear nueva orden
   const handleCreateNewOrder = () => {
     const newOrder = {
       id: null,
@@ -179,7 +179,7 @@ const WorkOrderProcessing = () => {
     setIsModalOpen(true);
   };
 
-  // ➕ Crear nueva requisición
+  // Crear nueva requisición
   const handleCreateNewRequisition = () => {
     const newRequisition = {
       id: null,
@@ -201,7 +201,7 @@ const WorkOrderProcessing = () => {
     setIsRequisitionModalOpen(true);
   };
 
-  // 💾 Guardar requisición
+  // Guardar requisición
   const handleSaveRequisition = async (savedRequisition) => {
     let newReq = { ...savedRequisition };
 

@@ -429,7 +429,7 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
   type="button"
   onClick={handleSave}
   className="bg-blue-600 hover:bg-blue-700 text-white"
-  disabled={!formData?.projectName} // solo requiere nombre de proyecto
+  disabled={!formData?.projectName} 
 >
   Crear Requisición
 </Button>
