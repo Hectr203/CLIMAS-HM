@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useConfirmDialog } from '../../ui/ConfirmDialogContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { useLocation } from 'react-router-dom';
+import useAuth from '../../hooks/useAuth';
 import Icon from '../AppIcon';
 import Button from './Button';
 import AppImage from '../AppImage';
@@ -31,9 +32,9 @@ const Header = ({ onMenuToggle, isMenuOpen = false }) => {
     setUserMenuOpen(!userMenuOpen);
   };
 
-  // showSuccess ya está declarado arriba
   const { showSuccess } = useNotifications();
   const { showConfirm } = useConfirmDialog();
+  const { logout } = useAuth();
   const handleLogout = async () => {
     const confirmed = await showConfirm({
       title: 'Cerrar sesión',
@@ -44,8 +45,7 @@ const Header = ({ onMenuToggle, isMenuOpen = false }) => {
     if (confirmed) {
       showSuccess('Sesión cerrada correctamente');
       setTimeout(() => {
-        localStorage.removeItem('authToken');
-        window.location.href = '/login';
+        logout();
       }, 1200);
     }
   };

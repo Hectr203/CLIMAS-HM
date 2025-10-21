@@ -15,8 +15,10 @@ const useProyecto = () => {
       const response = await proyectoService.getProyectos();
       if (response.success && Array.isArray(response.data)) {
         setProyectos(response.data);
+        console.log('Proyectos cargados:', response.data);
       } else {
         setProyectos([]);
+        console.log('No se encontraron proyectos.');
       }
     } catch (err) {
       console.error("Error en useProyecto.getProyectos:", err);
