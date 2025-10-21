@@ -5,9 +5,14 @@ import Input from "../../../components/ui/Input";
 import Select from "../../../components/ui/Select";
 import { Checkbox } from "../../../components/ui/Checkbox";
 import useOperac from "../../../hooks/useOperac";
+import useClient from "../../../hooks/useClient";
+import usePerson from "../../../hooks/usePerson";
 
 const WorkOrderModal = ({ isOpen, onClose, workOrder, mode = "edit", onSaveSuccess }) => {
   const { createWorkOrder, updateWorkOrder } = useOperac();
+  const { clients, getClients, loading: loadingClients, error: errorClients } = useClient();
+  const { getPersonsByDepartment, departmentPersons, loading: loadingPersons } = usePerson();
+
   const isViewMode = mode === "view";
 
   const [formData, setFormData] = useState({
@@ -18,10 +23,20 @@ const WorkOrderModal = ({ isOpen, onClose, workOrder, mode = "edit", onSaveSucce
     notes: "",
     requiredPPE: [],
     medicalRequirements: false,
-    client: "Constructora Atlas",
+    client: "",
     type: "",
   });
 
+  // 🔹 Cargar clientes y técnicos cuando se abre el modal
+  useEffect(() => {
+    if (isOpen) {
+      getClients();
+      // Cargar empleados de Taller y Mantenimiento
+      getPersonsByDepartment("Taller,Mantenimiento");
+    }
+  }, [isOpen]);
+
+  // 🔹 Cargar datos si existe una orden
   useEffect(() => {
     if (workOrder) {
       setFormData({
@@ -40,19 +55,11 @@ const WorkOrderModal = ({ isOpen, onClose, workOrder, mode = "edit", onSaveSucce
           ...(workOrder.chalecoReflectivo ? ["Chaleco Reflectivo"] : []),
         ],
         medicalRequirements: workOrder.requiereEstudiosMedicosActualizados || false,
-        client: workOrder.cliente || "Constructora Atlas",
+        client: workOrder.cliente || "",
         type: workOrder.tipo || "",
       });
     }
   }, [workOrder, isOpen]);
-
-  const technicianOptions = [
-    { value: "Carlos Mendoza", label: "Carlos Mendoza - Técnico Senior" },
-    { value: "Ana García", label: "Ana García - Especialista HVAC" },
-    { value: "Roberto Silva", label: "Roberto Silva - Técnico Junior" },
-    { value: "María López", label: "María López - Supervisora" },
-    { value: "Diego Ramírez", label: "Diego Ramírez - Técnico Senior" },
-  ];
 
   const priorityOptions = [
     { value: "Crítica", label: "Crítica" },
@@ -79,14 +86,6 @@ const WorkOrderModal = ({ isOpen, onClose, workOrder, mode = "edit", onSaveSucce
     "Chaleco Reflectivo",
   ];
 
-  const clientOptions = [
-    { value: "Constructora Atlas", label: "Constructora Atlas" },
-    { value: "Grupo Industrial MaxAir", label: "Grupo Industrial MaxAir" },
-    { value: "Instalaciones Frías del Norte", label: "Instalaciones Frías del Norte" },
-    { value: "Servicios HVAC Monterrey", label: "Servicios HVAC Monterrey" },
-    { value: "Mantenimiento Total MX", label: "Mantenimiento Total MX" },
-  ];
-
   const handleInputChange = (field, value) => {
     if (isViewMode) return;
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -102,52 +101,48 @@ const WorkOrderModal = ({ isOpen, onClose, workOrder, mode = "edit", onSaveSucce
     }));
   };
 
-const handleSave = async () => {
-  const payload = {
-    tecnicoAsignado: formData.assignedTechnician,
-    prioridad: formData.priority,
-    estado: formData.status,
-    fechaLimite: formData.dueDate,
-    notasAdicionales: formData.notes,
-    cascoSeguridad: formData.requiredPPE.includes("Casco de Seguridad"),
-    gafasProteccion: formData.requiredPPE.includes("Gafas de Protección"),
-    guantesTrabajo: formData.requiredPPE.includes("Guantes de Trabajo"),
-    calzadoSeguridad: formData.requiredPPE.includes("Calzado de Seguridad"),
-    arnesSeguridad: formData.requiredPPE.includes("Arnés de Seguridad"),
-    respiradorN95: formData.requiredPPE.includes("Respirador N95"),
-    chalecoReflectivo: formData.requiredPPE.includes("Chaleco Reflectivo"),
-    requiereEstudiosMedicosActualizados: formData.medicalRequirements,
-    cliente: formData.client,
-    tipo: formData.type,
-  };
+  const handleSave = async () => {
+    const payload = {
+      tecnicoAsignado: formData.assignedTechnician,
+      prioridad: formData.priority,
+      estado: formData.status,
+      fechaLimite: formData.dueDate,
+      notasAdicionales: formData.notes,
+      cascoSeguridad: formData.requiredPPE.includes("Casco de Seguridad"),
+      gafasProteccion: formData.requiredPPE.includes("Gafas de Protección"),
+      guantesTrabajo: formData.requiredPPE.includes("Guantes de Trabajo"),
+      calzadoSeguridad: formData.requiredPPE.includes("Calzado de Seguridad"),
+      arnesSeguridad: formData.requiredPPE.includes("Arnés de Seguridad"),
+      respiradorN95: formData.requiredPPE.includes("Respirador N95"),
+      chalecoReflectivo: formData.requiredPPE.includes("Chaleco Reflectivo"),
+      requiereEstudiosMedicosActualizados: formData.medicalRequirements,
+      cliente: formData.client,
+      tipo: formData.type,
+    };
 
-  try {
-    let savedOrder;
+    try {
+      let savedOrder;
+      if (workOrder?.id) {
+        savedOrder = await updateWorkOrder(workOrder.id, payload);
+      } else {
+        savedOrder = await createWorkOrder(payload);
+      }
 
-    if (workOrder?.id) {
-      savedOrder = await updateWorkOrder(workOrder.id, payload);
-    } else {
-      savedOrder = await createWorkOrder(payload);
+      onClose();
+      if (onSaveSuccess) {
+        onSaveSuccess(savedOrder || { ...payload, id: workOrder?.id || Date.now() });
+      }
+    } catch (error) {
+      console.error("❌ Error al guardar:", error);
     }
-
-    // 🔹 Cierra el modal
-    onClose();
-
-    // 🔹 No hace falta actualizar filteredOrders manualmente, porque el hook ya actualizó oportunities
-  if (onSaveSuccess) {
-  onSaveSuccess(savedOrder || { ...payload, id: workOrder?.id || Date.now() });
-}
-  } catch (error) {
-    console.error("❌ Error al guardar:", error);
-  }
-};
-
+  };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-card rounded-lg border border-border w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border">
           <h2 className="text-xl font-semibold text-foreground">
             {isViewMode
@@ -161,15 +156,33 @@ const handleSave = async () => {
           </Button>
         </div>
 
+        {/* Formulario */}
         <div className="p-6 space-y-6">
+          {/* Asignación y estado */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Select
               label="Técnico Asignado"
-              options={technicianOptions}
+              options={
+                Array.isArray(departmentPersons)
+                  ? departmentPersons.map((p) => ({
+                      value: p.nombreCompleto,
+                      label: `${p.nombreCompleto} - ${p.departamento || ""}`,
+                    }))
+                  : []
+              }
               value={formData.assignedTechnician}
               onChange={(value) => handleInputChange("assignedTechnician", value)}
               disabled={isViewMode}
+              placeholder={
+                loadingPersons
+                  ? "Cargando técnicos..."
+                  : departmentPersons.length === 0
+                  ? "No hay técnicos disponibles"
+                  : "Selecciona un técnico"
+              }
+              loading={loadingPersons}
             />
+
             <Select
               label="Prioridad"
               options={priorityOptions}
@@ -177,6 +190,7 @@ const handleSave = async () => {
               onChange={(value) => handleInputChange("priority", value)}
               disabled={isViewMode}
             />
+
             <Select
               label="Estado"
               options={statusOptions}
@@ -184,6 +198,7 @@ const handleSave = async () => {
               onChange={(value) => handleInputChange("status", value)}
               disabled={isViewMode}
             />
+
             <Input
               label="Fecha Límite"
               type="date"
@@ -193,23 +208,50 @@ const handleSave = async () => {
             />
           </div>
 
+          {/* Cliente y tipo */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Select
-              label="Cliente"
-              options={clientOptions}
-              value={formData.client}
-              onChange={(value) => handleInputChange("client", value)}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">
+                Cliente <span className="text-destructive">*</span>
+              </label>
+              <Select
+                value={formData.client}
+                onChange={(value) => handleInputChange("client", value)}
+                options={
+                  Array.isArray(clients) && clients.length > 0
+                    ? clients.map((c) => ({
+                        value: c.id || c._id,
+                        label: c.companyName || c.empresa || c.nombre || "Sin nombre",
+                      }))
+                    : []
+                }
+                placeholder={
+                  loadingClients
+                    ? "Cargando clientes..."
+                    : clients.length === 0
+                    ? "No hay clientes registrados"
+                    : "Selecciona un cliente"
+                }
+                loading={loadingClients}
+                disabled={isViewMode}
+                error={errorClients ? "Error al cargar clientes" : ""}
+                searchable
+              />
+              {errorClients && (
+                <p className="text-xs text-destructive">Error al cargar clientes</p>
+              )}
+            </div>
+
+            <Input
+              label="Tipo"
+              placeholder="Ej. Mantenimiento Preventivo"
+              value={formData.type}
+              onChange={(e) => handleInputChange("type", e.target.value)}
               disabled={isViewMode}
             />
-            <Input
-  label="Tipo"
-  placeholder="Ej. Mantenimiento Preventivo"
-  value={formData.type}
-  onChange={(e) => handleInputChange("type", e.target.value)}
-  disabled={isViewMode}
-/>
           </div>
 
+          {/* Notas */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
               Notas Adicionales
@@ -223,6 +265,7 @@ const handleSave = async () => {
             />
           </div>
 
+          {/* PPE */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-3">
               PPE Requerido
@@ -240,6 +283,7 @@ const handleSave = async () => {
             </div>
           </div>
 
+          {/* Estudios Médicos */}
           <div className="bg-muted/30 rounded-lg p-4">
             <Checkbox
               label="Requiere Estudios Médicos"
@@ -250,6 +294,7 @@ const handleSave = async () => {
           </div>
         </div>
 
+        {/* Footer */}
         {!isViewMode && (
           <div className="flex items-center justify-end space-x-3 p-6 border-t border-border">
             <Button variant="outline" onClick={onClose}>

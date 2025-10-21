@@ -2,10 +2,12 @@ import React, { useState, useEffect, useMemo } from "react";
 import Icon from "../../../components/AppIcon";
 import Button from "../../../components/ui/Button";
 import useOperac from "../../../hooks/useOperac";
+import useClient from "../../../hooks/useClient"; // 👈 agregado para traer los clientes
 import WorkOrderModal from "../components/WorkOrderModal";
 
 const WorkOrderTable = ({ workOrders, onStatusUpdate, onAssignTechnician, onViewDetails, onEditOrder, loading, error }) => {
   const { oportunities, getOportunities } = useOperac();
+  const { clients, getClients, loading: loadingClients } = useClient(); // 👈 agregado
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [sortConfig, setSortConfig] = useState({ key: "prioridad", direction: "asc" });
   const [currentPage, setCurrentPage] = useState(1);
@@ -21,11 +23,18 @@ const WorkOrderTable = ({ workOrders, onStatusUpdate, onAssignTechnician, onView
     if (!workOrders?.length) {
       getOportunities();
     }
+    getClients(); // 👈 obtener lista de clientes al montar
   }, []);
 
   // 🔹 Usar las órdenes filtradas si existen, o las del hook si no
   const dataSource = useMemo(() => workOrders?.length ? workOrders : (oportunities || []), [workOrders, oportunities]);
 
+  // 🔹 Obtener nombre del cliente por ID
+  const getClientName = (clientId) => {
+    if (!clientId) return "—";
+    const client = clients?.find((c) => c.id === clientId || c._id === clientId);
+    return client ? client.companyName || client.empresa || client.nombre : "Sin cliente";
+  };
 
   const sortedOrders = useMemo(() => {
     const sorted = [...dataSource];
@@ -124,7 +133,7 @@ const WorkOrderTable = ({ workOrders, onStatusUpdate, onAssignTechnician, onView
     </th>
   );
 
-  if (loading)
+  if (loading || loadingClients)
     return (
       <div className="flex justify-center items-center py-10">
         <Icon name="Loader2" className="animate-spin mr-2" size={18} />
@@ -189,7 +198,7 @@ const WorkOrderTable = ({ workOrders, onStatusUpdate, onAssignTechnician, onView
                       <div>{order.tecnicoAsignado}</div>
                     </div>
                   </td>
-
+                  
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(order.prioridad)}`}>
                       {order.prioridad}
@@ -201,11 +210,14 @@ const WorkOrderTable = ({ workOrders, onStatusUpdate, onAssignTechnician, onView
                       {order.estado}
                     </span>
                   </td>
-
                   <td className="px-6 py-4 whitespace-nowrap text-sm">{order.fechaLimite}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">{order.cliente || "—"}</td>
+                  
+                  {/* 👇 Mostrar nombre del cliente correctamente */}
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    {getClientName(order.cliente)}
+                  </td>
+                  
                   <td className="px-6 py-4 whitespace-nowrap text-sm">{order.tipo || "—"}</td>
-
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                     {order.notasAdicionales || "-"}
                   </td>
@@ -229,6 +241,15 @@ const WorkOrderTable = ({ workOrders, onStatusUpdate, onAssignTechnician, onView
                         onClick={() => handleEdit(order)}
                       >
                         Editar
+                      </Button>
+                       <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onAssignTechnician(order)}
+                        iconName="UserPlus"
+                        iconSize={16}
+                      >
+                        Asignar
                       </Button>
                     </div>
                   </td>
@@ -270,19 +291,19 @@ const WorkOrderTable = ({ workOrders, onStatusUpdate, onAssignTechnician, onView
 
         {/* Modal */}
         {isModalOpen && (
-  <WorkOrderModal
-    isOpen={isModalOpen}
-    onClose={handleCloseModal}
-    workOrder={selectedOrder}
-    mode={modalMode}
-    onSaveSuccess={(updatedOrder) => {
-      if (onEditOrder) {
-        onEditOrder(updatedOrder);
-      }
-      handleCloseModal();
-    }}
-  />
-)}
+          <WorkOrderModal
+            isOpen={isModalOpen}
+            onClose={handleCloseModal}
+            workOrder={selectedOrder}
+            mode={modalMode}
+            onSaveSuccess={(updatedOrder) => {
+              if (onEditOrder) {
+                onEditOrder(updatedOrder);
+              }
+              handleCloseModal();
+            }}
+          />
+        )}
 
       </div>
 
