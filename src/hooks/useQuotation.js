@@ -26,10 +26,55 @@ const useQuotation = () => {
     }
   };
 
+    const getCotizaciones = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await quotationService.getCotizaciones();
+        return response;
+      } catch (err) {
+        setError(err);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const getCotizacionById = async (id) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await quotationService.getCotizacionById(id);
+        return response;
+      } catch (err) {
+        setError(err);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const editCotizacion = async (id, data) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await quotationService.editCotizacion(id, data);
+        return response;
+      } catch (err) {
+        setError(err);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    };
+
   return {
-    createQuotation,
-    loading,
-    error,
+      createQuotation,
+      getCotizaciones,
+      getCotizacionById,
+      editCotizacion,
+      loading,
+      error,
   };
 };
 

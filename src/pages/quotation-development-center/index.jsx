@@ -10,6 +10,7 @@ import ClientCommunication from './components/ClientCommunication';
 import RevisionHistory from './components/RevisionHistory';
 import InternalReview from './components/InternalReview';
 import NewQuotationModal from './components/NewQuotationModal';
+import useQuotation from '../../hooks/useQuotation';
 
 const QuotationDevelopmentCenter = () => {
   const [quotations, setQuotations] = useState([]);
@@ -20,227 +21,26 @@ const QuotationDevelopmentCenter = () => {
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [isNewQuotationModalOpen, setIsNewQuotationModalOpen] = useState(false);
 
-  // Mock quotation data following the development workflow
-  const mockQuotations = [
-    {
-      id: "COT-2024-001",
-      clientName: "Corporación ABC",
-      projectName: "Instalación HVAC Torre Corporativa",
-      status: "development",
-      createdDate: "2024-03-28",
-      lastModified: "2024-03-30",
-      assignedTo: "María García",
-      priority: "high",
-      stage: "scope-definition",
-      quotationData: {
-        scope: "Instalación completa de sistema HVAC para edificio corporativo de 12 pisos",
-        assumptions: [
-          "Acceso libre durante horario laboral (8:00-18:00)",
-          "Cliente proporciona conexiones eléctricas principales",
-          "Estructura existente soporta equipos propuestos"
-        ],
-        timeline: "16 semanas",
-        conditions: "50% anticipo, 25% avance 50%, 25% finalización",
-        warranty: "24 meses en equipos, 12 meses en instalación",
-        totalAmount: 2750000,
-        validity: "45 días"
-      },
-      materials: [
-        { item: "Unidades condensadoras", quantity: 6, cost: 450000, risk: "medium" },
-        { item: "Ductos galvanizados", quantity: "500 m", cost: 125000, risk: "low" },
-        { item: "Controles inteligentes", quantity: 12, cost: 180000, risk: "high" }
-      ],
-      riskAssessment: {
-        overall: "medium",
-        factors: [
-          { factor: "Acceso a obra", risk: "low", mitigation: "Confirmado por cliente" },
-          { factor: "Disponibilidad de materiales", risk: "medium", mitigation: "Proveedores alternativos identificados" },
-          { factor: "Complejidad técnica", risk: "high", mitigation: "Equipo especializado asignado" }
-        ],
-        extraCostsPrevention: true
-      },
-      revisions: [
-        {
-          version: "1.0",
-          date: "2024-03-28",
-          changes: "Versión inicial",
-          author: "María García"
-        }
-      ],
-      communications: [
-        {
-          id: "comm-1",
-          type: "email",
-          date: "2024-03-29",
-          subject: "Consulta sobre especificaciones técnicas",
-          content: "Cliente solicita aclaraciones sobre capacidad de enfriamiento",
-          urgency: "normal",
-          attachments: ["Especificaciones_Tecnicas.pdf"]
-        }
-      ],
-      internalReview: {
-        status: "pending",
-        reviewAreas: {
-          pricing: { reviewed: false, reviewer: "", comments: "" },
-          scope: { reviewed: false, reviewer: "", comments: "" },
-          timeline: { reviewed: false, reviewer: "", comments: "" },
-          technical: { reviewed: false, reviewer: "", comments: "" }
-        }
-      },
-      additionalWork: []
-    },
-    {
-      id: "COT-2024-002",
-      clientName: "Green Energy México",
-      projectName: "Sistema HVAC Complejo Residencial",
-      status: "review",
-      createdDate: "2024-03-25",
-      lastModified: "2024-03-30",
-      assignedTo: "Carmen Díaz",
-      priority: "urgent",
-      stage: "client-review",
-      quotationData: {
-        scope: "Instalación de sistema HVAC para complejo residencial sustentable de 200 unidades",
-        assumptions: [
-          "Trabajo nocturno y fines de semana permitido",
-          "Acceso a todas las unidades durante construcción",
-          "Coordinación con otros contratistas del cliente"
-        ],
-        timeline: "20 semanas",
-        conditions: "40% anticipo, 30% avance 50%, 30% finalización",
-        warranty: "36 meses en equipos, 24 meses en instalación",
-        totalAmount: 4200000,
-        validity: "30 días"
-      },
-      materials: [
-        { item: "Sistemas VRF", quantity: 25, cost: 1800000, risk: "medium" },
-        { item: "Unidades interiores", quantity: 200, cost: 1200000, risk: "low" },
-        { item: "Ductos y accesorios", quantity: "2000 m", cost: 350000, risk: "low" }
-      ],
-      riskAssessment: {
-        overall: "low",
-        factors: [
-          { factor: "Volumen del proyecto", risk: "medium", mitigation: "Equipo ampliado asignado" },
-          { factor: "Coordinación con terceros", risk: "medium", mitigation: "Plan de coordinación establecido" }
-        ],
-        extraCostsPrevention: true
-      },
-      revisions: [
-        {
-          version: "1.0",
-          date: "2024-03-25",
-          changes: "Versión inicial",
-          author: "Carmen Díaz"
-        },
-        {
-          version: "1.1",
-          date: "2024-03-28",
-          changes: "Ajuste en cronograma por solicitud del cliente",
-          author: "Carmen Díaz"
-        }
-      ],
-      communications: [
-        {
-          id: "comm-2",
-          type: "whatsapp",
-          date: "2024-03-30",
-          subject: "Seguimiento de cotización",
-          content: "Cliente solicita presentación de propuesta la próxima semana",
-          urgency: "urgent",
-          attachments: []
-        }
-      ],
-      internalReview: {
-        status: "approved",
-        reviewAreas: {
-          pricing: { reviewed: true, reviewer: "Martín López", comments: "Precios competitivos" },
-          scope: { reviewed: true, reviewer: "Ana Rodríguez", comments: "Alcance bien definido" },
-          timeline: { reviewed: true, reviewer: "Carlos Martínez", comments: "Timeline realista" },
-          technical: { reviewed: true, reviewer: "Roberto Silva", comments: "Solución técnica sólida" }
-        },
-        approvedDate: "2024-03-29",
-        approvedBy: "Ventas/Martín"
-      },
-      clientSubmission: {
-        sent: true,
-        sentDate: "2024-03-30",
-        method: "email",
-        urgencyLevel: "high",
-        attachments: ["Cotizacion_GreenEnergy_v1.1.pdf", "Cronograma_Detallado.pdf"],
-        followUpScheduled: "2024-04-05"
-      }
-    },
-    {
-      id: "COT-2024-003",
-      clientName: "Tech Solutions SA",
-      projectName: "Modernización Sistema Climatización",
-      status: "additional-work",
-      createdDate: "2024-03-22",
-      lastModified: "2024-03-29",
-      assignedTo: "Patricia Morales",
-      priority: "medium",
-      stage: "additional-quotation",
-      quotationData: {
-        scope: "Modernización completa del sistema de climatización existente",
-        assumptions: [
-          "Desmontaje de equipos obsoletos incluido",
-          "Disposición final de equipos viejos por cuenta del cliente",
-          "Instalaciones eléctricas existentes compatibles"
-        ],
-        timeline: "12 semanas",
-        conditions: "30% anticipo, 40% avance 60%, 30% finalización",
-        warranty: "24 meses",
-        totalAmount: 1850000,
-        validity: "60 días"
-      },
-      additionalWork: [
-        {
-          id: "add-1",
-          description: "Actualización del sistema eléctrico por incompatibilidad detectada",
-          reason: "Inspección reveló cableado obsoleto que no cumple normativas actuales",
-          costImpact: 280000,
-          timeImpact: "+3 semanas",
-          status: "pending-approval"
-        }
-      ],
-      materials: [
-        { item: "Chillers de alta eficiencia", quantity: 2, cost: 850000, risk: "medium" },
-        { item: "Manejadoras de aire", quantity: 8, cost: 480000, risk: "low" },
-        { item: "Sistema de control BMS", quantity: 1, cost: 220000, risk: "high" }
-      ],
-      revisions: [
-        {
-          version: "1.0",
-          date: "2024-03-22",
-          changes: "Versión inicial",
-          author: "Patricia Morales"
-        },
-        {
-          version: "1.1",
-          date: "2024-03-26",
-          changes: "Cotización adicional por trabajos extra identificados",
-          author: "Patricia Morales"
-        }
-      ],
-      internalReview: {
-        status: "approved",
-        reviewAreas: {
-          pricing: { reviewed: true, reviewer: "Ventas/Martín", comments: "Pricing adicional justificado" },
-          scope: { reviewed: true, reviewer: "Ing. Técnico", comments: "Trabajo adicional necesario" }
-        }
-      }
-    }
-  ];
+  const { getCotizaciones, getCotizacionById } = useQuotation();
 
   useEffect(() => {
-    const loadQuotations = async () => {
+    const fetchQuotations = async () => {
       setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setQuotations(mockQuotations);
-      setIsLoading(false);
+      try {
+        const response = await getCotizaciones();
+        console.log('Respuesta completa del backend:', response);
+        // Acceso correcto al array de cotizaciones
+        const data = Array.isArray(response.data?.data) ? response.data.data : [];
+        console.log('Cotizaciones obtenidas:', data);
+        setQuotations(data);
+      } catch (err) {
+        setQuotations([]); // Si hay error, deja quotations como array vacío
+        console.error('Error al obtener cotizaciones:', err);
+      } finally {
+        setIsLoading(false);
+      }
     };
-
-    loadQuotations();
+    fetchQuotations();
   }, []);
 
   const handleCreateQuotation = (newQuotation) => {
@@ -249,8 +49,16 @@ const QuotationDevelopmentCenter = () => {
     setActiveTab('builder');
   };
 
-  const handleQuotationSelect = (quotation) => {
-    setSelectedQuotation(quotation);
+  const handleQuotationSelect = async (quotation) => {
+    setIsLoading(true);
+    try {
+      const quotationDetail = await getCotizacionById(quotation.id);
+      setSelectedQuotation(quotationDetail);
+    } catch (err) {
+      // Manejo de error si es necesario
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleQuotationUpdate = (quotationId, updates) => {
@@ -329,6 +137,12 @@ const QuotationDevelopmentCenter = () => {
     }
   };
 
+  useEffect(() => {
+    if (quotations.length > 0 && !selectedQuotation) {
+      handleQuotationSelect(quotations[0]);
+    }
+  }, [quotations, selectedQuotation]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex">
@@ -397,37 +211,41 @@ const QuotationDevelopmentCenter = () => {
                         onClick={() => handleQuotationSelect(quotation)}
                         className={`p-3 rounded-lg border-l-4 cursor-pointer hover:shadow-md transition-all ${
                           selectedQuotation?.id === quotation?.id ? 'bg-primary/10' : 'bg-card'
-                        } ${getPriorityColor(quotation?.priority)}`}
+                        } ${getPriorityColor(quotation?.prioridad || quotation?.priority)}`}
                       >
                         <div className="flex items-start justify-between mb-2">
                           <h4 className="font-medium text-sm text-foreground line-clamp-2">
-                            {quotation?.projectName}
+                            {quotation?.Proyecto?.nombre || quotation?.projectName || 'Sin proyecto'}
                           </h4>
-                          <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(quotation?.status)}`}>
-                            {quotation?.status === 'development' ? 'Desarrollo' :
-                             quotation?.status === 'review' ? 'Revisión' :
-                             quotation?.status === 'approved' ? 'Aprobada' :
-                             quotation?.status === 'additional-work' ? 'Trabajo Adicional' : 'Enviada'}
+                          <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(quotation?.estado || quotation?.status)}`}>
+                            {quotation?.estado === 'activo' ? 'Activo' :
+                             quotation?.estado === 'desarrollo' ? 'Desarrollo' :
+                             quotation?.estado === 'review' ? 'Revisión' :
+                             quotation?.estado === 'approved' ? 'Aprobada' :
+                             quotation?.estado === 'additional-work' ? 'Trabajo Adicional' :
+                             quotation?.estado || quotation?.status || 'Sin estado'}
                           </span>
                         </div>
                         
-                        <p className="text-xs text-muted-foreground mb-2">{quotation?.clientName}</p>
+                        <p className="text-xs text-muted-foreground mb-2">{quotation?.Cliente?.nombre || quotation?.clientName || 'Sin cliente'}</p>
                         <p className="text-xs text-muted-foreground mb-2">{quotation?.id}</p>
-                        
                         <div className="flex items-center space-x-2 mb-2">
                           <Icon name="User" size={12} className="text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">{quotation?.assignedTo}</span>
+                          <span className="text-xs text-muted-foreground">{
+                            (quotation?.PersonalAsignado?.nombres?.length > 0
+                              ? quotation.PersonalAsignado.nombres.join(', ')
+                              : quotation?.assignedTo || 'Sin responsable')
+                          }</span>
                         </div>
-                        
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-1">
                             <Icon name="Calendar" size={12} className="text-muted-foreground" />
                             <span className="text-xs text-muted-foreground">
-                              {new Date(quotation?.lastModified)?.toLocaleDateString('es-MX')}
+                              {new Date(quotation?.ultimaModificacion || quotation?.lastModified || quotation?.fechaCreacion)?.toLocaleDateString('es-MX')}
                             </span>
                           </div>
                           <div className="text-xs font-medium text-foreground">
-                            ${quotation?.quotationData?.totalAmount?.toLocaleString('es-MX')}
+                            ${quotation?.datosCotizacion?.montoTotal?.toLocaleString('es-MX') || quotation?.quotationData?.totalAmount?.toLocaleString('es-MX') || '0'}
                           </div>
                         </div>
                       </div>
