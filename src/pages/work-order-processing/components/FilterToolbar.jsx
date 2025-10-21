@@ -1,60 +1,72 @@
-import React, { useState } from 'react';
-import Icon from '../../../components/AppIcon';
-import Button from '../../../components/ui/Button';
-import Input from '../../../components/ui/Input';
-import Select from '../../../components/ui/Select';
+import React, { useState, useEffect } from "react";
+import Icon from "../../../components/AppIcon";
+import Button from "../../../components/ui/Button";
+import Input from "../../../components/ui/Input";
+import Select from "../../../components/ui/Select";
+import usePerson from "../../../hooks/usePerson";
 
 const FilterToolbar = ({ onFiltersChange, totalCount, filteredCount }) => {
   const [filters, setFilters] = useState({
-    search: '',
-    status: '',
-    technician: '',
-    priority: '',
-    project: '',
-    dateRange: ''
+    search: "",
+    status: "",
+    technician: "",
+    priority: "",
+    project: "",
+    dateRange: "",
   });
 
+  const { getPersonsByDepartment, departmentPersons, loading: loadingPersons } = usePerson();
+
+  // Cargar técnicos de Taller y Mantenimiento al montar el componente
+  useEffect(() => {
+    getPersonsByDepartment("Taller,Mantenimiento");
+  }, []);
+
   const statusOptions = [
-    { value: '', label: 'Todos los Estados' },
-    { value: 'Pendiente', label: 'Pendiente' },
-    { value: 'En Progreso', label: 'En Progreso' },
-    { value: 'Completada', label: 'Completada' },
-    { value: 'En Pausa', label: 'En Pausa' },
-    { value: 'Cancelada', label: 'Cancelada' }
+    { value: "", label: "Todos los Estados" },
+    { value: "Pendiente", label: "Pendiente" },
+    { value: "En Progreso", label: "En Progreso" },
+    { value: "Completada", label: "Completada" },
+    { value: "En Pausa", label: "En Pausa" },
+    { value: "Cancelada", label: "Cancelada" },
   ];
 
   const priorityOptions = [
-    { value: '', label: 'Todas las Prioridades' },
-    { value: 'Crítica', label: 'Crítica' },
-    { value: 'Alta', label: 'Alta' },
-    { value: 'Media', label: 'Media' },
-    { value: 'Baja', label: 'Baja' }
-  ];
-
-  const technicianOptions = [
-    { value: '', label: 'Todos los Técnicos' },
-    { value: 'Carlos Mendoza', label: 'Carlos Mendoza' },
-    { value: 'Ana García', label: 'Ana García' },
-    { value: 'Roberto Silva', label: 'Roberto Silva' },
-    { value: 'María López', label: 'María López' },
-    { value: 'Diego Ramírez', label: 'Diego Ramírez' }
+    { value: "", label: "Todas las Prioridades" },
+    { value: "Crítica", label: "Crítica" },
+    { value: "Alta", label: "Alta" },
+    { value: "Media", label: "Media" },
+    { value: "Baja", label: "Baja" },
   ];
 
   const projectOptions = [
-    { value: '', label: 'Todos los Proyectos' },
-    { value: 'HVAC-2024-001', label: 'Torre Corporativa ABC' },
-    { value: 'HVAC-2024-002', label: 'Centro Comercial Plaza Norte' },
-    { value: 'HVAC-2024-003', label: 'Hospital General San José' },
-    { value: 'HVAC-2024-004', label: 'Edificio Residencial Vista Mar' }
+    { value: "", label: "Todos los Proyectos" },
+    { value: "HVAC-2024-001", label: "Torre Corporativa ABC" },
+    { value: "HVAC-2024-002", label: "Centro Comercial Plaza Norte" },
+    { value: "HVAC-2024-003", label: "Hospital General San José" },
+    { value: "HVAC-2024-004", label: "Edificio Residencial Vista Mar" },
   ];
 
   const dateRangeOptions = [
-    { value: '', label: 'Todas las Fechas' },
-    { value: 'today', label: 'Hoy' },
-    { value: 'week', label: 'Esta Semana' },
-    { value: 'month', label: 'Este Mes' },
-    { value: 'overdue', label: 'Vencidas' }
+    { value: "", label: "Todas las Fechas" },
+    { value: "today", label: "Hoy" },
+    { value: "week", label: "Esta Semana" },
+    { value: "month", label: "Este Mes" },
+    { value: "overdue", label: "Vencidas" },
   ];
+
+  // Generar opciones de técnicos dinámicamente
+  const technicianOptions = loadingPersons
+    ? [{ value: "", label: "Cargando técnicos..." }]
+    : Array.isArray(departmentPersons) && departmentPersons.length > 0
+    ? [
+        { value: "", label: "Todos los Técnicos" },
+        ...departmentPersons.map((p) => ({
+          value: p.nombreCompleto,
+          label: `${p.nombreCompleto} - ${p.departamento || ""}`,
+        })),
+      ]
+    : [{ value: "", label: "No hay técnicos disponibles" }];
 
   const handleFilterChange = (key, value) => {
     const newFilters = { ...filters, [key]: value };
@@ -64,18 +76,18 @@ const FilterToolbar = ({ onFiltersChange, totalCount, filteredCount }) => {
 
   const clearAllFilters = () => {
     const clearedFilters = {
-      search: '',
-      status: '',
-      technician: '',
-      priority: '',
-      project: '',
-      dateRange: ''
+      search: "",
+      status: "",
+      technician: "",
+      priority: "",
+      project: "",
+      dateRange: "",
     };
     setFilters(clearedFilters);
     onFiltersChange(clearedFilters);
   };
 
-  const hasActiveFilters = Object.values(filters)?.some(value => value !== '');
+  const hasActiveFilters = Object.values(filters)?.some((value) => value !== "");
 
   return (
     <div className="bg-card border border-border rounded-lg p-4 mb-6">
@@ -83,7 +95,9 @@ const FilterToolbar = ({ onFiltersChange, totalCount, filteredCount }) => {
         <div className="flex items-center space-x-4">
           <h3 className="text-lg font-semibold text-foreground">Órdenes de Trabajo</h3>
           <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <span>Mostrando {filteredCount} de {totalCount} órdenes</span>
+            <span>
+              Mostrando {filteredCount} de {totalCount} órdenes
+            </span>
             {hasActiveFilters && (
               <span className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs">
                 Filtros activos
@@ -92,6 +106,7 @@ const FilterToolbar = ({ onFiltersChange, totalCount, filteredCount }) => {
           </div>
         </div>
       </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
         <div className="lg:col-span-2">
           <div className="relative">
@@ -99,12 +114,12 @@ const FilterToolbar = ({ onFiltersChange, totalCount, filteredCount }) => {
               type="search"
               placeholder="Buscar por número de orden, proyecto..."
               value={filters?.search}
-              onChange={(e) => handleFilterChange('search', e?.target?.value)}
+              onChange={(e) => handleFilterChange("search", e?.target?.value)}
               className="pl-10"
             />
-            <Icon 
-              name="Search" 
-              size={16} 
+            <Icon
+              name="Search"
+              size={16}
               className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
             />
           </div>
@@ -114,38 +129,41 @@ const FilterToolbar = ({ onFiltersChange, totalCount, filteredCount }) => {
           placeholder="Estado"
           options={statusOptions}
           value={filters?.status}
-          onChange={(value) => handleFilterChange('status', value)}
+          onChange={(value) => handleFilterChange("status", value)}
         />
 
         <Select
           placeholder="Prioridad"
           options={priorityOptions}
           value={filters?.priority}
-          onChange={(value) => handleFilterChange('priority', value)}
+          onChange={(value) => handleFilterChange("priority", value)}
         />
 
+        {/* Select dinámico de técnicos */}
         <Select
           placeholder="Técnico"
           options={technicianOptions}
           value={filters?.technician}
-          onChange={(value) => handleFilterChange('technician', value)}
+          onChange={(value) => handleFilterChange("technician", value)}
           searchable
+          loading={loadingPersons}
         />
 
         <Select
           placeholder="Proyecto"
           options={projectOptions}
           value={filters?.project}
-          onChange={(value) => handleFilterChange('project', value)}
+          onChange={(value) => handleFilterChange("project", value)}
           searchable
         />
       </div>
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-4 pt-4 border-t border-border">
         <Select
           placeholder="Rango de fechas"
           options={dateRangeOptions}
           value={filters?.dateRange}
-          onChange={(value) => handleFilterChange('dateRange', value)}
+          onChange={(value) => handleFilterChange("dateRange", value)}
           className="sm:w-48"
         />
 
