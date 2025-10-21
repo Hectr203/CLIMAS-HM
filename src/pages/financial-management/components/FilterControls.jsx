@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
-
+import useProyect from '../../../hooks/useProyect';
 const FilterControls = ({ onFiltersChange, onExport, onReset }) => {
   const [filters, setFilters] = useState({
-    dateRange: 'thisMonth',
+    dateRange: 'all',
     startDate: '',
     endDate: '',
     category: '',
@@ -19,8 +19,24 @@ const FilterControls = ({ onFiltersChange, onExport, onReset }) => {
   });
 
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const { getProyectos, proyectos } = useProyect();
 
+  // Cargar proyectos desde el hook
+  useEffect(() => {
+    getProyectos().catch(() => {});
+  }, [getProyectos]);
+
+  // Notificar filtros iniciales al padre
+  useEffect(() => {
+    onFiltersChange?.(filters);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* ==============================
+     OPCIONES DE SELECT
+  ============================== */
   const dateRangeOptions = [
+    { value: 'all', label: 'Sin filtro' },
     { value: 'today', label: 'Hoy' },
     { value: 'thisWeek', label: 'Esta Semana' },
     { value: 'thisMonth', label: 'Este Mes' },
@@ -49,31 +65,71 @@ const FilterControls = ({ onFiltersChange, onExport, onReset }) => {
     { value: 'Operaciones', label: 'Operaciones' }
   ];
 
+  // 🔹 Estado: solo Pendiente y Autorizado
   const statusOptions = [
     { value: '', label: 'Todos los Estados' },
     { value: 'Pendiente', label: 'Pendiente' },
-    { value: 'Aprobado', label: 'Aprobado' },
-    { value: 'Rechazado', label: 'Rechazado' },
-    { value: 'En Revisión', label: 'En Revisión' }
+    { value: 'Autorizado', label: 'Autorizado' }
   ];
 
-  const projectOptions = [
-    { value: '', label: 'Todos los Proyectos' },
-    { value: 'HVAC-2024-001', label: 'Torre Corporativa - HVAC-2024-001' },
-    { value: 'HVAC-2024-002', label: 'Centro Comercial - HVAC-2024-002' },
-    { value: 'HVAC-2024-003', label: 'Hospital Regional - HVAC-2024-003' },
-    { value: 'HVAC-2024-004', label: 'Complejo Industrial - HVAC-2024-004' }
-  ];
+  // 🔹 Proyectos cargados dinámicamente
+  const projectOptions = useMemo(() => {
+    const base = [{ value: '', label: 'Todos los Proyectos' }];
+    const seen = new Set();
 
+    const list = Array.isArray(proyectos) ? proyectos : [];
+    const opts = list
+      .map((p) => {
+        const id =
+          p?.id ?? p?._id ?? p?.proyectoId ?? p?.codigo ?? p?.code ?? null;
+
+        const nombre =
+          p?.nombreProyecto ??
+          p?.nombre ??
+          p?.name ??
+          p?.titulo ??
+          p?.descripcion ??
+          '';
+
+        const codigo =
+          p?.codigo ?? p?.code ?? p?.clave ?? p?.projectCode ?? '';
+
+        const value = codigo || id;
+        if (!value) return null;
+        if (seen.has(value)) return null;
+        seen.add(value);
+
+        // 👇 solo muestra el nombre del proyecto, sin código
+        return { value, label: nombre || value };
+      })
+      .filter(Boolean);
+
+    return base.concat(opts);
+  }, [proyectos]);
+
+  /* ==============================
+     MANEJADORES
+  ============================== */
   const handleFilterChange = (key, value) => {
-    const newFilters = { ...filters, [key]: value };
-    setFilters(newFilters);
-    onFiltersChange(newFilters);
+    let next = { ...filters, [key]: value };
+
+    if (key === 'dateRange' && value !== 'custom') {
+      next.startDate = '';
+      next.endDate = '';
+    }
+
+    if (key === 'amountMin' || key === 'amountMax') {
+      const raw = String(value ?? '');
+      next[key] = raw === '' ? '' : isNaN(Number(raw)) ? '' : raw;
+    }
+
+    setFilters(next);
+    onFiltersChange?.(next);
   };
 
   const handleReset = () => {
     const resetFilters = {
-      dateRange: 'thisMonth',
+      dateRange: 'all',
       startDate: '',
       endDate: '',
       category: '',
@@ -85,32 +141,36 @@ const FilterControls = ({ onFiltersChange, onExport, onReset }) => {
       searchTerm: ''
     };
     setFilters(resetFilters);
-    onReset(resetFilters);
+    onReset?.(resetFilters);
+    onFiltersChange?.(resetFilters);
   };
 
   const getActiveFiltersCount = () => {
-    return Object.entries(filters)?.filter(([key, value]) => {
-      if (key === 'dateRange') return value !== 'thisMonth';
+    return Object.entries(filters).filter(([key, value]) => {
+      if (key === 'dateRange') return value !== 'all';
       return value !== '';
-    })?.length;
+    }).length;
   };
 
+  /* ==============================
+     RENDER
+  ============================== */
   return (
     <div className="bg-card border border-border rounded-lg p-6 space-y-4">
-      {/* Search and Quick Actions */}
+      {/* 🔍 Buscador y botón de filtros */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
         <div className="flex-1 max-w-md">
           <div className="relative">
             <Input
               type="search"
               placeholder="Buscar gastos, proveedores, proyectos..."
-              value={filters?.searchTerm}
+              value={filters.searchTerm}
               onChange={(e) => handleFilterChange('searchTerm', e?.target?.value)}
               className="pl-10"
             />
-            <Icon 
-              name="Search" 
-              size={16} 
+            <Icon
+              name="Search"
+              size={16}
               className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
             />
           </div>
@@ -132,64 +192,67 @@ const FilterControls = ({ onFiltersChange, onExport, onReset }) => {
           </Button>
         </div>
       </div>
-      {/* Basic Filters */}
+
+      {/* Filtros básicos */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Select
           label="Rango de Fechas"
           options={dateRangeOptions}
-          value={filters?.dateRange}
+          value={filters.dateRange}
           onChange={(value) => handleFilterChange('dateRange', value)}
         />
 
         <Select
           label="Categoría"
           options={categoryOptions}
-          value={filters?.category}
+          value={filters.category}
           onChange={(value) => handleFilterChange('category', value)}
         />
 
         <Select
           label="Estado"
           options={statusOptions}
-          value={filters?.status}
+          value={filters.status}
           onChange={(value) => handleFilterChange('status', value)}
         />
 
         <Select
           label="Proyecto"
           options={projectOptions}
-          value={filters?.project}
+          value={filters.project}
           onChange={(value) => handleFilterChange('project', value)}
           searchable
         />
       </div>
-      {/* Custom Date Range */}
-      {filters?.dateRange === 'custom' && (
+
+      {/* Filtro de fechas personalizadas */}
+      {filters.dateRange === 'custom' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
           <Input
             type="date"
             label="Fecha Inicio"
-            value={filters?.startDate}
+            value={filters.startDate}
             onChange={(e) => handleFilterChange('startDate', e?.target?.value)}
           />
           <Input
             type="date"
             label="Fecha Fin"
-            value={filters?.endDate}
+            value={filters.endDate}
             onChange={(e) => handleFilterChange('endDate', e?.target?.value)}
           />
         </div>
       )}
-      {/* Advanced Filters */}
+
+      {/* Filtros avanzados */}
       {showAdvanced && (
         <div className="border-t border-border pt-4 space-y-4">
           <h4 className="text-sm font-medium text-foreground">Filtros Avanzados</h4>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <Select
               label="Departamento"
               options={departmentOptions}
-              value={filters?.department}
+              value={filters.department}
               onChange={(value) => handleFilterChange('department', value)}
             />
 
@@ -197,7 +260,7 @@ const FilterControls = ({ onFiltersChange, onExport, onReset }) => {
               type="number"
               label="Monto Mínimo (MXN)"
               placeholder="0.00"
-              value={filters?.amountMin}
+              value={filters.amountMin}
               onChange={(e) => handleFilterChange('amountMin', e?.target?.value)}
             />
 
@@ -205,7 +268,7 @@ const FilterControls = ({ onFiltersChange, onExport, onReset }) => {
               type="number"
               label="Monto Máximo (MXN)"
               placeholder="999999.99"
-              value={filters?.amountMax}
+              value={filters.amountMax}
               onChange={(e) => handleFilterChange('amountMax', e?.target?.value)}
             />
           </div>

@@ -5,7 +5,7 @@ import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import proyectoService from 'services/proyectoService';
 import clientService from 'services/clientService';
-import usePerson from 'hooks/usePerson'; // ⬅️ personal real
+import usePerson from 'hooks/usePerson';
 
 const priorityOptions = [
   { value: 'low', label: 'Baja' },
