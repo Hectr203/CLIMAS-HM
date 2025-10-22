@@ -18,6 +18,7 @@ const useProyecto = () => {
   const [error, setError] = useState(null);
   const fetchedOnceRef = useRef(false);
 
+  // ========= PROYECTOS (tu backend) =========
   const getProyectos = useCallback(async ({ force = false, signal } = {}) => {
     // si ya cargaste y no fuerzas, devuelve cache
     if (!force && fetchedOnceRef.current && proyectos.length > 0) {
@@ -110,15 +111,64 @@ const useProyecto = () => {
     }
   }, []);
 
+  // ========= (currencyapi.com) =========
+  /**
+   * Trae el JSON crudo de currencyapi (data:{ MXN:{value}, ... })
+   * Ej: await getCurrencyRates({ base: 'USD', currencies: ['MXN','EUR'] })
+   */
+  const getCurrencyRates = useCallback(
+    async ({ base = 'USD', currencies = [] } = {}, { signal } = {}) => {
+      // No toco el estado global de proyectos; sólo propagamos loading/error si te interesa.
+      // Si prefieres estados separados de loading para currency, podemos agregarlos.
+      setLoading(true);
+      setError(null);
+      try {
+        const resp = await proyectoService.getCurrencyRates({ base, currencies }, { signal });
+        return resp; // estructura completa de la API externa
+      } catch (err) {
+        console.error('Error en useProyecto.getCurrencyRates:', err);
+        setError(err);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  const getCurrencyRatesMap = useCallback(
+    async ({ base = 'USD', currencies = [] } = {}, { signal } = {}) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const map = await proyectoService.getCurrencyRatesMap({ base, currencies }, { signal });
+        return map;
+      } catch (err) {
+        console.error('Error en useProyecto.getCurrencyRatesMap:', err);
+        setError(err);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
   return {
     proyectos,
     loading,
     error,
+
+    // acciones backend propio
     getProyectos,
     getProyectoById,
     createProyecto,
     updateProyecto,
     deleteProyecto,
+
+    // acciones API externa (currencyapi)
+    getCurrencyRates,
+    getCurrencyRatesMap,
   };
 };
 
