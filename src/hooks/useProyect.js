@@ -2,7 +2,6 @@
 import { useState, useCallback, useRef } from 'react';
 import proyectoService from '../services/proyectoService';
 
-// Helper: intenta extraer arreglo sin importar el formato del backend
 const extractList = (resp) => {
   if (Array.isArray(resp)) return resp;
   if (resp?.success && Array.isArray(resp?.data)) return resp.data;
@@ -19,15 +18,9 @@ const useProyecto = () => {
   const [error, setError] = useState(null);
   const fetchedOnceRef = useRef(false);
 
-  /**
-   * Obtener todos los proyectos con:
-   * - memoización (useCallback)
-   * - caché (no vuelve a pegarle a la red salvo force=true)
-   * - cancelación (AbortController -> { signal })
-   */
   const getProyectos = useCallback(async ({ force = false, signal } = {}) => {
+    // si ya cargaste y no fuerzas, devuelve cache
     if (!force && fetchedOnceRef.current && proyectos.length > 0) {
-      // Devolver caché sin tocar loading para evitar “parpadeos”
       return proyectos;
     }
 
@@ -50,12 +43,11 @@ const useProyecto = () => {
     }
   }, [proyectos]);
 
-  // Obtener un proyecto por ID (memoizado)
-  const getProyectoById = useCallback(async (id) => {
+  const getProyectoById = useCallback(async (id, { signal } = {}) => {
     setLoading(true);
     setError(null);
     try {
-      const resp = await proyectoService.getProyectoById(id);
+      const resp = await proyectoService.getProyectoById(id, { signal });
       return unwrap(resp);
     } catch (err) {
       console.error('Error en useProyecto.getProyectoById:', err);
@@ -66,12 +58,11 @@ const useProyecto = () => {
     }
   }, []);
 
-  // Crear (memoizado) — añade al estado local para que el UI refleje de inmediato
-  const createProyecto = useCallback(async (payload) => {
+  const createProyecto = useCallback(async (payload, { signal } = {}) => {
     setLoading(true);
     setError(null);
     try {
-      const resp = await proyectoService.createProyecto(payload);
+      const resp = await proyectoService.createProyecto(payload, { signal });
       const created = unwrap(resp);
       if (created) setProyectos((prev) => [...prev, created]);
       return created;
@@ -84,12 +75,11 @@ const useProyecto = () => {
     }
   }, []);
 
-  // Actualizar (memoizado)
-  const updateProyecto = useCallback(async (id, payload) => {
+  const updateProyecto = useCallback(async (id, payload, { signal } = {}) => {
     setLoading(true);
     setError(null);
     try {
-      const resp = await proyectoService.updateProyecto(id, payload);
+      const resp = await proyectoService.updateProyecto(id, payload, { signal });
       const updated = unwrap(resp);
       setProyectos((prev) =>
         prev.map((p) => (String(p.id ?? p._id) === String(id) ? { ...p, ...updated } : p))
@@ -104,12 +94,11 @@ const useProyecto = () => {
     }
   }, []);
 
-  // Eliminar (memoizado)
-  const deleteProyecto = useCallback(async (id) => {
+  const deleteProyecto = useCallback(async (id, { signal } = {}) => {
     setLoading(true);
     setError(null);
     try {
-      const resp = await proyectoService.deleteProyecto(id);
+      const resp = await proyectoService.deleteProyecto(id, { signal });
       setProyectos((prev) => prev.filter((p) => String(p.id ?? p._id) !== String(id)));
       return unwrap(resp) ?? true;
     } catch (err) {
@@ -125,7 +114,7 @@ const useProyecto = () => {
     proyectos,
     loading,
     error,
-    getProyectos,      
+    getProyectos,
     getProyectoById,
     createProyecto,
     updateProyecto,

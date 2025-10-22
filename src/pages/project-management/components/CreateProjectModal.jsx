@@ -1,12 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Button from '../../../components/ui/Button';
 import Icon from '../../../components/AppIcon';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import proyectoService from 'services/proyectoService';
 import clientService from 'services/clientService';
-import usePerson from 'hooks/usePerson'; // ⬅️ agregado: para obtener empleados reales
+import usePerson from 'hooks/usePerson';
 
+/* === Catálogos === */
 const projectTypes = [
   { value: 'Instalación', label: 'Instalación' },
   { value: 'Mantenimiento Preventivo', label: 'Mantenimiento Preventivo' },
@@ -27,11 +28,19 @@ const priorityOptions = [
   { value: 'urgent', label: 'Urgente' },
 ];
 
-// Opcional: si ya tienes un catálogo real de personal, cámbialo aquí
-const personnelOptions = [
-  { value: 'Andrés Torres - Técnico HVAC', label: 'Andrés Torres - Técnico HVAC' },
-  { value: 'Laura Gómez - Supervisora de Mantenimiento', label: 'Laura Gómez - Supervisora de Mantenimiento' },
-  { value: 'Pedro Hernández - Ingeniero de Campo', label: 'Pedro Hernández - Ingeniero de Campo' },
+const projectStatusOptions = [
+  { value: 'Planificación', label: 'Planificación' },
+  { value: 'En Progreso', label: 'En Progreso' },
+  { value: 'En Pausa', label: 'En Pausa' },
+  { value: 'En Revisión', label: 'En Revisión' },
+  { value: 'Completado', label: 'Completado' },
+  { value: 'Cancelado', label: 'Cancelado' },
+];
+
+const personnelOptionsFallback = [
+  { value: 'Andrés Torres — Técnico HVAC', label: 'Andrés Torres — Técnico HVAC' },
+  { value: 'Laura Gómez — Supervisora de Mantenimiento', label: 'Laura Gómez — Supervisora de Mantenimiento' },
+  { value: 'Pedro Hernández — Ingeniero de Campo', label: 'Pedro Hernández — Ingeniero de Campo' },
 ];
 
 const mapPriorityToEs = (v) => {
@@ -39,8 +48,14 @@ const mapPriorityToEs = (v) => {
   return m[(v || '').toString().toLowerCase()] || v || '';
 };
 
+/** Tu backend de CREAR solo acepta: "activo" | "en proceso" */
+const mapStatusForCreate = (uiStatus) => {
+  const s = (uiStatus || '').toLowerCase();
+  if (s === 'en progreso') return 'en proceso';
+  return 'activo';
+};
+
 /* ===================== Helpers de números con comas ===================== */
-// Formato visual con comas; decide decimales según sea entero o no.
 const formatWithCommas = (v, decimals = 2) => {
   if (v === '' || v == null) return '';
   const num = Number(v);
@@ -51,7 +66,6 @@ const formatWithCommas = (v, decimals = 2) => {
   return num.toLocaleString('es-MX', options);
 };
 
-// Limpia un string con comas/símbolos → número JS
 const unformatNumber = (raw) => {
   if (raw === '' || raw == null) return 0;
   const clean = String(raw).replace(/[^\d.-]/g, '');
@@ -63,22 +77,21 @@ const unformatNumber = (raw) => {
 const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
-
-  // ⬇️ hook de personal
   const { persons, getPersons } = usePerson();
 
-  // Estado del formulario (guardamos NÚMEROS en budgetBreakdown)
+  // Estado del formulario (mantén esta estructura para no tocar la vista)
   const [formData, setFormData] = useState({
     name: '',
     code: '',
     type: '',
-    client: '', // id del cliente
+    client: '',
     department: '',
     priority: '',
+    status: '', // UI status
     budgetBreakdown: {
       labor: 0,
       parts: 0,
-      equipment: 0, // SIEMPRE almacenado en MXN
+      equipment: 0, // se guarda SIEMPRE en MXN
       materials: 0,
       transportation: 0,
       other: 0,
@@ -86,27 +99,28 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
     location: '',
     startDate: '',
     endDate: '',
-    assignedPersonnel: [], // arreglo de strings "Nombre — Rol"
+    assignedPersonnel: [],
     description: '',
   });
 
-  // === NUEVO: Control para USD en Equipos ===
+  // Equipos en USD
   const [isEquipmentInUSD, setIsEquipmentInUSD] = useState(false);
-  const [exchangeRate, setExchangeRate] = useState(18); // MXN por 1 USD (editable)
-  const [uiEquipmentUSD, setUiEquipmentUSD] = useState(''); // valor visual cuando está en USD
+  const [exchangeRate, setExchangeRate] = useState(18);
+  const [uiEquipmentUSD, setUiEquipmentUSD] = useState('');
 
-  // CLIENTES: reales → options { value, label }
+  // Clientes
   const [clientOptions, setClientOptions] = useState([]);
   const [loadingClients, setLoadingClients] = useState(false);
 
+  // Cargar clientes una vez por apertura
   useEffect(() => {
     if (!isOpen) return;
     let mounted = true;
     (async () => {
       try {
         setLoadingClients(true);
-        const resp = await clientService.getClients(); // {success, data:[...] }
-        const list = Array.isArray(resp?.data) ? resp.data : [];
+        const resp = await clientService.getClients();
+        const list = Array.isArray(resp?.data) ? resp.data : (Array.isArray(resp) ? resp : []);
         const opts = list.map((c) => ({
           value: c.id,
           label: c.empresa || c.contacto || '—',
@@ -121,26 +135,36 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
     return () => { mounted = false; };
   }, [isOpen]);
 
-  // Cargar empleados al abrir
+  // --------- FIX DEL BUCLE: ejecutar getPersons() solo una vez por apertura ---------
+  const fetchedPersonsRef = useRef(false);
+
   useEffect(() => {
     if (!isOpen) return;
-    getPersons().catch((e) => console.error('Error cargando empleados:', e));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (fetchedPersonsRef.current) return; // ya cargado en esta apertura
+    fetchedPersonsRef.current = true;
+    (async () => {
+      try {
+        await getPersons();
+      } catch (e) {
+        console.error('Error cargando empleados:', e);
+      }
+    })();
+    return () => {
+      // Al cerrar el modal, permitimos que en la próxima apertura se vuelva a cargar
+      fetchedPersonsRef.current = false;
+    };
+    // Importante: NO dependemos de getPersons para evitar re-ejecución por referencia inestable
   }, [isOpen]);
+  // -------------------------------------------------------------------------------
 
-  // Construir opciones desde persons, deduplicadas
   const personnelOptionsFinal = useMemo(() => {
-    if (!Array.isArray(persons) || persons.length === 0) {
-      return personnelOptions; // fallback
-    }
+    if (!Array.isArray(persons) || persons.length === 0) return personnelOptionsFallback;
     const built = persons
       .map((p) => {
         const nombre =
           p?.nombreCompleto ||
           [p?.nombre, p?.apellidoPaterno, p?.apellidoMaterno].filter(Boolean).join(' ') ||
-          p?.nombre ||
-          p?.name ||
-          '—';
+          p?.nombre || p?.name || '—';
         const puesto = p?.puesto || p?.rol || p?.cargo;
         const etiqueta = puesto ? `${nombre} — ${puesto}` : nombre;
         return etiqueta ? { value: etiqueta, label: etiqueta } : null;
@@ -154,63 +178,42 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
       seen.add(opt.value);
       dedup.push(opt);
     }
-    return dedup.length ? dedup : personnelOptions;
+    return dedup.length ? dedup : personnelOptionsFallback;
   }, [persons]);
-
-  // Total presupuesto (siempre en MXN)
-  const totalBudget = useMemo(() => {
-    const b = formData.budgetBreakdown || {};
-    const sum = ['labor','parts','equipment','materials','transportation','other']
-      .map(k => Number(b[k] || 0))
-      .reduce((a,b) => a + b, 0);
-    return Number.isFinite(sum) ? sum : 0;
-  }, [formData.budgetBreakdown]);
-
-  const calculateTotalBudget = () => totalBudget;
 
   const handleInputChange = (key, value) => {
     setFormData((s) => ({ ...s, [key]: value }));
     if (errors[key]) setErrors((e) => ({ ...e, [key]: undefined }));
   };
 
-  // ⬇️ Manejo genérico de partidas en MXN
   const handleBudgetChange = (key, rawValue) => {
     const cleanedNumber = unformatNumber(rawValue);
-    // Si la clave es "equipment" y estamos en USD, convertir a MXN
     if (key === 'equipment' && isEquipmentInUSD) {
-      const usd = cleanedNumber;
-      setUiEquipmentUSD(rawValue); // conservar visual en USD
-      const mxn = Number(usd) * Number(exchangeRate || 0);
+      setUiEquipmentUSD(rawValue);
+      const mxn = cleanedNumber * Number(exchangeRate || 0);
       setFormData((s) => ({
         ...s,
         budgetBreakdown: { ...s.budgetBreakdown, equipment: mxn },
       }));
       return;
     }
-
-    // Resto de claves o equipment en MXN normal
     setFormData((s) => ({
       ...s,
       budgetBreakdown: { ...s.budgetBreakdown, [key]: cleanedNumber },
     }));
   };
 
-  // Cuando se activa/desactiva el modo USD para Equipos
   const toggleEquipmentUSD = (checked) => {
     setIsEquipmentInUSD(checked);
     if (checked) {
-      // Pasamos el valor MXN actual a USD visual
       const currentMXN = Number(formData?.budgetBreakdown?.equipment || 0);
       const usd = exchangeRate ? currentMXN / Number(exchangeRate) : 0;
       setUiEquipmentUSD(usd ? formatWithCommas(usd, 2) : '');
     } else {
-      // Al volver a MXN, copiamos el valor visual (si existiera) convirtiéndolo a MXN? No: ya guardamos MXN.
-      // Solo limpiamos el visual USD
       setUiEquipmentUSD('');
     }
   };
 
-  // Cambio del tipo de cambio: re-calcular MXN si estamos en USD
   const handleExchangeRateChange = (raw) => {
     const rate = unformatNumber(raw);
     setExchangeRate(rate);
@@ -231,13 +234,15 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
     if (!formData.client) e.client = 'Seleccione un cliente';
     if (!formData.department) e.department = 'Requerido';
     if (!formData.priority) e.priority = 'Requerido';
+    if (!formData.status) e.status = 'Requerido';
     if (!formData.location) e.location = 'Requerido';
     if (!formData.startDate) e.startDate = 'Requerido';
     if (!formData.endDate) e.endDate = 'Requerido';
-    if (new Date(formData.endDate) < new Date(formData.startDate)) {
-      e.endDate = 'La fecha de fin no puede ser anterior al inicio';
+    if (formData.startDate && formData.endDate) {
+      if (new Date(formData.endDate) < new Date(formData.startDate)) {
+        e.endDate = 'La fecha de fin no puede ser anterior al inicio';
+      }
     }
-    // Validación adicional si está en USD y no hay tipo de cambio
     if (isEquipmentInUSD && !(exchangeRate > 0)) {
       e.exchangeRate = 'Indique un tipo de cambio válido';
     }
@@ -245,48 +250,48 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
     return Object.keys(e).length === 0;
   };
 
-  const buildPayloadES = () => {
-    // nombre del cliente desde options
-    const clienteFound = clientOptions.find((o) => o.value === formData.client);
-    const clienteNombre = clienteFound?.label || '';
+  /** Construye el payload EXACTO que tu backend de CREAR acepta */
+  const buildPayloadForBackend = () => {
+    const b = formData.budgetBreakdown || {};
+    const total =
+      (Number(b.labor) || 0) +
+      (Number(b.parts) || 0) +
+      (Number(b.equipment) || 0) +
+      (Number(b.materials) || 0) +
+      (Number(b.transportation) || 0) +
+      (Number(b.other) || 0);
 
-    const manoObra = Number(formData?.budgetBreakdown?.labor || 0);
-    const piezas = Number(formData?.budgetBreakdown?.parts || 0);
-    const equipos = Number(formData?.budgetBreakdown?.equipment || 0); // MXN
-    const materiales = Number(formData?.budgetBreakdown?.materials || 0);
-    const transporte = Number(formData?.budgetBreakdown?.transportation || 0);
-    const otros = Number(formData?.budgetBreakdown?.other || 0);
-    const total = manoObra + piezas + equipos + materiales + transporte + otros;
-
-    // (Opcional) Puedes incluir metadatos de cómo se capturó equipos
-    const metaEquipos = isEquipmentInUSD
-      ? { capturadoEn: 'USD', tipoCambio: Number(exchangeRate || 0), valorUSD: unformatNumber(uiEquipmentUSD) }
-      : { capturadoEn: 'MXN' };
+    // Si se capturó en USD, además guardamos equipoDolares
+    const equipoDolares = isEquipmentInUSD ? unformatNumber(uiEquipmentUSD) : undefined;
 
     return {
       codigo: formData.code || '',
-      nombreProyecto: formData.name || '',
+      nombre: formData.name || '',
       tipoProyecto: formData.type || '',
-      cliente: {
-        id: formData.client || '',
-        nombre: clienteNombre,
-      },
+      cliente: { id: formData.client || '' }, // SOLO id (como exige tu API)
       departamento: formData.department || '',
       prioridad: mapPriorityToEs(formData.priority),
       ubicacion: formData.location || '',
       descripcion: formData.description || '',
-      personalAsignado: Array.isArray(formData.assignedPersonnel) ? formData.assignedPersonnel : [],
+      personalAsignado: Array.isArray(formData.assignedPersonnel)
+        ? formData.assignedPersonnel
+        : [],
       cronograma: {
         fechaInicio: formData.startDate || '',
         fechaFin: formData.endDate || '',
       },
       presupuesto: {
-        manoObra, piezas, equipos, materiales, transporte, otros, total,
-        _metaEquipos: metaEquipos, // <- no rompe nada si tu backend lo ignora
+        manoObra: Number(b.labor) || 0,
+        piezas: Number(b.parts) || 0,
+        equipos: Number(b.equipment) || 0,     // SIEMPRE llega en MXN
+        ...(equipoDolares !== undefined ? { equipoDolares } : {}),
+        materiales: Number(b.materials) || 0,
+        transporte: Number(b.transportation) || 0,
+        otros: Number(b.other) || 0,
+        _metaEquipos: { capturadoEn: isEquipmentInUSD ? 'USD' : 'MXN' },
+        // ❌ NO enviar 'total' en create para evitar 400 si el back lo calcula
       },
-      totalPresupuesto: total,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      estado: mapStatusForCreate(formData.status), // "activo" | "en proceso"
     };
   };
 
@@ -295,20 +300,25 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
     if (!validate()) return;
     setIsSubmitting(true);
     try {
-      const payload = buildPayloadES();
+      const payload = buildPayloadForBackend();
+      console.log('📦 Payload final que se envía al backend:', payload);
       await proyectoService.createProyecto(payload);
       onSubmit && onSubmit(payload);
       onClose && onClose();
     } catch (err) {
       console.error('Error creando proyecto:', err);
-      alert('No se pudo crear el proyecto.');
+      alert(
+        err?.data?.message ||
+        err?.userMessage ||
+        err?.message ||
+        'Error al crear el proyecto.'
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
   if (!isOpen) return null;
-
   const b = formData.budgetBreakdown || {};
 
   return (
@@ -328,7 +338,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Basic Information */}
+            {/* Información Básica */}
             <div className="md:col-span-2">
               <h3 className="text-lg font-medium text-foreground mb-4">Información Básica</h3>
             </div>
@@ -346,7 +356,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
             <Input
               label="Código del Proyecto"
               type="text"
-              placeholder="Ej: PROJ-2024-001"
+              placeholder="Ej: PROJ-2025-001"
               value={formData?.code}
               onChange={(e) => handleInputChange('code', e?.target?.value)}
               error={errors?.code}
@@ -391,6 +401,25 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
               required
             />
 
+            <Select
+              label="Estado del Proyecto"
+              options={projectStatusOptions}
+              value={formData?.status}
+              onChange={(value) => handleInputChange('status', value)}
+              error={errors?.status}
+              required
+            />
+
+            <Input
+              label="Ubicación"
+              type="text"
+              placeholder="Ej: Ciudad de México, CDMX"
+              value={formData?.location}
+              onChange={(e) => handleInputChange('location', e?.target?.value)}
+              error={errors?.location}
+              required
+            />
+
             {/* Desglose de Presupuesto */}
             <div className="md:col-span-2 mt-6">
               <h3 className="text-lg font-medium text-foreground mb-4">Desglose de Presupuesto</h3>
@@ -417,7 +446,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
               onChange={(e) => handleBudgetChange('parts', e?.target?.value)}
             />
 
-            {/* ====== Equipos con toggle USD ====== */}
+            {/* Equipos con toggle USD */}
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-foreground">
@@ -434,21 +463,15 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
                 </label>
               </div>
 
-              {/* Input de Equipos: muestra USD o MXN según el toggle */}
               <input
                 type="text"
                 inputMode="decimal"
                 placeholder={isEquipmentInUSD ? '0.00 USD' : '0.00 MXN'}
-                value={
-                  isEquipmentInUSD
-                    ? uiEquipmentUSD
-                    : formatWithCommas(b?.equipment)
-                }
+                value={isEquipmentInUSD ? uiEquipmentUSD : formatWithCommas(b?.equipment)}
                 onChange={(e) => handleBudgetChange('equipment', e?.target?.value)}
                 className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               />
 
-              {/* Tipo de cambio visible solo en modo USD */}
               {isEquipmentInUSD && (
                 <div className="flex items-center gap-3">
                   <div className="flex-1">
@@ -468,7 +491,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
                 </div>
               )}
             </div>
-            {/* ====== Fin Equipos ====== */}
+            {/* Fin Equipos */}
 
             <Input
               label="Materiales (MXN)"
@@ -503,21 +526,21 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-foreground">Total del Presupuesto (MXN):</span>
                   <span className="text-lg font-semibold text-primary">
-                    ${formatWithCommas(calculateTotalBudget(), 2)} MXN
+                    $
+                    {formatWithCommas(
+                      (Number(b?.labor) || 0) +
+                      (Number(b?.parts) || 0) +
+                      (Number(b?.equipment) || 0) +
+                      (Number(b?.materials) || 0) +
+                      (Number(b?.transportation) || 0) +
+                      (Number(b?.other) || 0),
+                      2
+                    )}{' '}
+                    MXN
                   </span>
                 </div>
               </div>
             </div>
-
-            <Input
-              label="Ubicación"
-              type="text"
-              placeholder="Ej: Ciudad de México, CDMX"
-              value={formData?.location}
-              onChange={(e) => handleInputChange('location', e?.target?.value)}
-              error={errors?.location}
-              required
-            />
 
             {/* Cronograma */}
             <div className="md:col-span-2 mt-6">
@@ -542,7 +565,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
               required
             />
 
-            {/* Personal */}
+            {/* Asignación de Personal */}
             <div className="md:col-span-2 mt-6">
               <h3 className="text-lg font-medium text-foreground mb-4">Asignación de Personal</h3>
             </div>
