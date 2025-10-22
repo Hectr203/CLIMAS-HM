@@ -4,7 +4,7 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 
-const PaymentAuthorizationModal = ({ isOpen, onClose, expense, onAuthorize }) => {
+const PaymentAuthorizationModal = ({ isOpen, onClose, expense, onAuthorize, onDelete }) => {
   const [authData, setAuthData] = useState({
     authorizationLevel: '',
     approverComments: '',
@@ -15,6 +15,7 @@ const PaymentAuthorizationModal = ({ isOpen, onClose, expense, onAuthorize }) =>
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const authorizationLevels = [
     { value: 'supervisor', label: 'Supervisor de Departamento' },
@@ -49,15 +50,31 @@ const PaymentAuthorizationModal = ({ isOpen, onClose, expense, onAuthorize }) =>
     setIsSubmitting(true);
 
     try {
-      await onAuthorize({
+      await onAuthorize?.({
         expenseId: expense?.id,
         ...authData
       });
-      onClose();
+      onClose?.();
     } catch (error) {
       console.error('Error authorizing payment:', error);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!expense?.id) return;
+    const ok = window.confirm('¿Eliminar este pago? Esta acción no se puede deshacer.');
+    if (!ok) return;
+
+    setIsDeleting(true);
+    try {
+      await onDelete?.(expense.id);
+      onClose?.();
+    } catch (err) {
+      console.error('Error eliminando pago:', err);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -90,6 +107,7 @@ const PaymentAuthorizationModal = ({ isOpen, onClose, expense, onAuthorize }) =>
             variant="ghost"
             size="icon"
             onClick={onClose}
+            disabled={isSubmitting || isDeleting}
           >
             <Icon name="X" size={20} />
           </Button>
@@ -215,24 +233,39 @@ const PaymentAuthorizationModal = ({ isOpen, onClose, expense, onAuthorize }) =>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center justify-end space-x-3 pt-6 border-t border-border">
+          <div className="flex items-center justify-between pt-6 border-t border-border">
+            {/* Botón eliminar */}
             <Button
               type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isSubmitting}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              variant="success"
-              loading={isSubmitting}
-              iconName="Check"
+              variant="destructive"
+              iconName="Trash2"
               iconPosition="left"
+              onClick={handleDelete}
+              disabled={isSubmitting || isDeleting}
             >
-              Autorizar Pago
+              {isDeleting ? 'Eliminando…' : 'Eliminar pago'}
             </Button>
+
+            <div className="flex items-center space-x-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                disabled={isSubmitting || isDeleting}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                variant="success"
+                loading={isSubmitting}
+                disabled={isDeleting}
+                iconName="Check"
+                iconPosition="left"
+              >
+                Autorizar Pago
+              </Button>
+            </div>
           </div>
         </form>
       </div>

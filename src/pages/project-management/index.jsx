@@ -12,6 +12,44 @@ import CreateProjectModal from './components/CreateProjectModal';
 import EditProjectModal from './components/EditProjectModal';
 import useProyect from '../../hooks/useProyect';
 
+/* ====== Cache local para estado UI ====== */
+const UI_ESTADO_KEY = 'proyectos_ui_estado_v1';
+const uiEstadoCache = {
+  _read() { try { return JSON.parse(localStorage.getItem(UI_ESTADO_KEY)) || {}; } catch { return {}; } },
+  get(id) { if (!id) return null; const m = this._read(); return m[id] || null; },
+  set(id, estado) {
+    if (!id) return;
+    const m = this._read();
+    if (estado) m[id] = estado; else delete m[id];
+    localStorage.setItem(UI_ESTADO_KEY, JSON.stringify(m));
+  },
+  bulkMergeFromApi(list=[]) {
+    const m = this._read();
+    let changed = false;
+    list.forEach(p => {
+      const id = p?.id ?? p?._id;
+      if (!id) return;
+      if (!m[id]) {
+        const def = backendToUiDefault(p?.estado);
+        if (def) { m[id] = def; changed = true; }
+      }
+    });
+    if (changed) localStorage.setItem(UI_ESTADO_KEY, JSON.stringify(m));
+  }
+};
+
+/* Mapeos de estado */
+const backendToUiDefault = (apiEstado) => {
+  const v = String(apiEstado || '').toLowerCase();
+  if (v === 'en proceso') return 'en proceso';
+  if (v === 'activo') return 'planificación';
+  return 'planificación';
+};
+const mapUiToBackend = (uiEstado) => {
+  const v = String(uiEstado || '').toLowerCase();
+  return v === 'en proceso' ? 'en proceso' : 'activo';
+};
+
 const ProjectManagement = () => {
   const {
     proyectos: projects,
@@ -34,132 +72,134 @@ const ProjectManagement = () => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
-  // Cargar proyectos al montar el componente
-  useEffect(() => {
-    getProyectos();
-  }, []);
+  /* ===== Helpers de normalización de ESTADO (filtros) ===== */
+  const norm = (s) =>
+    (s ?? '')
+      .toString()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, ' ');
 
-  // Actualizar filteredProjects cuando cambien los projects
+  const canonicalEstado = (raw) => {
+    const v = norm(raw);
+    if (v.includes('planific') || v.includes('planning')) return 'planificacion';
+    if (v === 'en proceso' || v.includes('progress') || v.includes('in progress') || v.includes('process')) return 'en proceso';
+    if (v === 'en pausa' || v.includes('pause') || v.includes('on hold') || v.includes('on-hold') || v.includes('hold')) return 'en pausa';
+    if (v === 'en revision' || v === 'en revisión' || v.includes('review') || v.includes('revision')) return 'en revision';
+    if (v === 'completado' || v.includes('complet') || v.includes('done') || v.includes('closed')) return 'completado';
+    if (v === 'cancelado' || v.includes('canceled') || v.includes('cancelled') || v.includes('cancel')) return 'cancelado';
+    return v;
+  };
+
+  useEffect(() => { getProyectos(); }, []);
   useEffect(() => {
-    if (projects && projects.length > 0) {
-      setFilteredProjects(projects);
-    }
+    const arr = Array.isArray(projects) ? projects : [];
+    // sembramos cache con el estado derivado del backend si no existe
+    uiEstadoCache.bulkMergeFromApi(arr);
+    setFilteredProjects(arr);
   }, [projects]);
 
+  // getters (usando cache UI antes que el backend)
+  const getNombre = (p) => p?.nombre ?? p?.nombreProyecto ?? p?.name ?? '';
+  const getCodigo = (p) => p?.codigo ?? p?.code ?? '';
+  const getEstado = (p) => uiEstadoCache.get(p?.id ?? p?._id) || backendToUiDefault(p?.estado);
+  const getDepto = (p) => p?.departamento ?? p?.department ?? '';
+  const getPrioridad = (p) => p?.prioridad ?? p?.priority ?? '';
+  const getInicio = (p) => p?.cronograma?.fechaInicio ?? p?.startDate ?? null;
+  const getFin = (p) => p?.cronograma?.fechaFin ?? p?.endDate ?? null;
+  const getBudget = (p) => Number(p?.totalPresupuesto ?? p?.presupuesto?.total ?? p?.budget ?? 0);
+
+  // USD equipos
+  const getEquipoUSD = (p) => {
+    const usd = p?.presupuesto?.equipoDolares;
+    if (usd != null) return Number(usd) || 0;
+    const mxn = Number(p?.presupuesto?.equipos ?? 0);
+    const tipo = Number(p?.presupuesto?._metaEquipos?.tipoCambio ?? 0);
+    if (p?.presupuesto?._metaEquipos?.capturadoEn === 'USD' && p?.presupuesto?._metaEquipos?.valorUSD != null) {
+      return Number(p?.presupuesto?._metaEquipos?.valorUSD) || 0;
+    }
+    return tipo > 0 ? mxn / tipo : 0;
+  };
+
+  /* ====== Filtros ====== */
   const handleFiltersChange = (filters) => {
-    let filtered = [...projects];
+    let filtered = Array.isArray(projects) ? [...projects] : [];
 
-    // Search filter - buscar en código y nombre de proyecto
     if (filters?.search) {
-      const searchTerm = filters.search.toLowerCase().trim();
+      const q = norm(filters.search);
       filtered = filtered.filter(project => {
-        const name = (project?.nombreProyecto || '').toLowerCase();
-        const code = (project?.codigo || '').toLowerCase();
-        return name.includes(searchTerm) || code.includes(searchTerm);
+        const name = norm(getNombre(project));
+        const code = norm(getCodigo(project));
+        const cliente = norm(project?.cliente?.nombre || project?.cliente || '');
+        return name.includes(q) || code.includes(q) || cliente.includes(q);
       });
     }
 
-    // Department filter - comparar con los valores reales del backend
+    if (filters?.status) {
+      const target = canonicalEstado(filters.status);
+      filtered = filtered.filter(project => {
+        const uiEstado = getEstado(project);
+        const canon = canonicalEstado(uiEstado);
+        return canon === target;
+      });
+    }
+
     if (filters?.department) {
-      const deptMap = {
-        'sales': 'Ventas',
-        'engineering': 'Ingeniería',
-        'installation': 'Instalación',
-        'maintenance': 'Mantenimiento',
-        'administration': 'Administración'
-      };
-
+      const deptMap = { sales: 'Ventas', engineering: 'Ingeniería', installation: 'Instalación', maintenance: 'Mantenimiento', administration: 'Administración' };
       const targetDept = deptMap[filters.department] || filters.department;
-      filtered = filtered.filter(project => {
-        const dept = project?.departamento || '';
-        return dept === targetDept;
-      });
+      filtered = filtered.filter(project => (getDepto(project) || '') === targetDept);
     }
 
-    // Priority filter - comparar con valores del backend
     if (filters?.priority) {
-      const priorityMap = {
-        'low': 'Baja',
-        'medium': 'Media',
-        'high': 'Alta',
-        'urgent': 'Urgente'
-      };
-
+      const priorityMap = { low: 'Baja', medium: 'Media', high: 'Alta', urgent: 'Urgente' };
       const targetPriority = priorityMap[filters.priority] || filters.priority;
-      filtered = filtered.filter(project => {
-        const priority = project?.prioridad || '';
-        return priority === targetPriority;
-      });
+      filtered = filtered.filter(project => (getPrioridad(project) || '') === targetPriority);
     }
 
-    // Date range filter
     if (filters?.dateRange) {
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
       filtered = filtered.filter(project => {
-        const startDateStr = project?.cronograma?.fechaInicio;
+        const startDateStr = getInicio(project);
         if (!startDateStr) return false;
-
         const startDate = new Date(startDateStr);
         if (isNaN(startDate.getTime())) return false;
-
         switch (filters.dateRange) {
-          case 'today':
-            return startDate.toDateString() === today.toDateString();
-          case 'week':
-            const weekAgo = new Date(today);
-            weekAgo.setDate(weekAgo.getDate() - 7);
-            return startDate >= weekAgo && startDate <= now;
-          case 'month':
-            return startDate.getMonth() === now.getMonth() &&
-              startDate.getFullYear() === now.getFullYear();
-          case 'quarter':
-            const quarter = Math.floor(now.getMonth() / 3);
-            const projectQuarter = Math.floor(startDate.getMonth() / 3);
-            return projectQuarter === quarter &&
-              startDate.getFullYear() === now.getFullYear();
-          case 'year':
-            return startDate.getFullYear() === now.getFullYear();
-          default:
-            return true;
+          case 'today': return startDate.toDateString() === today.toDateString();
+          case 'week': { const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7); return startDate >= weekAgo && startDate <= now; }
+          case 'month': return startDate.getMonth() === now.getMonth() && startDate.getFullYear() === now.getFullYear();
+          case 'quarter': { const quarter = Math.floor(now.getMonth() / 3); const projectQuarter = Math.floor(startDate.getMonth() / 3); return projectQuarter === quarter && startDate.getFullYear() === now.getFullYear(); }
+          case 'year': return startDate.getFullYear() === now.getFullYear();
+          default: return true;
         }
       });
     }
 
-    // Budget filters
     if (filters?.minBudget) {
       const minBudget = Number(filters.minBudget);
-      filtered = filtered.filter(project => {
-        const budget = project?.totalPresupuesto || 0;
-        return budget >= minBudget;
-      });
+      filtered = filtered.filter(project => getBudget(project) >= minBudget);
     }
-
     if (filters?.maxBudget) {
       const maxBudget = Number(filters.maxBudget);
-      filtered = filtered.filter(project => {
-        const budget = project?.totalPresupuesto || 0;
-        return budget <= maxBudget;
-      });
+      filtered = filtered.filter(project => getBudget(project) <= maxBudget);
     }
 
-    // Start date filter
     if (filters?.startDate) {
       const filterStartDate = new Date(filters.startDate);
       filtered = filtered.filter(project => {
-        const startDateStr = project?.cronograma?.fechaInicio;
+        const startDateStr = getInicio(project);
         if (!startDateStr) return false;
         const projectStartDate = new Date(startDateStr);
         return projectStartDate >= filterStartDate;
       });
     }
 
-    // End date filter
     if (filters?.endDate) {
       const filterEndDate = new Date(filters.endDate);
       filtered = filtered.filter(project => {
-        const endDateStr = project?.cronograma?.fechaFin;
+        const endDateStr = getFin(project);
         if (!endDateStr) return false;
         const projectEndDate = new Date(endDateStr);
         return projectEndDate <= filterEndDate;
@@ -169,81 +209,61 @@ const ProjectManagement = () => {
     setFilteredProjects(filtered);
   };
 
-  const handleProjectSelect = (project) => {
-    setSelectedProject(project);
-    console.log('Selected project:', project);
-  };
+  /* ====== Acciones ====== */
+  const handleProjectSelect = (project) => { setSelectedProject(project); setIsEditModalOpen(true); };
 
-  const handleStatusUpdate = async (projectId, newStatus) => {
+  // actualización desde tabla: guardamos UI en cache y enviamos mapeado al API
+  const handleStatusUpdate = async (projectId, newStatusUi) => {
     try {
-      // Actualizar en el backend
-      await updateProyecto(projectId, { status: newStatus });
-      console.log(`Estado del proyecto ${projectId} actualizado exitosamente`);
+      const estadoBackend = mapUiToBackend(newStatusUi);
+      await updateProyecto(projectId, { estado: estadoBackend });
+      uiEstadoCache.set(projectId, newStatusUi); // <— persistimos lo que eligió el usuario
+      await getProyectos({ force: true }).catch(() => {});
     } catch (error) {
       console.error('Error al actualizar estado del proyecto:', error);
       alert('Error al actualizar el estado del proyecto');
     }
   };
 
-  const handleBulkAction = (action, selectedIds) => {
-    console.log(`Bulk action: ${action}`, selectedIds);
-    // Implement bulk actions (edit, export, notify)
-  };
+  const handleBulkAction = (action, selectedIds) => { console.log(`Bulk action: ${action}`, selectedIds); };
 
-  const handleCreateProject = async (projectData) => {
+  const handleCreateProject = async (_createdPayloadFromModal) => {
     try {
-      // Crear proyecto en el backend
-      await createProyecto(projectData);
-      
-      console.log('Proyecto creado exitosamente');
+      await getProyectos({ force: true });
       alert('Proyecto creado exitosamente');
+      setIsCreateModalOpen(false);
     } catch (error) {
-      console.error('Error al crear proyecto:', error);
-      alert('Error al crear el proyecto. Por favor, inténtelo de nuevo.');
+      console.error('Error al refrescar proyectos tras crear:', error);
     }
   };
 
   const handleExport = async () => {
     try {
-      // Create CSV content  
-      const csvHeaders = ['Código', 'Nombre', 'Cliente', 'Estado', 'Prioridad', 'Presupuesto'];
-      const csvRows = projects?.map(project => [
-        project?.codigo || '',
-        project?.nombreProyecto || '',
+      const headers = ['Código', 'Nombre', 'Cliente', 'Estado (UI)', 'Prioridad', 'Presupuesto (MXN)', 'Equipos (USD)'];
+      const rows = (projects || []).map(project => [
+        getCodigo(project),
+        getNombre(project),
         project?.cliente?.nombre || project?.cliente || '',
-        project?.estado || '',
-        project?.prioridad || '',
-        `$${project?.totalPresupuesto?.toLocaleString('es-MX') || '0'}`
+        getEstado(project), // usamos el estado UI
+        getPrioridad(project),
+        `$${getBudget(project).toLocaleString('es-MX')}`,
+        `$${getEquipoUSD(project).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       ]);
-
-      const csvContent = [
-        csvHeaders?.join(','),
-        ...csvRows?.map(row => row?.map(cell => `"${cell}"`)?.join(','))
-      ]?.join('\n');
-
-      // Download CSV file
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(','))].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `proyectos-${new Date()?.toISOString()?.split('T')?.[0]}.csv`;
-      document.body?.appendChild(link);
-      link?.click();
-      document.body?.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      console.log('Proyectos exportados exitosamente');
-    } catch (error) {
-      console.error('Error al exportar proyectos:', error);
-    }
+      const link = document.createElement('a'); link.href = url;
+      link.download = `proyectos-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
+    } catch (error) { console.error('Error al exportar proyectos:', error); }
   };
 
   const handleViewProject = async (project) => {
     try {
-      // Obtener detalles completos del proyecto
       const fullProject = await getProyectoById(project?.id);
-      
-      alert(`Ver detalles del proyecto: ${fullProject?.nombreProyecto || fullProject?.codigo}\n\nCliente: ${fullProject?.cliente?.nombre || fullProject?.cliente || ''}\nEstado: ${fullProject?.estado || ''}`);
+      alert(`Ver detalles del proyecto: ${fullProject?.nombreProyecto || fullProject?.codigo}
+Cliente: ${fullProject?.cliente?.nombre || fullProject?.cliente || ''}
+Estado: ${getEstado(fullProject)}`);
     } catch (error) {
       console.error('Error al obtener detalles del proyecto:', error);
       alert('Error al cargar los detalles del proyecto');
@@ -251,108 +271,62 @@ const ProjectManagement = () => {
   };
 
   const handleEditProject = (project) => {
-    setSelectedProject(project);
+    if (!project) return;
+    const id = project?.id ?? project?._id;
+    if (!id) { console.warn('Proyecto sin id: ', project); return; }
+    setSelectedProject({ ...project, id });
     setIsEditModalOpen(true);
   };
 
-  const handleUpdateProject = async (updatedProject) => {
+  const handleUpdateProject = async (_updatedFromModal) => {
     try {
-      // Actualizar en el backend
-      await updateProyecto(updatedProject?.id, updatedProject);
-
-      console.log(`Proyecto ${updatedProject?.codigo} actualizado exitosamente`);
+      await getProyectos({ force: true });
       alert('Proyecto actualizado exitosamente');
       setSelectedProject(null);
+      setIsEditModalOpen(false);
     } catch (error) {
-      console.error('Error al actualizar proyecto:', error);
-      alert('Error al actualizar el proyecto. Por favor, inténtelo de nuevo.');
+      console.error('Error al refrescar proyectos tras actualizar:', error);
+      setSelectedProject(null);
+      setIsEditModalOpen(false);
     }
   };
 
   const handleDeleteProject = async (project) => {
-    if (window.confirm(`¿Está seguro de que desea eliminar el proyecto "${project?.nombreProyecto || project?.codigo}"?\n\nEsta acción no se puede deshacer.`)) {
-      try {
-        // Eliminar en el backend
+    if (window.confirm(`¿Está seguro de que desea eliminar el proyecto "${getNombre(project) || getCodigo(project)}"?\n\nEsta acción no se puede deshacer.`)) {
+      try { 
         await deleteProyecto(project?.id);
-        
-        console.log(`Proyecto ${project?.codigo} eliminado exitosamente`);
-        alert('Proyecto eliminado exitosamente');
-      } catch (error) {
-        console.error('Error al eliminar proyecto:', error);
-        alert('Error al eliminar el proyecto. Por favor, inténtelo de nuevo.');
+        await getProyectos({ force: true });
+        alert('Proyecto eliminado exitosamente'); 
       }
+      catch (error) { console.error('Error al eliminar proyecto:', error); alert('Error al eliminar el proyecto.'); }
     }
   };
 
   const handleImageUpload = async () => {
     try {
       setIsUploadingImage(true);
-
-      // Create file input element
       const fileInput = document.createElement('input');
-      fileInput.type = 'file';
-      fileInput.accept = 'image/*';
-      fileInput.multiple = false;
-
-      // Handle file selection
+      fileInput.type = 'file'; fileInput.accept = 'image/*'; fileInput.multiple = false;
       fileInput.onchange = async (event) => {
         const file = event?.target?.files?.[0];
-
         if (file) {
-          // Validate file type
-          if (!file?.type?.startsWith('image/')) {
-            alert('Por favor seleccione un archivo de imagen válido');
-            setIsUploadingImage(false);
-            return;
-          }
-
-          // Validate file size (5MB limit)
-          const maxSize = 5 * 1024 * 1024; // 5MB
-          if (file?.size > maxSize) {
-            alert('El archivo es demasiado grande. El tamaño máximo es 5MB');
-            setIsUploadingImage(false);
-            return;
-          }
-
-          // Create file preview
+          if (!file?.type?.startsWith('image/')) { alert('Por favor seleccione un archivo de imagen válido'); setIsUploadingImage(false); return; }
+          if (file?.size > 5 * 1024 * 1024) { alert('El archivo es demasiado grande. Máximo 5MB'); setIsUploadingImage(false); return; }
           const reader = new FileReader();
-          reader.onload = (e) => {
-            const imagePreview = {
-              file: file,
-              name: file?.name,
-              size: file?.size,
-              type: file?.type,
-              url: e?.target?.result,
-              lastModified: file?.lastModified
-            };
-
-            setSelectedImage(imagePreview);
-            console.log('Imagen seleccionada:', imagePreview);
-
-            // Show success notification
-            alert(`Imagen "${file?.name}" cargada exitosamente\n\nTamaño: ${(file?.size / 1024 / 1024)?.toFixed(2)} MB\nTipo: ${file?.type}`);
-          };
-
-          reader?.readAsDataURL(file);
+          reader.onload = (e) => setSelectedImage({ file, name:file?.name, size:file?.size, type:file?.type, url:e?.target?.result, lastModified:file?.lastModified });
+          reader.readAsDataURL(file);
         }
-
         setIsUploadingImage(false);
       };
-
-      // Trigger file picker
-      fileInput?.click();
-
+      fileInput.click();
     } catch (error) {
       console.error('Error al seleccionar imagen:', error);
-      alert('Error al seleccionar la imagen. Por favor, inténtelo de nuevo.');
+      alert('Error al seleccionar la imagen.');
       setIsUploadingImage(false);
     }
   };
 
-  const handleClearImage = () => {
-    setSelectedImage(null);
-    console.log('Imagen eliminada');
-  };
+  const handleClearImage = () => setSelectedImage(null);
 
   const viewOptions = [
     { value: 'table', label: 'Tabla', icon: 'Table' },
@@ -391,13 +365,10 @@ const ProjectManagement = () => {
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
               <div>
                 <h1 className="text-3xl font-bold text-foreground mb-2">Gestión de Proyectos</h1>
-                <p className="text-muted-foreground">
-                  Administre el ciclo completo de proyectos HVAC desde la planificación hasta el cierre
-                </p>
+                <p className="text-muted-foreground">Administre el ciclo completo de proyectos HVAC desde la planificación hasta el cierre</p>
               </div>
 
               <div className="flex items-center space-x-4 mt-4 lg:mt-0">
-                {/* View Toggle */}
                 <div className="flex bg-muted rounded-lg p-1">
                   {viewOptions?.map((option) => (
                     <button
@@ -414,73 +385,14 @@ const ProjectManagement = () => {
                   ))}
                 </div>
 
-                <Button
-                  onClick={() => setIsCreateModalOpen(true)}
-                  iconName="Plus"
-                  iconPosition="left"
-                >
+                <Button onClick={() => setIsCreateModalOpen(true)} iconName="Plus" iconPosition="left">
                   Nuevo Proyecto
                 </Button>
               </div>
             </div>
 
-            {/* Image Preview Section */}
-            {selectedImage && (
-              <div className="bg-card rounded-lg border p-6 mb-8">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium text-foreground">Imagen Seleccionada</h3>
-                  <Button
-                    onClick={handleClearImage}
-                    variant="outline"
-                    size="sm"
-                    iconName="X"
-                    iconPosition="left"
-                  >
-                    Eliminar
-                  </Button>
-                </div>
-
-                <div className="flex flex-col lg:flex-row lg:items-start space-y-4 lg:space-y-0 lg:space-x-6">
-                  <div className="flex-shrink-0">
-                    <img
-                      src={selectedImage?.url}
-                      alt={selectedImage?.name}
-                      className="w-32 h-32 object-cover rounded-lg border"
-                    />
-                  </div>
-
-                  <div className="flex-1 space-y-2">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Nombre del archivo</p>
-                        <p className="text-sm font-medium text-foreground truncate">{selectedImage?.name}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Tamaño</p>
-                        <p className="text-sm font-medium text-foreground">
-                          {(selectedImage?.size / 1024 / 1024)?.toFixed(2)} MB
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Tipo</p>
-                        <p className="text-sm font-medium text-foreground">{selectedImage?.type}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Última modificación</p>
-                        <p className="text-sm font-medium text-foreground">
-                          {new Date(selectedImage?.lastModified)?.toLocaleDateString('es-ES')}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Stats Overview */}
-            {activeView !== 'stats' && filteredProjects?.length > 0 && (
-              <ProjectStats projects={filteredProjects} />
-            )}
+            {activeView !== 'stats' && filteredProjects?.length > 0 && <ProjectStats projects={filteredProjects} />}
 
             {/* Filters */}
             {activeView === 'table' && (
@@ -491,44 +403,21 @@ const ProjectManagement = () => {
               />
             )}
 
-            {/* Mensaje cuando no hay proyectos en la base de datos */}
-            {filteredProjects?.length === 0 && !isLoading && projects?.length === 0 && (
+            {/* Mensajes vacíos */}
+            {filteredProjects?.length === 0 && projects?.length === 0 && (
               <div className="text-center py-12">
-                <Icon
-                  name="FolderOpen"
-                  size={64}
-                  className="text-muted-foreground mx-auto mb-4"
-                />
-                <h3 className="text-lg font-medium text-foreground mb-2">
-                  No hay proyectos disponibles
-                </h3>
-                <p className="text-muted-foreground mb-6">
-                  Comienza creando tu primer proyecto
-                </p>
-                <Button
-                  onClick={() => setIsCreateModalOpen(true)}
-                  iconName="Plus"
-                  iconPosition="left"
-                >
-                  Crear Proyecto
-                </Button>
+                <Icon name="FolderOpen" size={64} className="text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">No hay proyectos disponibles</h3>
+                <p className="text-muted-foreground mb-6">Comienza creando tu primer proyecto</p>
+                <Button onClick={() => setIsCreateModalOpen(true)} iconName="Plus" iconPosition="left">Crear Proyecto</Button>
               </div>
             )}
 
-            {/* Mensaje cuando los filtros no encuentran coincidencias */}
-            {filteredProjects?.length === 0 && !isLoading && projects?.length > 0 && (
+            {filteredProjects?.length === 0 && projects?.length > 0 && (
               <div className="text-center py-12">
-                <Icon
-                  name="Filter"
-                  size={64}
-                  className="text-muted-foreground mx-auto mb-4"
-                />
-                <h3 className="text-lg font-medium text-foreground mb-2">
-                  No se encuentra proyecto con tus especificaciones
-                </h3>
-                <p className="text-muted-foreground mb-6">
-                  Intenta con otros filtros o parámetros de búsqueda
-                </p>
+                <Icon name="Filter" size={64} className="text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">No se encuentra proyecto con tus especificaciones</h3>
+                <p className="text-muted-foreground mb-6">Intenta con otros filtros o parámetros de búsqueda</p>
               </div>
             )}
 
@@ -543,44 +432,46 @@ const ProjectManagement = () => {
                   onImageUpload={handleImageUpload}
                   isUploadingImage={isUploadingImage}
                   selectedImage={selectedImage}
+                  extraBudgetRenderer={(project) => {
+                    const usd = getEquipoUSD(project);
+                    if (!usd) return null;
+                    return (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Equipos: <span className="font-medium">${usd.toLocaleString('es-MX', { minimumFractionDigits: 2 })} USD</span>
+                      </div>
+                    );
+                  }}
+                  /* Mostrar estado UI en la tabla si el componente lo soporta */
+                  estadoRenderer={(project) => getEstado(project)}
                 />
               )}
 
-              {activeView === 'timeline' && filteredProjects?.length > 0 && (
-                <ProjectTimeline projects={filteredProjects} />
-              )}
-
-              {activeView === 'quotations' && filteredProjects?.length > 0 && (
-                <ProjectQuotations projects={filteredProjects} />
-              )}
+              {activeView === 'timeline' && filteredProjects?.length > 0 && <ProjectTimeline projects={filteredProjects} />}
+              {activeView === 'quotations' && filteredProjects?.length > 0 && <ProjectQuotations projects={filteredProjects} />}
 
               {activeView === 'stats' && (
                 <div className="space-y-6">
                   <ProjectStats projects={filteredProjects} />
-                  {filteredProjects?.length > 0 && (
-                    <ProjectTimeline projects={filteredProjects} />
-                  )}
+                  {filteredProjects?.length > 0 && <ProjectTimeline projects={filteredProjects} />}
                 </div>
               )}
             </div>
 
-            {/* Create Project Modal */}
+            {/* Modales */}
             <CreateProjectModal
               isOpen={isCreateModalOpen}
               onClose={() => setIsCreateModalOpen(false)}
               onSubmit={handleCreateProject}
             />
 
-            {/* Edit Project Modal */}
-            <EditProjectModal
-              isOpen={isEditModalOpen}
-              onClose={() => {
-                setIsEditModalOpen(false);
-                setSelectedProject(null);
-              }}
-              onSubmit={handleUpdateProject}
-              project={selectedProject}
-            />
+            {isEditModalOpen && (
+              <EditProjectModal
+                isOpen
+                onClose={() => { setIsEditModalOpen(false); setSelectedProject(null); }}
+                onSubmit={handleUpdateProject}
+                project={selectedProject}
+              />
+            )}
           </div>
         </div>
       </div>
