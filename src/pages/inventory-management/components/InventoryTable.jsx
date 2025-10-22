@@ -112,7 +112,18 @@ const InventoryTable = ({ items, onViewDetails, onUpdateStock, onCreatePO }) => 
             </tr>
           </thead>
           <tbody>
-            {sortedItems?.map((item) => {
+            {sortedItems?.length === 0 ? (
+              <tr>
+                <td colSpan="9" className="p-8 text-center text-muted-foreground">
+                  <div className="flex flex-col items-center space-y-2">
+                    <Icon name="Package" size={48} className="text-muted-foreground/50" />
+                    <p className="text-lg font-medium">No hay artículos disponibles</p>
+                    <p className="text-sm">Los artículos que agregues aparecerán aquí</p>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              sortedItems?.map((item) => {
               const stockStatus = getStockStatus(item?.currentStock, item?.reorderPoint);
               return (
                 <tr key={item?.id} className="border-b border-border hover:bg-muted/50 transition-smooth">
@@ -189,13 +200,23 @@ const InventoryTable = ({ items, onViewDetails, onUpdateStock, onCreatePO }) => 
                   </td>
                 </tr>
               );
-            })}
+            })
+            )}
           </tbody>
         </table>
       </div>
       {/* Mobile Cards */}
       <div className="lg:hidden space-y-4 p-4">
-        {sortedItems?.map((item) => {
+        {sortedItems?.length === 0 ? (
+          <div className="flex flex-col items-center space-y-4 py-8">
+            <Icon name="Package" size={48} className="text-muted-foreground/50" />
+            <div className="text-center">
+              <p className="text-lg font-medium text-foreground mb-1">No hay artículos disponibles</p>
+              <p className="text-sm text-muted-foreground">Los artículos que agregues aparecerán aquí</p>
+            </div>
+          </div>
+        ) : (
+          sortedItems?.map((item) => {
           const stockStatus = getStockStatus(item?.currentStock, item?.reorderPoint);
           return (
             <div key={item?.id} className="bg-background border border-border rounded-lg p-4">
@@ -272,7 +293,8 @@ const InventoryTable = ({ items, onViewDetails, onUpdateStock, onCreatePO }) => 
               </div>
             </div>
           );
-        })}
+        })
+        )}
       </div>
     </div>
   );

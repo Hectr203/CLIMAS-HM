@@ -3,8 +3,11 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import Icon from '../../../components/AppIcon';
+import useInventory from '../../../hooks/useInventory';
 
 const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
+  const { createArticulo, loading } = useInventory();
+  
   const [formData, setFormData] = useState({
     itemCode: '',
     description: '',
@@ -110,36 +113,57 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
     setIsSubmitting(true);
     
     try {
-      // Generate a unique ID and create the new item
-      const newItem = {
-        id: Date.now(),
-        itemCode: formData?.itemCode?.toUpperCase(),
-        description: formData?.description,
-        specifications: formData?.specifications || 'Sin especificaciones',
-        category: formData?.category,
-        currentStock: parseInt(formData?.currentStock),
-        reservedStock: 0,
-        reorderPoint: parseInt(formData?.reorderPoint),
-        unit: formData?.unit,
-        supplier: {
-          name: formData?.supplierName,
-          contact: formData?.supplierContact || 'Sin contacto'
-        },
-        location: formData?.location,
-        lastUpdated: new Date(),
-        unitCost: parseFloat(formData?.unitCost),
-        notes: formData?.notes
+      // Crear el payload según la estructura del backend
+      const payload = {
+        codigoArticulo: formData?.itemCode?.trim(),
+        descripcion: formData?.description?.trim(),
+        especificaciones: formData?.specifications?.trim() || '',
+        categoria: formData?.category,
+        unidad: formData?.unit,
+        costoUnitario: parseFloat(formData?.unitCost),
+        puntoReorden: parseInt(formData?.reorderPoint),
+        stockActual: parseInt(formData?.currentStock),
+        ubicacion: formData?.location,
+        nombreProveedor: formData?.supplierName?.trim(),
+        contactoProveedor: formData?.supplierContact?.trim() || '',
+        notas: formData?.notes?.trim() || ''
       };
 
-      // Call the parent function to add the item
-      await onAddItem(newItem);
+      // Llamar al servicio para crear el artículo
+      const nuevoArticulo = await createArticulo(payload);
+
+      // Transformar la respuesta del backend al formato esperado por el componente
+      const itemForTable = {
+        id: nuevoArticulo.id,
+        itemCode: nuevoArticulo.codigoArticulo,
+        description: nuevoArticulo.descripcion,
+        specifications: nuevoArticulo.especificaciones,
+        category: nuevoArticulo.categoria,
+        currentStock: nuevoArticulo.stockActual,
+        reservedStock: nuevoArticulo.stockReservado || 0,
+        reorderPoint: nuevoArticulo.puntoReorden,
+        unit: nuevoArticulo.unidad,
+        supplier: {
+          name: nuevoArticulo.proveedor?.nombre || nuevoArticulo.nombreProveedor,
+          contact: nuevoArticulo.proveedor?.contacto || nuevoArticulo.contactoProveedor
+        },
+        location: nuevoArticulo.ubicacion,
+        lastUpdated: new Date(nuevoArticulo.fechaActualizacion || nuevoArticulo.fechaCreacion),
+        unitCost: nuevoArticulo.costoUnitario,
+        notes: nuevoArticulo.notas
+      };
+
+      // Llamar a la función del componente padre para actualizar la tabla
+      if (onAddItem) {
+        await onAddItem(itemForTable);
+      }
       
       // Reset form and close modal
       handleReset();
       onClose();
     } catch (error) {
-      console.error('Error adding new item:', error);
-      setErrors({ submit: 'Error al agregar el artículo. Intente nuevamente.' });
+      console.error('Error creating article:', error);
+      setErrors({ submit: 'Error al crear el artículo. Intente nuevamente.' });
     } finally {
       setIsSubmitting(false);
     }
@@ -443,19 +467,19 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
             type="button"
             variant="outline"
             onClick={handleClose}
-            disabled={isSubmitting}
+            disabled={isSubmitting || loading}
           >
             Cancelar
           </Button>
           <Button
             type="submit"
             onClick={handleSubmit}
-            disabled={isSubmitting}
-            iconName={isSubmitting ? "Loader" : "Plus"}
+            disabled={isSubmitting || loading}
+            iconName={(isSubmitting || loading) ? "Loader" : "Plus"}
             iconSize={16}
-            className={isSubmitting ? "animate-spin" : ""}
+            className={(isSubmitting || loading) ? "animate-spin" : ""}
           >
-            {isSubmitting ? 'Agregando...' : 'Agregar Artículo'}
+            {(isSubmitting || loading) ? 'Creando Artículo...' : 'Crear Artículo'}
           </Button>
         </div>
       </div>

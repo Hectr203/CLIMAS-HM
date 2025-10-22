@@ -11,8 +11,11 @@ import InventoryStats from './components/InventoryStats';
 import NewItemModal from './components/NewItemModal';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
+import useInventory from '../../hooks/useInventory';
 
 const InventoryManagement = () => {
+  const { articulos, getArticulos, loading, error } = useInventory();
+  
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeView, setActiveView] = useState('overview');
@@ -28,245 +31,106 @@ const InventoryManagement = () => {
     quickFilter: ''
   });
 
-  // Mock data for inventory items - Convert to state to allow adding new items
-  const [inventoryItems, setInventoryItems] = useState([
-    {
-      id: 1,
-      itemCode: 'HVAC-001',
-      description: 'Unidad Condensadora 3 Toneladas',
-      specifications: 'R-410A, 220V, Eficiencia SEER 16',
-      category: 'Equipos HVAC',
-      currentStock: 5,
-      reservedStock: 2,
-      reorderPoint: 3,
-      unit: 'pcs',
+  // Transformar los artículos del backend al formato esperado por los componentes
+  const inventoryItems = React.useMemo(() => {
+    return articulos.map(articulo => ({
+      id: articulo.id,
+      itemCode: articulo.codigoArticulo,
+      description: articulo.descripcion,
+      specifications: articulo.especificaciones || 'Sin especificaciones',
+      category: articulo.categoria,
+      currentStock: articulo.stockActual,
+      reservedStock: articulo.stockReservado || 0,
+      reorderPoint: articulo.puntoReorden,
+      unit: articulo.unidad,
       supplier: {
-        name: 'Carrier México',
-        contact: 'ventas@carrier.mx'
+        name: articulo.proveedor?.nombre || articulo.nombreProveedor || 'Sin proveedor',
+        contact: articulo.proveedor?.contacto || articulo.contactoProveedor || 'Sin contacto'
       },
-      location: 'Almacén Principal',
-      lastUpdated: new Date('2024-09-28'),
-      unitCost: 45000
-    },
-    {
-      id: 2,
-      itemCode: 'REF-002',
-      description: 'Compresor Scroll 2HP',
-      specifications: 'Copeland, R-404A, 220V',
-      category: 'Refrigeración',
-      currentStock: 0,
-      reservedStock: 0,
-      reorderPoint: 2,
-      unit: 'pcs',
-      supplier: {
-        name: 'Trane Climatización',
-        contact: 'pedidos@trane.mx'
-      },
-      location: 'Almacén Principal',
-      lastUpdated: new Date('2024-09-25'),
-      unitCost: 12500
-    },
-    {
-      id: 3,
-      itemCode: 'ELE-003',
-      description: 'Contactor 40A 3 Polos',
-      specifications: '220V, Bobina 24V, Schneider Electric',
-      category: 'Componentes Eléctricos',
-      currentStock: 15,
-      reservedStock: 5,
-      reorderPoint: 10,
-      unit: 'pcs',
-      supplier: {
-        name: 'York International',
-        contact: 'soporte@york.mx'
-      },
-      location: 'Taller',
-      lastUpdated: new Date('2024-09-29'),
-      unitCost: 850
-    },
-    {
-      id: 4,
-      itemCode: 'PLU-004',
-      description: 'Tubería de Cobre 1/2"',
-      specifications: 'Tipo L, 20 pies de longitud',
-      category: 'Plomería',
-      currentStock: 2,
-      reservedStock: 1,
-      reorderPoint: 5,
-      unit: 'pcs',
-      supplier: {
-        name: 'Lennox Industries',
-        contact: 'ventas@lennox.mx'
-      },
-      location: 'Almacén Secundario',
-      lastUpdated: new Date('2024-09-27'),
-      unitCost: 320
-    },
-    {
-      id: 5,
-      itemCode: 'TOO-005',
-      description: 'Manifold Digital R-410A',
-      specifications: 'Con mangueras, precisión ±0.5%',
-      category: 'Herramientas',
-      currentStock: 8,
-      reservedStock: 0,
-      reorderPoint: 3,
-      unit: 'pcs',
-      supplier: {
-        name: 'Daikin México',
-        contact: 'herramientas@daikin.mx'
-      },
-      location: 'Taller',
-      lastUpdated: new Date('2024-09-30'),
-      unitCost: 4200
-    }
-  ]);
+      location: articulo.ubicacion,
+      lastUpdated: new Date(articulo.fechaActualizacion || articulo.fechaCreacion),
+      unitCost: articulo.costoUnitario,
+      notes: articulo.notas
+    }));
+  }, [articulos]);
 
-  // Mock data for stock alerts
-  const stockAlerts = [
-    {
-      id: 1,
-      type: 'out-of-stock',
-      title: 'Compresor Scroll Agotado',
-      message: 'El compresor scroll 2HP está completamente agotado y hay proyectos pendientes que lo requieren.',
-      itemCode: 'REF-002',
-      currentStock: 0,
-      reorderPoint: 2,
-      unit: 'pcs',
-      supplier: 'Trane Climatización',
-      createdAt: new Date('2024-09-25T10:30:00')
-    },
-    {
-      id: 2,
-      type: 'low-stock',
-      title: 'Tubería de Cobre en Stock Bajo',
-      message: 'La tubería de cobre 1/2" está por debajo del punto de reorden.',
-      itemCode: 'PLU-004',
-      currentStock: 2,
-      reorderPoint: 5,
-      unit: 'pcs',
-      supplier: 'Lennox Industries',
-      createdAt: new Date('2024-09-27T14:15:00')
-    },
-    {
-      id: 3,
-      type: 'low-stock',
-      title: 'Unidad Condensadora Stock Crítico',
-      message: 'Solo quedan 3 unidades disponibles después de las reservas.',
-      itemCode: 'HVAC-001',
-      currentStock: 5,
-      reorderPoint: 3,
-      unit: 'pcs',
-      supplier: 'Carrier México',
-      createdAt: new Date('2024-09-28T09:45:00')
-    }
-  ];
+  // Generar alertas dinámicas basadas en los artículos reales
+  const stockAlerts = React.useMemo(() => {
+    return inventoryItems
+      .filter(item => {
+        const currentStock = item.currentStock || 0;
+        const reorderPoint = item.reorderPoint || 0;
+        return currentStock === 0 || currentStock <= reorderPoint;
+      })
+      .map((item, index) => {
+        const currentStock = item.currentStock || 0;
+        const reorderPoint = item.reorderPoint || 0;
+        const description = item.description || 'Artículo sin descripción';
+        const itemCode = item.itemCode || 'Sin código';
+        const unit = item.unit || 'pcs';
+        const supplierName = item.supplier?.name || 'Sin proveedor';
+        
+        return {
+          id: index + 1,
+          type: currentStock === 0 ? 'out-of-stock' : 'low-stock',
+          title: currentStock === 0 
+            ? `${description} Agotado`
+            : `${description} en Stock Bajo`,
+          message: currentStock === 0
+            ? `El artículo ${itemCode} está completamente agotado.`
+            : `Solo quedan ${currentStock} ${unit} disponibles, por debajo del punto de reorden de ${reorderPoint} ${unit}.`,
+          itemCode: itemCode,
+          currentStock: currentStock,
+          reorderPoint: reorderPoint,
+          unit: unit,
+          supplier: supplierName,
+          createdAt: new Date()
+        };
+      });
+  }, [inventoryItems]);
 
-  // Mock data for purchase orders
-  const purchaseOrders = [
-    {
-      id: 1,
-      orderNumber: 'PO-2024-001',
-      supplier: 'Carrier México',
-      status: 'pending',
-      orderDate: new Date('2024-09-28'),
-      expectedDelivery: new Date('2024-10-05'),
-      total: 135000,
-      itemCount: 3,
-      urgent: false
-    },
-    {
-      id: 2,
-      orderNumber: 'PO-2024-002',
-      supplier: 'Trane Climatización',
-      status: 'approved',
-      orderDate: new Date('2024-09-25'),
-      expectedDelivery: new Date('2024-10-02'),
-      total: 25000,
-      itemCount: 2,
-      urgent: true
-    },
-    {
-      id: 3,
-      orderNumber: 'PO-2024-003',
-      supplier: 'York International',
-      status: 'received',
-      orderDate: new Date('2024-09-20'),
-      expectedDelivery: new Date('2024-09-27'),
-      total: 8500,
-      itemCount: 10,
-      urgent: false
-    }
-  ];
+  // Purchase orders - to be implemented with backend
+  const purchaseOrders = [];
 
-  // Mock data for material requirements
-  const materialRequirements = [
-    {
-      id: 1,
-      requestNumber: 'REQ-2024-001',
-      projectName: 'Instalación HVAC Torre Corporativa',
-      requestedBy: 'Carlos Mendoza',
-      status: 'pending',
-      priority: 'high',
-      requestDate: new Date('2024-09-29'),
-      requiredDate: new Date('2024-10-03'),
-      notes: 'Materiales urgentes para completar instalación en piso 15',
-      items: [
-        { description: 'Unidad Condensadora 5 Ton', quantity: 2, unit: 'pcs' },
-        { description: 'Tubería de Cobre 3/4"', quantity: 50, unit: 'ft' },
-        { description: 'Refrigerante R-410A', quantity: 4, unit: 'kg' }
-      ]
-    },
-    {
-      id: 2,
-      requestNumber: 'REQ-2024-002',
-      projectName: 'Mantenimiento Centro Comercial',
-      requestedBy: 'Ana García',
-      status: 'approved',
-      priority: 'medium',
-      requestDate: new Date('2024-09-27'),
-      requiredDate: new Date('2024-10-01'),
-      notes: 'Repuestos para mantenimiento preventivo',
-      items: [
-        { description: 'Filtros de Aire 20x25x1', quantity: 24, unit: 'pcs' },
-        { description: 'Correas Tipo A', quantity: 6, unit: 'pcs' }
-      ]
-    },
-    {
-      id: 3,
-      requestNumber: 'REQ-2024-003',
-      projectName: 'Reparación Sistema Industrial',
-      requestedBy: 'Miguel Torres',
-      status: 'fulfilled',
-      priority: 'low',
-      requestDate: new Date('2024-09-24'),
-      requiredDate: new Date('2024-09-28'),
-      notes: 'Componentes para reparación de chiller',
-      items: [
-        { description: 'Compresor Scroll 10HP', quantity: 1, unit: 'pcs' },
-        { description: 'Válvula de Expansión', quantity: 2, unit: 'pcs' }
-      ]
-    }
-  ];
+  // Material requirements - to be implemented with backend
+  const materialRequirements = [];
 
-  // Mock inventory statistics
-  const inventoryStats = {
-    totalItems: 1247,
-    totalValue: 2850000,
-    lowStockItems: 23,
-    outOfStockItems: 5,
-    itemsChange: 5.2,
-    valueChange: 12.8,
-    lowStockChange: -15.3,
-    outOfStockChange: -40.0,
-    categories: {
-      hvacEquipment: 435,
-      refrigeration: 312,
-      electrical: 248,
-      tools: 150,
-      others: 102
-    }
-  };
+  // Calcular estadísticas dinámicas basadas en los artículos reales
+  const inventoryStats = React.useMemo(() => {
+    const totalItems = inventoryItems.length;
+    const totalValue = inventoryItems.reduce((sum, item) => {
+      const unitCost = item.unitCost || 0;
+      const currentStock = item.currentStock || 0;
+      return sum + (unitCost * currentStock);
+    }, 0);
+    const lowStockItems = inventoryItems.filter(item => {
+      const currentStock = item.currentStock || 0;
+      const reorderPoint = item.reorderPoint || 0;
+      return currentStock > 0 && currentStock <= reorderPoint;
+    }).length;
+    const outOfStockItems = inventoryItems.filter(item => (item.currentStock || 0) === 0).length;
+    
+    // Agrupar por categorías
+    const categoryGroups = inventoryItems.reduce((acc, item) => {
+      if (item.category) {
+        const category = item.category.toLowerCase().replace(/\s+/g, '');
+        acc[category] = (acc[category] || 0) + 1;
+      }
+      return acc;
+    }, {});
+
+    return {
+      totalItems,
+      totalValue,
+      lowStockItems,
+      outOfStockItems,
+      itemsChange: 0, // Podrías implementar lógica para calcular cambios
+      valueChange: 0,
+      lowStockChange: 0,
+      outOfStockChange: 0,
+      categories: categoryGroups
+    };
+  }, [inventoryItems]);
 
   // Filter inventory items based on current filters
   const filteredItems = inventoryItems?.filter(item => {
@@ -423,11 +287,9 @@ const InventoryManagement = () => {
 
   const handleAddNewItem = async (newItem) => {
     try {
-      // Add the new item to the inventory
-      setInventoryItems(prevItems => [...prevItems, newItem]);
-      
-      // Show success message or notification
-      console.log('Nuevo artículo agregado exitosamente:', newItem);
+      // El artículo ya fue creado en el backend por el NewItemModal
+      // Solo necesitamos refrescar la lista de artículos
+      await getArticulos();
       
       // If we're not on the inventory view, switch to it to show the new item
       if (activeView !== 'inventory') {
@@ -436,7 +298,7 @@ const InventoryManagement = () => {
       
       return Promise.resolve();
     } catch (error) {
-      console.error('Error adding new item:', error);
+      console.error('Error refreshing inventory after adding new item:', error);
       return Promise.reject(error);
     }
   };
@@ -456,6 +318,11 @@ const InventoryManagement = () => {
     { id: 'orders', label: 'Órdenes', icon: 'ShoppingCart' },
     { id: 'requirements', label: 'Requisiciones', icon: 'ClipboardList' }
   ];
+
+  // Cargar artículos al montar el componente
+  useEffect(() => {
+    getArticulos();
+  }, [getArticulos]);
 
   useEffect(() => {
     document.title = 'Gestión de Inventario - AireFlow Pro';
