@@ -34,13 +34,12 @@ import Button from '../../../components/ui/Button';
                 </div>
               </div>
 
-              {/* Single scrollable board area: vertical scrollbar here (max height keeps page scrollbar unchanged) */}
-              <div className="overflow-x-auto overflow-y-auto max-h-[64vh] p-4">
+              <div className="overflow-x-auto p-4">
                 <div className="flex space-x-4">
                   {columns.map((column) => {
                     const orders = workOrders.filter((o) => o?.status === column.id);
                     return (
-                      <div key={column.id} className="bg-muted/30 rounded-lg p-3 flex flex-col flex-shrink-0 w-72 md:w-80 lg:w-96">
+                      <div key={column.id} className="bg-muted/30 rounded-lg p-3 flex flex-col flex-shrink-0 w-72 md:w-80 lg:w-96 h-[60vh]">
                         {/* Fixed header area for each column to align starts */}
                         <div className="flex items-center space-x-2 mb-3 h-16 flex-shrink-0">
                           <div className={`w-3 h-3 rounded-full ${column.color}`} />
@@ -49,8 +48,7 @@ import Button from '../../../components/ui/Button';
                           <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full ml-auto">{orders.length}</span>
                         </div>
 
-                        {/* Cards area - no per-column scrollbars; cards will flow and the outer container will scroll */}
-                        <div className="space-y-3">
+                        <div className="space-y-3 overflow-y-auto flex-1 pr-1 no-scrollbar">
                           {orders.length === 0 && (
                             <div className="text-center text-muted-foreground py-6">
                               <Icon name={column.icon} size={28} className="mx-auto mb-2 opacity-50" />

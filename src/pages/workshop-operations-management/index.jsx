@@ -298,7 +298,7 @@ import React, { useState, useEffect } from 'react';
                     {/* Shift Indicator */}
                     <div className="bg-muted rounded-lg px-4 py-2">
                       <div className="flex items-center space-x-2">
-                        <Icon name="Clock" size={1} className="text-primary" />
+                        <Icon name="Clock" size={16} className="text-primary" />
                         <span className="text-sm font-medium">
                           Turno: {currentShift === 'morning' ? '8:00 - 18:00' : 'Fuera de Horario'}
                         </span>
@@ -308,20 +308,19 @@ import React, { useState, useEffect } from 'react';
                       </div>
                     </div>
 
-                    {/* Panel Toggle */}
-                    <div className="flex bg-muted rounded-lg p-1 max-w-xs overflow-x-auto">
+                    <div className="flex bg-muted rounded-lg p-1 overflow-x-auto no-scrollbar sticky top-20 z-40">
                       {panelOptions?.slice(0, 3)?.map((option) => (
                         <button
                           key={option?.value}
                           onClick={() => setActivePanel(option?.value)}
-                          className={`flex items-center space-x-1 px-2 py-2 rounded-md transition-smooth whitespace-nowrap ${
+                          className={`flex items-center justify-center space-x-2 px-3 py-2 rounded-md transition-smooth whitespace-nowrap min-w-[96px] ${
                             activePanel === option?.value
                               ? 'bg-primary text-primary-foreground'
                               : 'text-muted-foreground hover:text-foreground'
                           }`}
                         >
-                          <Icon name={option?.icon} size={14} />
-                          <span className="text-xs">{option?.label}</span>
+                          <Icon name={option?.icon} size={28} />
+                          <span className="text-sm font-medium">{option?.label}</span>
                         </button>
                       ))}
                     </div>
