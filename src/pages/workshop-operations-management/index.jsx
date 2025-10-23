@@ -241,11 +241,14 @@ import React, { useState, useEffect } from 'react';
 
           if (isLoading) {
             return (
-              <div className="min-h-screen bg-background">
-                <div className="flex items-center justify-center h-96">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                    <p className="text-muted-foreground">Cargando órdenes de trabajo...</p>
+              <div className="min-h-screen bg-background flex">
+                <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
+                <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
+                  <div className="pt-16 flex items-center justify-center h-96">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                      <p className="text-muted-foreground">Cargando proyectos...</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -305,20 +308,19 @@ import React, { useState, useEffect } from 'react';
                       </div>
                     </div>
 
-                    {/* Panel Toggle */}
-                    <div className="flex bg-muted rounded-lg p-1 max-w-xs overflow-x-auto">
+                    <div className="flex bg-muted rounded-lg p-1 overflow-x-auto no-scrollbar sticky top-20 z-40">
                       {panelOptions?.slice(0, 3)?.map((option) => (
                         <button
                           key={option?.value}
                           onClick={() => setActivePanel(option?.value)}
-                          className={`flex items-center space-x-1 px-2 py-2 rounded-md transition-smooth whitespace-nowrap ${
+                          className={`flex items-center justify-center space-x-2 px-3 py-2 rounded-md transition-smooth whitespace-nowrap min-w-[96px] ${
                             activePanel === option?.value
                               ? 'bg-primary text-primary-foreground'
                               : 'text-muted-foreground hover:text-foreground'
                           }`}
                         >
-                          <Icon name={option?.icon} size={14} />
-                          <span className="text-xs">{option?.label}</span>
+                          <Icon name={option?.icon} size={28} />
+                          <span className="text-sm font-medium">{option?.label}</span>
                         </button>
                       ))}
                     </div>
