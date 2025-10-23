@@ -29,12 +29,25 @@ const QuotationDevelopmentCenter = () => {
       try {
         const response = await getCotizaciones();
         console.log('Respuesta completa del backend:', response);
-        // Acceso correcto al array de cotizaciones
-        const data = Array.isArray(response.data?.data) ? response.data.data : [];
-        console.log('Cotizaciones obtenidas:', data);
-        setQuotations(data);
+        const cotizaciones = Array.isArray(response.data?.data) ? response.data.data : [];
+        console.log('Cotizaciones obtenidas:', cotizaciones);
+        // Mapeo adaptado a la estructura real del backend
+        const mapped = cotizaciones.map(cotizacion => ({
+          id: cotizacion.folio || cotizacion.id || '',
+          clientName: cotizacion.informacion_basica?.cliente?.find?.(c => c?.nombre_cliente)?.nombre_cliente || '',
+          projectName: cotizacion.informacion_basica?.proyecto?.find?.(p => p?.nombre_proyecto)?.nombre_proyecto || '',
+          status: 'development',
+          createdDate: cotizacion.fechaCreacion ? new Date(cotizacion.fechaCreacion).toLocaleDateString('es-MX') : '',
+          lastModified: cotizacion.fechaActualizacion ? new Date(cotizacion.fechaActualizacion).toLocaleDateString('es-MX') : '',
+          assignedTo: cotizacion.asignacion?.responsables?.[0]?.nombre_responsable || '',
+          priority: cotizacion.informacion_basica?.prioridad || 'media',
+          quotationData: {
+            totalAmount: cotizacion.detalles_proyecto?.presupuesto_estimado_mxn || 0
+          }
+        }));
+        setQuotations(mapped);
       } catch (err) {
-        setQuotations([]); // Si hay error, deja quotations como array vacío
+        setQuotations([]);
         console.error('Error al obtener cotizaciones:', err);
       } finally {
         setIsLoading(false);
@@ -44,16 +57,52 @@ const QuotationDevelopmentCenter = () => {
   }, []);
 
   const handleCreateQuotation = (newQuotation) => {
-    setQuotations(prev => [newQuotation, ...prev]);
-    setSelectedQuotation(newQuotation);
+    // Extraer datos relevantes según el formato recibido
+    const mappedQuotation = {
+      id: newQuotation?.folio || newQuotation?.id || '',
+      clientName: newQuotation?.informacion_basica?.cliente?.find?.(c => c?.nombre_cliente)?.nombre_cliente || '',
+      projectName: newQuotation?.informacion_basica?.proyecto?.find?.(p => p?.nombre_proyecto)?.nombre_proyecto || '',
+      status: 'development',
+      createdDate: newQuotation?.fechaCreacion ? new Date(newQuotation?.fechaCreacion).toLocaleDateString('es-MX') : new Date().toLocaleDateString('es-MX'),
+      lastModified: newQuotation?.fechaActualizacion ? new Date(newQuotation?.fechaActualizacion).toLocaleDateString('es-MX') : new Date().toLocaleDateString('es-MX'),
+      assignedTo: newQuotation?.asignacion?.responsables?.[0]?.nombre_responsable || '',
+      priority: newQuotation?.informacion_basica?.prioridad || 'media',
+      quotationData: {
+        totalAmount: newQuotation?.detalles_proyecto?.presupuesto_estimado_mxn || 0
+      }
+    };
+    setQuotations(prev => {
+      const updated = [mappedQuotation, ...prev];
+      console.log('Cotizaciones actualizadas:', updated);
+      return updated;
+    });
+    setSelectedQuotation(mappedQuotation);
     setActiveTab('builder');
   };
 
   const handleQuotationSelect = async (quotation) => {
     setIsLoading(true);
     try {
-      const quotationDetail = await getCotizacionById(quotation.id);
-      setSelectedQuotation(quotationDetail);
+      // Si el objeto ya tiene la estructura mapeada, úsalo directamente
+      if (quotation.quotationData && quotation.projectName) {
+        setSelectedQuotation(quotation);
+      } else {
+        const quotationDetail = await getCotizacionById(quotation.id);
+        const mappedQuotation = {
+          id: quotationDetail.folio || quotationDetail.id || '',
+          clientName: quotationDetail.informacion_basica?.cliente?.find?.(c => c?.nombre_cliente)?.nombre_cliente || '',
+          projectName: quotationDetail.informacion_basica?.proyecto?.find?.(p => p?.nombre_proyecto)?.nombre_proyecto || '',
+          status: 'development',
+          createdDate: quotationDetail.fechaCreacion ? new Date(quotationDetail.fechaCreacion).toLocaleDateString('es-MX') : '',
+          lastModified: quotationDetail.fechaActualizacion ? new Date(quotationDetail.fechaActualizacion).toLocaleDateString('es-MX') : '',
+          assignedTo: quotationDetail.asignacion?.responsables?.[0]?.nombre_responsable || '',
+          priority: quotationDetail.informacion_basica?.prioridad || 'media',
+          quotationData: {
+            totalAmount: quotationDetail.detalles_proyecto?.presupuesto_estimado_mxn || 0
+          }
+        };
+        setSelectedQuotation(mappedQuotation);
+      }
     } catch (err) {
       // Manejo de error si es necesario
     } finally {
@@ -118,29 +167,27 @@ const QuotationDevelopmentCenter = () => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'development': return 'bg-blue-100 text-blue-800';
-      case 'review': return 'bg-yellow-100 text-yellow-800';
-      case 'approved': return 'bg-green-100 text-green-800';
-      case 'additional-work': return 'bg-purple-100 text-purple-800';
-      case 'sent': return 'bg-indigo-100 text-indigo-800';
+      case 'development': return 'bg-blue-100 text-blue-800'; // Desarrollo
+      case 'review': return 'bg-yellow-100 text-yellow-800'; // Revisión
+      case 'approved': return 'bg-green-100 text-green-800'; // Aprobada
+      case 'rejected': return 'bg-red-100 text-red-800'; // Rechazada
+      case 'sent': return 'bg-indigo-100 text-indigo-800'; // Enviada
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getPriorityColor = (priority) => {
     switch (priority) {
-      case 'urgent': return 'border-l-red-600';
-      case 'high': return 'border-l-orange-500';
-      case 'medium': return 'border-l-yellow-500';
-      case 'low': return 'border-l-green-500';
+      case 'urgente': return 'border-l-red-600';
+      case 'alta': return 'border-l-orange-500';
+      case 'media': return 'border-l-yellow-500';
+      case 'baja': return 'border-l-green-500';
       default: return 'border-l-gray-400';
     }
   };
 
   useEffect(() => {
-    if (quotations.length > 0 && !selectedQuotation) {
-      handleQuotationSelect(quotations[0]);
-    }
+    // Ya no selecciona automáticamente la primera cotización
   }, [quotations, selectedQuotation]);
 
   if (isLoading) {
@@ -211,41 +258,36 @@ const QuotationDevelopmentCenter = () => {
                         onClick={() => handleQuotationSelect(quotation)}
                         className={`p-3 rounded-lg border-l-4 cursor-pointer hover:shadow-md transition-all ${
                           selectedQuotation?.id === quotation?.id ? 'bg-primary/10' : 'bg-card'
-                        } ${getPriorityColor(quotation?.prioridad || quotation?.priority)}`}
+                        } ${getPriorityColor(quotation?.priority)}`}
                       >
                         <div className="flex items-start justify-between mb-2">
                           <h4 className="font-medium text-sm text-foreground line-clamp-2">
-                            {quotation?.Proyecto?.nombre || quotation?.projectName || 'Sin proyecto'}
+                            {quotation?.projectName || 'Sin proyecto'}
                           </h4>
-                          <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(quotation?.estado || quotation?.status)}`}>
-                            {quotation?.estado === 'activo' ? 'Activo' :
-                             quotation?.estado === 'desarrollo' ? 'Desarrollo' :
-                             quotation?.estado === 'review' ? 'Revisión' :
-                             quotation?.estado === 'approved' ? 'Aprobada' :
-                             quotation?.estado === 'additional-work' ? 'Trabajo Adicional' :
-                             quotation?.estado || quotation?.status || 'Sin estado'}
+                          <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(quotation?.status)}`}>
+                            {quotation?.status === 'development' ? 'Desarrollo' :
+                             quotation?.status === 'review' ? 'Revisión' :
+                             quotation?.status === 'approved' ? 'Aprobada' :
+                             quotation?.status === 'rejected' ? 'Rechazada' :
+                             quotation?.status === 'sent' ? 'Enviada' :
+                             quotation?.status || 'Sin estado'}
                           </span>
                         </div>
-                        
-                        <p className="text-xs text-muted-foreground mb-2">{quotation?.Cliente?.nombre || quotation?.clientName || 'Sin cliente'}</p>
+                        <p className="text-xs text-muted-foreground mb-2">{quotation?.clientName || 'Sin cliente'}</p>
                         <p className="text-xs text-muted-foreground mb-2">{quotation?.id}</p>
                         <div className="flex items-center space-x-2 mb-2">
                           <Icon name="User" size={12} className="text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">{
-                            (quotation?.PersonalAsignado?.nombres?.length > 0
-                              ? quotation.PersonalAsignado.nombres.join(', ')
-                              : quotation?.assignedTo || 'Sin responsable')
-                          }</span>
+                          <span className="text-xs text-muted-foreground">{quotation?.assignedTo || 'Sin responsable'}</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-1">
                             <Icon name="Calendar" size={12} className="text-muted-foreground" />
                             <span className="text-xs text-muted-foreground">
-                              {new Date(quotation?.ultimaModificacion || quotation?.lastModified || quotation?.fechaCreacion)?.toLocaleDateString('es-MX')}
+                              {quotation?.lastModified || quotation?.createdDate || ''}
                             </span>
                           </div>
                           <div className="text-xs font-medium text-foreground">
-                            ${quotation?.datosCotizacion?.montoTotal?.toLocaleString('es-MX') || quotation?.quotationData?.totalAmount?.toLocaleString('es-MX') || '0'}
+                            ${quotation?.quotationData?.totalAmount?.toLocaleString('es-MX') || '0'}
                           </div>
                         </div>
                       </div>
