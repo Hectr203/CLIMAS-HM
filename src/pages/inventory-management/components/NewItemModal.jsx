@@ -253,14 +253,17 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
                   <label className="block text-sm font-medium text-foreground mb-2">
                     Categoría *
                   </label>
-                  <Select
+                  <select
                     value={formData?.category}
-                    onChange={(value) => handleInputChange('category', value)}
-                    options={categories?.map(cat => ({ value: cat, label: cat }))}
-                    placeholder="Seleccionar categoría"
-                    error={errors?.category}
+                    onChange={(e) => handleInputChange('category', e.target.value)}
                     disabled={isSubmitting}
-                  />
+                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  >
+                    <option value="">Seleccionar categoría</option>
+                    {categories?.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
                   {errors?.category && (
                     <p className="text-sm text-destructive mt-1">{errors?.category}</p>
                   )}
@@ -346,12 +349,16 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
                   <label className="block text-sm font-medium text-foreground mb-2">
                     Unidad
                   </label>
-                  <Select
+                  <select
                     value={formData?.unit}
-                    onChange={(value) => handleInputChange('unit', value)}
-                    options={units?.map(unit => ({ value: unit, label: unit }))}
+                    onChange={(e) => handleInputChange('unit', e.target.value)}
                     disabled={isSubmitting}
-                  />
+                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  >
+                    {units?.map(unit => (
+                      <option key={unit} value={unit}>{unit}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -377,12 +384,16 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
                   <label className="block text-sm font-medium text-foreground mb-2">
                     Ubicación
                   </label>
-                  <Select
+                  <select
                     value={formData?.location}
-                    onChange={(value) => handleInputChange('location', value)}
-                    options={locations?.map(loc => ({ value: loc, label: loc }))}
+                    onChange={(e) => handleInputChange('location', e.target.value)}
                     disabled={isSubmitting}
-                  />
+                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  >
+                    {locations?.map(loc => (
+                      <option key={loc} value={loc}>{loc}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>

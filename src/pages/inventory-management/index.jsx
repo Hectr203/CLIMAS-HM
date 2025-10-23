@@ -9,6 +9,8 @@ import PurchaseOrderPanel from './components/PurchaseOrderPanel';
 import MaterialRequirements from './components/MaterialRequirements';
 import InventoryStats from './components/InventoryStats';
 import NewItemModal from './components/NewItemModal';
+import ItemDetailsModal from './components/ItemDetailsModal';
+import EditItemModal from './components/EditItemModal';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
 import useInventory from '../../hooks/useInventory';
@@ -20,6 +22,9 @@ const InventoryManagement = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeView, setActiveView] = useState('overview');
   const [showNewItemModal, setShowNewItemModal] = useState(false);
+  const [showItemDetailsModal, setShowItemDetailsModal] = useState(false);
+  const [showEditItemModal, setShowEditItemModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
   const [filters, setFilters] = useState({
     search: '',
     category: '',
@@ -178,14 +183,38 @@ const InventoryManagement = () => {
 
   const handleViewDetails = (item) => {
     console.log('View item details:', item);
+    setSelectedItem(item);
+    setShowItemDetailsModal(true);
   };
 
   const handleUpdateStock = (item) => {
     console.log('Update stock for:', item);
+    setSelectedItem(item);
+    setShowEditItemModal(true);
   };
 
   const handleCreatePO = (item) => {
     console.log('Create purchase order for:', item);
+  };
+
+  // Handlers para cerrar modales
+  const handleCloseItemDetailsModal = () => {
+    setShowItemDetailsModal(false);
+    setSelectedItem(null);
+  };
+
+  const handleCloseEditItemModal = () => {
+    setShowEditItemModal(false);
+    setSelectedItem(null);
+  };
+
+  // Handler para actualización exitosa
+  const handleUpdateSuccess = async () => {
+    try {
+      await getArticulos(); // Recargar la lista de artículos
+    } catch (error) {
+      console.error('Error recargando artículos después de actualizar:', error);
+    }
   };
 
   const handleApproveRequirement = (requirement) => {
@@ -345,50 +374,54 @@ const InventoryManagement = () => {
           <Breadcrumb />
           
           {/* Page Header */}
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground mb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 sm:mb-8 space-y-4 sm:space-y-0">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
                 Gestión de Inventario
               </h1>
-              <p className="text-muted-foreground">
+              <p className="text-sm sm:text-base text-muted-foreground">
                 Control integral de partes, materiales y recursos para proyectos de Aire Acondicionado
               </p>
             </div>
             
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
               <Button
                 variant="outline"
                 onClick={handleImportInventory}
                 iconName="Upload"
                 iconSize={16}
+                className="text-sm"
               >
-                Importar
+                <span className="hidden sm:inline">Importar</span>
+                <span className="sm:hidden">Import</span>
               </Button>
               <Button
                 variant="default"
                 onClick={handleOpenNewItemModal}
                 iconName="Plus"
                 iconSize={16}
+                className="text-sm"
               >
-                Nuevo Artículo
+                <span className="hidden sm:inline">Nuevo Artículo</span>
+                <span className="sm:hidden">Nuevo</span>
               </Button>
             </div>
           </div>
 
           {/* View Tabs */}
-          <div className="flex space-x-1 mb-6 bg-muted p-1 rounded-lg w-fit">
+          <div className="flex flex-wrap space-x-1 mb-4 sm:mb-6 bg-muted p-1 rounded-lg w-fit max-w-full overflow-x-auto">
             {viewTabs?.map((tab) => (
               <button
                 key={tab?.id}
                 onClick={() => setActiveView(tab?.id)}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-smooth ${
+                className={`flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-smooth whitespace-nowrap ${
                   activeView === tab?.id
                     ? 'bg-background text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                <Icon name={tab?.icon} size={16} />
-                <span>{tab?.label}</span>
+                <Icon name={tab?.icon} size={14} className="sm:w-4 sm:h-4" />
+                <span className="hidden xs:inline sm:inline">{tab?.label}</span>
                 {tab?.id === 'alerts' && stockAlerts?.length > 0 && (
                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-warning text-warning-foreground">
                     {stockAlerts?.length}
@@ -412,6 +445,7 @@ const InventoryManagement = () => {
                 onExport={handleExport}
                 totalItems={inventoryItems?.length}
                 filteredItems={filteredItems?.length}
+                inventoryItems={inventoryItems}
               />
               <InventoryTable
                 items={filteredItems}
@@ -454,6 +488,21 @@ const InventoryManagement = () => {
             isOpen={showNewItemModal}
             onClose={handleCloseNewItemModal}
             onAddItem={handleAddNewItem}
+          />
+
+          {/* Item Details Modal */}
+          <ItemDetailsModal
+            isOpen={showItemDetailsModal}
+            onClose={handleCloseItemDetailsModal}
+            item={selectedItem}
+          />
+
+          {/* Edit Item Modal */}
+          <EditItemModal
+            isOpen={showEditItemModal}
+            onClose={handleCloseEditItemModal}
+            item={selectedItem}
+            onUpdateSuccess={handleUpdateSuccess}
           />
         </div>
       </main>

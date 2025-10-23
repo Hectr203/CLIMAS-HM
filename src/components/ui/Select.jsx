@@ -10,7 +10,7 @@ const Select = React.forwardRef(({
     options = [],
     value,
     defaultValue,
-    placeholder = "Seleccionar una opcion",
+    placeholder = "Seleccionar una opción",
     multiple = false,
     disabled = false,
     required = false,
@@ -179,7 +179,7 @@ const Select = React.forwardRef(({
                                 <div className="relative">
                                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                                     <Input
-                                        placeholder="Search options..."
+                                        placeholder="Buscar opciones..."
                                         value={searchTerm}
                                         onChange={handleSearchChange}
                                         className="pl-8"
@@ -191,7 +191,7 @@ const Select = React.forwardRef(({
                         <div className="py-1 max-h-60 overflow-auto">
                             {filteredOptions?.length === 0 ? (
                                 <div className="px-3 py-2 text-sm text-muted-foreground">
-                                    {searchTerm ? 'No options found' : 'No options available'}
+                                    {searchTerm ? 'No se encontraron opciones' : 'No hay opciones disponibles'}
                                 </div>
                             ) : (
                                 filteredOptions?.map((option, idx) => (
