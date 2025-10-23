@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import { useConfirmDialog } from '../../ui/ConfirmDialogContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { useLocation } from 'react-router-dom';
+import useAuth from '../../hooks/useAuth';
 import Icon from '../AppIcon';
 import Button from './Button';
 import AppImage from '../AppImage';
@@ -31,12 +33,21 @@ const Header = ({ onMenuToggle, isMenuOpen = false }) => {
   };
 
   const { showSuccess } = useNotifications();
-  const handleLogout = () => {
-    showSuccess('Sesión cerrada correctamente');
-    setTimeout(() => {
-      localStorage.removeItem('authToken');
-      window.location.href = '/login';
-    }, 1200);
+  const { showConfirm } = useConfirmDialog();
+  const { logout } = useAuth();
+  const handleLogout = async () => {
+    const confirmed = await showConfirm({
+      title: 'Cerrar sesión',
+      message: '¿Deseas cerrar sesión?',
+      confirmText: 'Sí',
+      cancelText: 'No'
+    });
+    if (confirmed) {
+      showSuccess('Sesión cerrada correctamente');
+      setTimeout(() => {
+        logout();
+      }, 1200);
+    }
   };
 
   return (

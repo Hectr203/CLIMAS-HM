@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
         import Icon from '../../components/AppIcon';
         import Button from '../../components/ui/Button';
+        import Sidebar from '../../components/ui/Sidebar';
+        import Breadcrumb from '../../components/ui/Breadcrumb';
         import WorkflowBoard from './components/WorkflowBoard';
         import WorkflowControls from './components/WorkflowControls';
         import MaterialReceptionPanel from './components/MaterialReceptionPanel';
@@ -11,6 +13,8 @@ import React, { useState, useEffect } from 'react';
 
         const WorkshopOperationsManagement = () => {
           const [workOrders, setWorkOrders] = useState([]);
+          const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+          const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
           const [activePanel, setActivePanel] = useState('workflow');
           const [selectedOrder, setSelectedOrder] = useState(null);
           const [isLoading, setIsLoading] = useState(true);
@@ -237,11 +241,14 @@ import React, { useState, useEffect } from 'react';
 
           if (isLoading) {
             return (
-              <div className="min-h-screen bg-background">
-                <div className="flex items-center justify-center h-96">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                    <p className="text-muted-foreground">Cargando órdenes de trabajo...</p>
+              <div className="min-h-screen bg-background flex">
+                <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
+                <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
+                  <div className="pt-16 flex items-center justify-center h-96">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                      <p className="text-muted-foreground">Cargando proyectos...</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -250,7 +257,34 @@ import React, { useState, useEffect } from 'react';
 
           return (
             <div className="min-h-screen bg-background">
-              <div className="container mx-auto px-4 py-8">
+              {/* Desktop Sidebar */}
+              <div className="hidden lg:block">
+                <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
+              </div>
+
+              {/* Mobile Header Placeholder */}
+              <div className="lg:hidden">
+                <div className="p-4 bg-background border-b">
+                  <div className="flex items-center justify-between">
+                    <div className="text-lg font-semibold">Gestión Operativa - Taller</div>
+                    <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 rounded bg-muted">
+                      <Icon name="Menu" size={18} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className={`transition-all duration-300 ${
+                sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'
+              } lg:pt-0 pt-16`}>
+                <div className="container mx-auto px-4 py-8">
+                  {/* Breadcrumb */}
+                  <div className="mb-6">
+                    <Breadcrumb customItems={[
+                      { label: 'Dashboard', path: '/main-dashboard', icon: 'Home' },
+                      { label: 'Gestión Operativa - Área de Taller', path: '/workshop-operations-management', icon: 'Wrench', current: true }
+                    ]} />
+                  </div>
                 {/* Header */}
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
                   <div>
@@ -274,20 +308,19 @@ import React, { useState, useEffect } from 'react';
                       </div>
                     </div>
 
-                    {/* Panel Toggle */}
-                    <div className="flex bg-muted rounded-lg p-1 max-w-xs overflow-x-auto">
+                    <div className="flex bg-muted rounded-lg p-1 overflow-x-auto no-scrollbar sticky top-20 z-40">
                       {panelOptions?.slice(0, 3)?.map((option) => (
                         <button
                           key={option?.value}
                           onClick={() => setActivePanel(option?.value)}
-                          className={`flex items-center space-x-1 px-2 py-2 rounded-md transition-smooth whitespace-nowrap ${
+                          className={`flex items-center justify-center space-x-2 px-3 py-2 rounded-md transition-smooth whitespace-nowrap min-w-[96px] ${
                             activePanel === option?.value
                               ? 'bg-primary text-primary-foreground'
                               : 'text-muted-foreground hover:text-foreground'
                           }`}
                         >
-                          <Icon name={option?.icon} size={14} />
-                          <span className="text-xs">{option?.label}</span>
+                          <Icon name={option?.icon} size={28} />
+                          <span className="text-sm font-medium">{option?.label}</span>
                         </button>
                       ))}
                     </div>
@@ -448,6 +481,7 @@ import React, { useState, useEffect } from 'react';
                 )}
               </div>
             </div>
+          </div>
           );
         };
 

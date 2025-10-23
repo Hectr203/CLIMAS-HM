@@ -126,7 +126,7 @@ const Select = React.forwardRef(({
                     disabled={disabled}
                     aria-expanded={isOpen}
                     aria-haspopup="listbox"
-                    {...Object.fromEntries(Object.entries(props).filter(([k]) => k !== 'loading' && k !== 'isLoading'))}
+                    {...props}
                 >
                     <span className="truncate">{getSelectedDisplay()}</span>
 
@@ -164,8 +164,8 @@ const Select = React.forwardRef(({
                     required={required}
                 >
                     <option value="">Select...</option>
-                    {options?.map((option, idx) => (
-                        <option key={option?.value ?? idx} value={option?.value}>
+                    {options?.map(option => (
+                        <option key={option?.value} value={option?.value}>
                             {option?.label}
                         </option>
                     ))}
@@ -194,9 +194,9 @@ const Select = React.forwardRef(({
                                     {searchTerm ? 'No options found' : 'No options available'}
                                 </div>
                             ) : (
-                                filteredOptions?.map((option, idx) => (
+                                filteredOptions?.map((option) => (
                                     <div
-                                        key={option?.value ?? idx}
+                                        key={option?.value}
                                         className={cn(
                                             "relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
                                             isSelected(option?.value) && "bg-primary text-primary-foreground",

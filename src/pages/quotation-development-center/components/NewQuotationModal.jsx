@@ -1,42 +1,144 @@
+import { useNotifications } from '../../../context/NotificationContext';
+import useQuotation from '../../../hooks/useQuotation';
+import useClient from '../../../hooks/useClient';
 import React, { useState } from 'react';
+import useProyecto from '../../../hooks/useProyect';
+import usePerson from '../../../hooks/usePerson';
 import Icon from '../../../components/AppIcon';
+
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
+
 import Select from '../../../components/ui/Select';
+
+// Formatea el presupuesto solo con separadores de miles y decimales
+function formatearNumero(valor) {
+  if (!valor || isNaN(Number(valor))) return '';
+  const partes = valor.split('.');
+  let entero = partes[0];
+  let decimal = partes[1] || '';
+  entero = Number(entero).toLocaleString('es-MX');
+  if (decimal.length > 0) {
+    return `${entero}.${decimal}`;
+  }
+  return entero;
+}
+
+// Formatea el presupuesto como dinero MXN
+function formatearDinero(valor) {
+  if (!valor || isNaN(Number(valor))) return '';
+  return Number(valor).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
+}
 
 const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
   const [formData, setFormData] = useState({
-    clientName: '',
-    projectName: '',
-    contactPerson: '',
-    phone: '',
+    clienteId: '',
+    nombreCliente: '',
+    proyectoId: '',
+    nombreProyecto: '',
+    personalAsignadoId: '',
+    asignadoA: '',
+    personaContacto: '',
+    telefono: '',
     email: '',
-    projectDescription: '',
-    location: '',
-    estimatedBudget: '',
-    timeline: '',
-    priority: 'medium',
-    assignedTo: 'María García',
-    projectType: 'hvac',
-    notes: ''
+    descripcionProyecto: '',
+    ubicacion: '',
+    montoTotal: '',
+    cronograma: '',
+    prioridad: 'media',
+    tipoProyecto: 'hvac',
+    notas: ''
   });
+
+  // Proyectos y clientes
+  const { proyectos, getProyectos, loading: loadingProyectos } = useProyecto();
+  const { clients, getClients, loading: loadingClients } = useClient();
+  React.useEffect(() => {
+    getProyectos();
+    getClients();
+  }, []);
+  // Opciones para el select de proyectos (con clientId)
+  const projectOptions = proyectos?.map(p => ({
+    value: p.id || p._id || p.codigo || p.nombreProyecto,
+    label: p.nombreProyecto || p.codigo,
+    clientId: p.cliente?.id || p.cliente?.id || p.cliente || ''
+  })) || [];
+
+  // Función para obtener el nombre del cliente por id
+  const getClientNameById = (id) => {
+    if (!id || !clients) return '';
+    // Buscar por id, _id, y también comparar como string
+    const found = clients.find(c => String(c.id) === String(id) || String(c._id) === String(id));
+    // Mostrar empresa si existe, si no nombre, si no razonSocial, si no name
+  return found?.empresa || found?.nombre || found?.razonSocial || found?.name || id || '';
+  };
+
+  // Cuando cambia el proyecto seleccionado, actualizar el cliente
+  const handleProjectChange = (value) => {
+    const selected = projectOptions.find(opt => opt.value === value);
+    setFormData(prev => ({
+      ...prev,
+      proyectoId: selected?.value || '',
+      nombreProyecto: selected?.label || value,
+      clienteId: selected?.clientId || '',
+      nombreCliente: getClientNameById(selected?.clientId)
+    }));
+    // Limpiar error si lo hay
+    if (errors?.projectName) setErrors(prev => ({ ...prev, projectName: '' }));
+  };
+
+  // Cuando cambia el proyecto seleccionado, actualizar el cliente
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const assignedToOptions = [
-    'María García',
-    'Roberto Silva', 
-    'Carmen Díaz',
-    'Patricia Morales',
-    'Alejandro Torres'
-  ];
+
+  // Hook para cargar empleados
+  const { persons, getPersons, loading: loadingEmployees } = usePerson();
+  React.useEffect(() => { getPersons(); /* solo una vez */ }, []);
+  // Opciones para el select de responsables (corregido)
+  // Opciones para el select de responsables (corregido)
+  const assignedToOptions = persons?.map((emp, idx) => {
+    const idValue = emp.empleadoId || emp.id || `${idx}`;
+    return {
+      value: idValue,
+      label: emp.nombreCompleto || emp.nombre || emp.empleadoId || emp.id,
+      key: idValue // clave única para React
+    };
+  }) || [];
 
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    // Formateo visual para el campo montoTotal (presupuesto)
+    if (field === 'montoTotal') {
+      let cleanValue = value.replace(/[^\d.]/g, '');
+      if (cleanValue.includes('.')) {
+        const [intPart, decPart] = cleanValue.split('.');
+        cleanValue = intPart + '.' + decPart.slice(0,2);
+      }
+      setFormData(prev => ({
+        ...prev,
+        [field]: cleanValue
+      }));
+    } else if (field === 'telefono') {
+      let cleanValue = value.replace(/\D/g, '').slice(0, 10);
+      setFormData(prev => ({
+        ...prev,
+        [field]: cleanValue
+      }));
+    } else if (field === 'asignadoA') {
+      // Guardar id y nombre
+      const selected = assignedToOptions.find(opt => opt.value === value);
+      setFormData(prev => ({
+        ...prev,
+        personalAsignadoId: selected?.value || '',
+        asignadoA: selected?.label || value
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [field]: value
+      }));
+    }
 
     // Clear error when user starts typing
     if (errors?.[field]) {
@@ -50,20 +152,22 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData?.clientName?.trim()) {
-      newErrors.clientName = 'El nombre del cliente es requerido';
+    if (!formData?.nombreCliente?.trim()) {
+      newErrors.nombreCliente = 'El nombre del cliente es requerido';
     }
 
-    if (!formData?.projectName?.trim()) {
-      newErrors.projectName = 'El nombre del proyecto es requerido';
+    if (!formData?.nombreProyecto?.trim()) {
+      newErrors.nombreProyecto = 'El nombre del proyecto es requerido';
     }
 
-    if (!formData?.contactPerson?.trim()) {
-      newErrors.contactPerson = 'La persona de contacto es requerida';
+    if (!formData?.personaContacto?.trim()) {
+      newErrors.personaContacto = 'La persona de contacto es requerida';
     }
 
-    if (!formData?.phone?.trim()) {
-      newErrors.phone = 'El teléfono es requerido';
+    if (!formData?.telefono?.trim()) {
+      newErrors.telefono = 'El teléfono es requerido';
+    } else if (!/^\d{10}$/.test(formData?.telefono)) {
+      newErrors.telefono = 'El teléfono debe tener exactamente 10 dígitos numéricos';
     }
 
     if (!formData?.email?.trim()) {
@@ -72,20 +176,20 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
       newErrors.email = 'El formato del email no es válido';
     }
 
-    if (!formData?.projectDescription?.trim()) {
-      newErrors.projectDescription = 'La descripción del proyecto es requerida';
+    if (!formData?.descripcionProyecto?.trim()) {
+      newErrors.descripcionProyecto = 'La descripción del proyecto es requerida';
     }
 
-    if (!formData?.location?.trim()) {
-      newErrors.location = 'La ubicación es requerida';
+    if (!formData?.ubicacion?.trim()) {
+      newErrors.ubicacion = 'La ubicación es requerida';
     }
 
-    if (!formData?.estimatedBudget?.trim()) {
-      newErrors.estimatedBudget = 'El presupuesto estimado es requerido';
+    if (!formData?.montoTotal?.trim()) {
+      newErrors.montoTotal = 'El presupuesto estimado es requerido';
     }
 
-    if (!formData?.timeline?.trim()) {
-      newErrors.timeline = 'El cronograma es requerido';
+    if (!formData?.cronograma?.trim()) {
+      newErrors.cronograma = 'El cronograma es requerido';
     }
 
     setErrors(newErrors);
@@ -98,88 +202,44 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
     return `COT-${new Date()?.getFullYear()}-${timestamp?.toString()?.slice(-3)}${random?.toString()?.padStart(3, '0')}`;
   };
 
+  const { createQuotation, loading: loadingQuotation, error: errorQuotation } = useQuotation();
+  const { showOperationSuccess } = useNotifications();
+
   const handleSubmit = async (e) => {
     e?.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-
+    if (!validateForm()) return;
     setIsSubmitting(true);
-
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      const newQuotation = {
-        id: generateQuotationId(),
-        clientName: formData?.clientName?.trim(),
-        projectName: formData?.projectName?.trim(),
-        status: 'development',
-        createdDate: new Date()?.toISOString()?.split('T')?.[0],
-        lastModified: new Date()?.toISOString()?.split('T')?.[0],
-        assignedTo: formData?.assignedTo,
-        priority: formData?.priority,
-        stage: 'scope-definition',
-        quotationData: {
-          scope: formData?.projectDescription?.trim(),
-          assumptions: [
-            "Acceso libre durante horario laboral (8:00-18:00)",
-            "Cliente proporciona conexiones básicas de servicios"
-          ],
-          timeline: formData?.timeline?.trim(),
-          conditions: "50% anticipo, 50% contra entrega",
-          warranty: "24 meses en equipos, 12 meses en instalación",
-          totalAmount: parseFloat(formData?.estimatedBudget) || 0,
-          validity: "45 días"
-        },
-        materials: [],
-        riskAssessment: {
-          overall: "medium",
-          factors: [
-            { factor: "Evaluación inicial", risk: "low", mitigation: "Pendiente inspección técnica" }
-          ],
-          extraCostsPrevention: false
-        },
-        revisions: [
-          {
-            version: "1.0",
-            date: new Date()?.toISOString()?.split('T')?.[0],
-            changes: "Versión inicial de cotización",
-            author: formData?.assignedTo
-          }
-        ],
-        communications: [
-          {
-            id: `comm-${Date.now()}`,
-            type: "email",
-            date: new Date()?.toISOString()?.split('T')?.[0],
-            subject: `Nueva cotización registrada: ${formData?.projectName?.trim()}`,
-            content: `Cotización inicial creada para ${formData?.projectDescription?.trim()}`,
-            urgency: 'normal'
-          }
-        ],
-        internalReview: {
-          status: "pending",
-          reviewAreas: {
-            pricing: { reviewed: false, reviewer: "", comments: "" },
-            scope: { reviewed: false, reviewer: "", comments: "" },
-            timeline: { reviewed: false, reviewer: "", comments: "" },
-            technical: { reviewed: false, reviewer: "", comments: "" }
-          }
-        },
-        additionalWork: [],
-        contactInfo: {
-          phone: formData?.phone?.trim(),
-          email: formData?.email?.trim(),
-          contactPerson: formData?.contactPerson?.trim(),
-          location: formData?.location?.trim()
-        }
+      const quotationPayload = {
+        clienteId: formData?.clienteId,
+        nombreCliente: formData?.nombreCliente?.trim(),
+        proyectoId: formData?.proyectoId,
+        nombreProyecto: formData?.nombreProyecto?.trim(),
+        personalAsignadoId: formData?.personalAsignadoId,
+        asignadoA: formData?.asignadoA,
+        prioridad: formData?.prioridad,
+        tipoProyecto: formData?.tipoProyecto,
+        notas: formData?.notas,
+        personaContacto: formData?.personaContacto?.trim(),
+        telefono: formData?.telefono?.trim(),
+        email: formData?.email?.trim(),
+        descripcionProyecto: formData?.descripcionProyecto?.trim(),
+        ubicacion: formData?.ubicacion?.trim(),
+        presupuestoEstimado: Number(formData?.montoTotal),
+        cronograma: formData?.cronograma,
       };
-
-      onCreateQuotation?.(newQuotation);
-      handleClose();
+      console.log('Objeto enviado al backend:', quotationPayload);
+      const response = await createQuotation(quotationPayload);
+      const wasCreated = response?.success || response?.id || response?.data?.id;
+      if (wasCreated) {
+        showOperationSuccess('Cotización creada exitosamente');
+        onCreateQuotation?.(response.data || response);
+        handleClose();
+      } else {
+        showOperationSuccess('Error al crear la cotización');
+      }
     } catch (error) {
+      alert('Error al crear la cotización');
       console.error('Error creating quotation:', error);
     } finally {
       setIsSubmitting(false);
@@ -188,19 +248,22 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
 
   const handleClose = () => {
     setFormData({
-      clientName: '',
-      projectName: '',
-      contactPerson: '',
-      phone: '',
+      clienteId: '',
+      nombreCliente: '',
+      proyectoId: '',
+      nombreProyecto: '',
+      personalAsignadoId: '',
+      asignadoA: '',
+      personaContacto: '',
+      telefono: '',
       email: '',
-      projectDescription: '',
-      location: '',
-      estimatedBudget: '',
-      timeline: '',
-      priority: 'medium',
-      assignedTo: 'María García',
-      projectType: 'hvac',
-      notes: ''
+      descripcionProyecto: '',
+      ubicacion: '',
+      montoTotal: '',
+      cronograma: '',
+      prioridad: 'media',
+      tipoProyecto: 'hvac',
+      notas: ''
     });
     setErrors({});
     setIsSubmitting(false);
@@ -248,33 +311,40 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
                 <Input
                   label="Nombre del Cliente"
                   required
-                  value={formData?.clientName}
-                  onChange={(e) => handleInputChange('clientName', e?.target?.value)}
-                  error={errors?.clientName}
-                  placeholder="Ej. Corporación ABC"
+                  value={formData?.nombreCliente}
+                  disabled
+                  error={errors?.nombreCliente}
+                  placeholder="Cliente del proyecto seleccionado"
                 />
-                
-                <Input
-                  label="Nombre del Proyecto"
-                  required
-                  value={formData?.projectName}
-                  onChange={(e) => handleInputChange('projectName', e?.target?.value)}
-                  error={errors?.projectName}
-                  placeholder="Ej. Instalación HVAC Torre Corporativa"
-                />
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Nombre del Proyecto <span className="text-destructive">*</span>
+                  </label>
+                  <Select
+                    value={projectOptions.find(opt => opt.label === formData?.nombreProyecto)?.value || ''}
+                    onChange={handleProjectChange}
+                    options={projectOptions}
+                    isLoading={loadingProyectos}
+                    placeholder={loadingProyectos ? 'Cargando proyectos...' : 'Selecciona un proyecto'}
+                  />
+                  {errors?.nombreProyecto && (
+                    <p className="text-sm text-destructive mt-1">{errors?.nombreProyecto}</p>
+                  )}
+                </div>
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">
                     Prioridad <span className="text-destructive">*</span>
                   </label>
                   <Select
-                    value={formData?.priority}
-                    onChange={(value) => handleInputChange('priority', value)}
+                    value={formData?.prioridad}
+                    onChange={(value) => handleInputChange('prioridad', value)}
                     options={[
-                      { value: 'urgent', label: 'Urgente' },
-                      { value: 'high', label: 'Alta' },
-                      { value: 'medium', label: 'Media' },
-                      { value: 'low', label: 'Baja' }
+                      { value: 'urgente', label: 'Urgente' },
+                      { value: 'alta', label: 'Alta' },
+                      { value: 'media', label: 'Media' },
+                      { value: 'baja', label: 'Baja' }
                     ]}
                   />
                 </div>
@@ -284,13 +354,13 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
                     Tipo de Proyecto <span className="text-destructive">*</span>
                   </label>
                   <Select
-                    value={formData?.projectType}
-                    onChange={(value) => handleInputChange('projectType', value)}
+                    value={formData?.tipoProyecto}
+                    onChange={(value) => handleInputChange('tipoProyecto', value)}
                     options={[
                       { value: 'hvac', label: 'Sistema HVAC' },
-                      { value: 'installation', label: 'Instalación' },
-                      { value: 'maintenance', label: 'Mantenimiento' },
-                      { value: 'modernization', label: 'Modernización' }
+                      { value: 'instalacion', label: 'Instalación' },
+                      { value: 'mantenimiento', label: 'Mantenimiento' },
+                      { value: 'modernizacion', label: 'Modernización' }
                     ]}
                   />
                 </div>
@@ -307,18 +377,18 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
                 <Input
                   label="Persona de Contacto"
                   required
-                  value={formData?.contactPerson}
-                  onChange={(e) => handleInputChange('contactPerson', e?.target?.value)}
-                  error={errors?.contactPerson}
+                  value={formData?.personaContacto}
+                  onChange={(e) => handleInputChange('personaContacto', e?.target?.value)}
+                  error={errors?.personaContacto}
                   placeholder="Ej. Ing. Carlos Rodriguez"
                 />
 
                 <Input
                   label="Teléfono"
                   required
-                  value={formData?.phone}
-                  onChange={(e) => handleInputChange('phone', e?.target?.value)}
-                  error={errors?.phone}
+                  value={formData?.telefono}
+                  onChange={(e) => handleInputChange('telefono', e?.target?.value)}
+                  error={errors?.telefono}
                   placeholder="+52 55 1234 5678"
                 />
 
@@ -349,8 +419,8 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
                   </label>
                   <textarea
                     className="mt-2 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[100px]"
-                    value={formData?.projectDescription}
-                    onChange={(e) => handleInputChange('projectDescription', e?.target?.value)}
+                    value={formData?.descripcionProyecto}
+                    onChange={(e) => handleInputChange('descripcionProyecto', e?.target?.value)}
                     placeholder="Describe el alcance y especificaciones del proyecto..."
                   />
                   {errors?.projectDescription && (
@@ -362,20 +432,20 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
                   <Input
                     label="Ubicación del Proyecto"
                     required
-                    value={formData?.location}
-                    onChange={(e) => handleInputChange('location', e?.target?.value)}
-                    error={errors?.location}
+                    value={formData?.ubicacion}
+                    onChange={(e) => handleInputChange('ubicacion', e?.target?.value)}
+                    error={errors?.ubicacion}
                     placeholder="Ciudad, Estado"
                   />
 
                   <Input
                     label="Presupuesto Estimado (MXN)"
-                    type="number"
+                    type="text"
                     required
-                    value={formData?.estimatedBudget}
-                    onChange={(e) => handleInputChange('estimatedBudget', e?.target?.value)}
-                    error={errors?.estimatedBudget}
-                    placeholder="0"
+                    value={formatearNumero(formData?.montoTotal)}
+                    onChange={(e) => handleInputChange('montoTotal', e?.target?.value)}
+                    error={errors?.montoTotal}
+                    placeholder="$0.00 MXN"
                     min="0"
                     step="0.01"
                   />
@@ -384,9 +454,9 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
                 <Input
                   label="Tiempo de Ejecución"
                   required
-                  value={formData?.timeline}
-                  onChange={(e) => handleInputChange('timeline', e?.target?.value)}
-                  error={errors?.timeline}
+                  value={formData?.cronograma}
+                  onChange={(e) => handleInputChange('cronograma', e?.target?.value)}
+                  error={errors?.cronograma}
                   placeholder="Ej. 16 semanas, 3 meses"
                 />
               </div>
@@ -404,9 +474,11 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
                     Responsable <span className="text-destructive">*</span>
                   </label>
                   <Select
-                    value={formData?.assignedTo}
-                    onChange={(value) => handleInputChange('assignedTo', value)}
-                    options={assignedToOptions?.map(person => ({ value: person, label: person }))}
+                    value={formData?.personalAsignadoId}
+                    onChange={(value) => handleInputChange('asignadoA', value)}
+                    options={assignedToOptions}
+                    isLoading={loadingEmployees}
+                    placeholder={loadingEmployees ? 'Cargando empleados...' : 'Selecciona un responsable'}
                   />
                 </div>
 
@@ -414,8 +486,8 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
                   <label className="text-sm font-medium text-foreground">Notas Adicionales</label>
                   <textarea
                     className="mt-2 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[80px]"
-                    value={formData?.notes}
-                    onChange={(e) => handleInputChange('notes', e?.target?.value)}
+                    value={formData?.notas}
+                    onChange={(e) => handleInputChange('notas', e?.target?.value)}
                     placeholder="Información adicional relevante para la cotización..."
                   />
                 </div>

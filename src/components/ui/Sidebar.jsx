@@ -4,9 +4,10 @@ import Icon from '../AppIcon';
 import Button from './Button';
 import Input from './Input';
 import AppImage from '../AppImage';
-import { getAllowedNavigationItems, logout } from '../../utils/auth';
+import { getAllowedNavigationItems } from '../../utils/auth';
 import useAuth from '../../hooks/useAuth';
 import { useNotifications } from '../../context/NotificationContext';
+import { useConfirmDialog } from '../../ui/ConfirmDialogContext';
 
 const Sidebar = ({ isCollapsed = false, onToggle }) => {
   const location = useLocation();
@@ -15,7 +16,7 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
   const [searchResults, setSearchResults] = useState([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [navigationItems, setNavigationItems] = useState([]);
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const { showSuccess } = useNotifications();
 
   useEffect(() => {
@@ -65,8 +66,15 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
     navigate(path);
   };
 
-  const handleLogout = () => {
-    if (window.confirm('¿Está seguro que desea cerrar sesión?')) {
+  const { showConfirm } = useConfirmDialog();
+  const handleLogout = async () => {
+    const confirmed = await showConfirm({
+      title: 'Cerrar sesión',
+      message: '¿Deseas cerrar sesión?',
+      confirmText: 'Sí',
+      cancelText: 'No'
+    });
+    if (confirmed) {
       showSuccess('Sesión cerrada correctamente');
       setTimeout(() => {
         logout();
