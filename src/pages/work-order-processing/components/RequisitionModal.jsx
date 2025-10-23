@@ -203,64 +203,60 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
         </div>
 
         <div className="p-6 space-y-6">
-          {/* Información básica */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Número de Orden de Trabajo"
-              placeholder="OT-2025-XXX"
-              value={formData?.orderNumber}
-              onChange={(e) =>
-                handleInputChange("orderNumber", e?.target?.value)
-              }
-            />
+  {/* Información básica */}
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <Select
+      label="Número de Orden de Trabajo"
+      options={[
+        { label: "OT-2025-001", value: "OT-2025-001" },
+        { label: "OT-2025-002", value: "OT-2025-002" },
+        { label: "OT-2025-003", value: "OT-2025-003" },
+      ]}
+      value={formData?.orderNumber}
+      onChange={(value) => handleInputChange("orderNumber", value)}
+      required
+    />
 
-            <Input
-              label="Nombre del Proyecto"
-              placeholder="Nombre del proyecto"
-              value={formData?.projectName}
-              onChange={(e) =>
-                handleInputChange("projectName", e?.target?.value)
-              }
-              required
-            />
+    <Input
+      label="Nombre del Proyecto"
+      placeholder="Nombre del proyecto"
+      value={formData?.projectName}
+      onChange={(e) => handleInputChange("projectName", e?.target?.value)}
+      required
+    />
 
-            <Input
-              label="Solicitado por"
-              value={formData?.requestedBy}
-              onChange={(e) =>
-                handleInputChange("requestedBy", e?.target?.value)
-              }
-              required
-            />
+    <Input
+      label="Solicitado por"
+      value={formData?.requestedBy}
+      onChange={(e) => handleInputChange("requestedBy", e?.target?.value)}
+      required
+    />
 
-            <Input
-              label="Fecha de Solicitud"
-              type="date"
-              value={formData?.requestDate}
-              onChange={(e) =>
-                handleInputChange("requestDate", e?.target?.value)
-              }
-              required
-            />
+    <Input
+      label="Fecha de Solicitud"
+      type="date"
+      value={formData?.requestDate}
+      onChange={(e) => handleInputChange("requestDate", e?.target?.value)}
+      required
+    />
 
-            <Select
-              label="Prioridad"
-              options={priorityOptions}
-              value={formData?.priority}
-              onChange={(value) => handleInputChange("priority", value)}
-              required
-            />
+    <Select
+      label="Prioridad"
+      options={priorityOptions}
+      value={formData?.priority}
+      onChange={(value) => handleInputChange("priority", value)}
+      required
+    />
 
-            <Select
-              label="Estado"
-              options={statusOptions}
-              value={formData?.status}
-              onChange={(value) => handleInputChange("status", value)}
-              required
-            />
-          </div>
-
-          {/* Descripción */}
+    <Select
+      label="Estado"
+      options={statusOptions}
+      value={formData?.status}
+      onChange={(value) => handleInputChange("status", value)}
+      required
+    />
+  </div>
+      {/* Descripción */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
               Descripción de la Solicitud

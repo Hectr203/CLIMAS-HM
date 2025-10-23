@@ -2,12 +2,21 @@ import React, { useState, useEffect, useMemo } from "react";
 import Icon from "../../../components/AppIcon";
 import Button from "../../../components/ui/Button";
 import useOperac from "../../../hooks/useOperac";
-import useClient from "../../../hooks/useClient"; // 👈 agregado para traer los clientes
+import useClient from "../../../hooks/useClient";
 import WorkOrderModal from "../components/WorkOrderModal";
 
-const WorkOrderTable = ({ workOrders, onStatusUpdate, onAssignTechnician, onViewDetails, onEditOrder, loading, error }) => {
+const WorkOrderTable = ({
+  workOrders,
+  onStatusUpdate,
+  onAssignTechnician,
+  onViewDetails,
+  onEditOrder,
+  loading,
+  error,
+}) => {
   const { oportunities, getOportunities } = useOperac();
-  const { clients, getClients, loading: loadingClients } = useClient(); // 👈 agregado
+  const { clients, getClients, loading: loadingClients } = useClient();
+
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [sortConfig, setSortConfig] = useState({ key: "prioridad", direction: "asc" });
   const [currentPage, setCurrentPage] = useState(1);
@@ -19,22 +28,14 @@ const WorkOrderTable = ({ workOrders, onStatusUpdate, onAssignTechnician, onView
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
-    // Si no se pasaron datos desde arriba, los carga con el hook
-    if (!workOrders?.length) {
-      getOportunities();
-    }
-    getClients(); // 👈 obtener lista de clientes al montar
+    if (!workOrders?.length) getOportunities();
+    getClients();
   }, []);
 
-  // 🔹 Usar las órdenes filtradas si existen, o las del hook si no
-  const dataSource = useMemo(() => workOrders?.length ? workOrders : (oportunities || []), [workOrders, oportunities]);
-
-  // 🔹 Obtener nombre del cliente por ID
-  const getClientName = (clientId) => {
-    if (!clientId) return "—";
-    const client = clients?.find((c) => c.id === clientId || c._id === clientId);
-    return client ? client.companyName || client.empresa || client.nombre : "Sin cliente";
-  };
+  const dataSource = useMemo(
+    () => (workOrders?.length ? workOrders : oportunities || []),
+    [workOrders, oportunities]
+  );
 
   const sortedOrders = useMemo(() => {
     const sorted = [...dataSource];
@@ -73,7 +74,6 @@ const WorkOrderTable = ({ workOrders, onStatusUpdate, onAssignTechnician, onView
     setExpandedRows(newExpanded);
   };
 
-  // Modal handlers
   const handleView = (order) => {
     setSelectedOrder(order);
     setModalMode("view");
@@ -93,22 +93,33 @@ const WorkOrderTable = ({ workOrders, onStatusUpdate, onAssignTechnician, onView
 
   const getPriorityColor = (priority) => {
     switch (priority) {
-      case "Crítica": return "bg-red-100 text-red-800";
-      case "Alta": return "bg-orange-100 text-orange-800";
-      case "Media": return "bg-yellow-100 text-yellow-800";
-      case "Baja": return "bg-green-100 text-green-800";
-      default: return "bg-gray-100 text-gray-800";
+      case "Crítica":
+        return "bg-red-100 text-red-800";
+      case "Alta":
+        return "bg-orange-100 text-orange-800";
+      case "Media":
+        return "bg-yellow-100 text-yellow-800";
+      case "Baja":
+        return "bg-green-100 text-green-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
   const getStatusColor = (status) => {
     switch (status) {
-      case "Pendiente": return "bg-yellow-100 text-yellow-800";
-      case "En Progreso": return "bg-blue-100 text-blue-800";
-      case "Completada": return "bg-green-100 text-green-800";
-      case "En Pausa": return "bg-orange-100 text-orange-800";
-      case "Cancelada": return "bg-red-100 text-red-800";
-      default: return "bg-gray-100 text-gray-800";
+      case "Pendiente":
+        return "bg-yellow-100 text-yellow-800";
+      case "En Progreso":
+        return "bg-blue-100 text-blue-800";
+      case "Completada":
+        return "bg-green-100 text-green-800";
+      case "En Pausa":
+        return "bg-orange-100 text-orange-800";
+      case "Cancelada":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
@@ -162,131 +173,155 @@ const WorkOrderTable = ({ workOrders, onStatusUpdate, onAssignTechnician, onView
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-muted">
-            <tr>
-              <SortableHeader label="Técnico Asignado" sortKey="tecnicoAsignado" />
-              <SortableHeader label="Prioridad" sortKey="prioridad" />
-              <SortableHeader label="Estado" sortKey="estado" />
-              <SortableHeader label="Fecha Límite" sortKey="fechaLimite" />
-              <SortableHeader label="Cliente" sortKey="cliente" />
-              <SortableHeader label="Tipo Proyecto" sortKey="tipo" />
-              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Notas
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Acciones
-              </th>
-            </tr>
-          </thead>
+  <tr>
+    <SortableHeader label="Orden de Trabajo" sortKey="ordenTrabajo" /> {/* 👈 flechita aquí */}
+    <SortableHeader label="Técnico Asignado" sortKey="tecnicoAsignado" />
+    <SortableHeader label="Prioridad" sortKey="prioridad" />
+    <SortableHeader label="Estado" sortKey="estado" />
+    <SortableHeader label="Fecha Límite" sortKey="fechaLimite" />
+    <SortableHeader label="Cliente" sortKey="cliente" />
+    <SortableHeader label="Tipo Proyecto" sortKey="tipo" />
+    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+      Notas
+    </th>
+    <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+      Acciones
+    </th>
+  </tr>
+</thead>
 
-          <tbody className="bg-card divide-y divide-border">
-            {paginatedData.map((order) => (
-              <React.Fragment key={order.id}>
-                <tr className="hover:bg-muted/50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <div className="flex items-center space-x-3">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => toggleRowExpansion(order.id)}
-                        className="w-6 h-6"
-                      >
-                        <Icon
-                          name={expandedRows.has(order.id) ? "ChevronDown" : "ChevronRight"}
-                          size={16}
-                        />
-                      </Button>
-                      <div>{order.tecnicoAsignado}</div>
-                    </div>
-                  </td>
-                  
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(order.prioridad)}`}>
-                      {order.prioridad}
-                    </span>
-                  </td>
+<tbody className="bg-card divide-y divide-border">
+  {paginatedData.map((order) => (
+    <React.Fragment key={order.id}>
+      <tr className="hover:bg-muted/50 transition-colors">
+        {/* 🔹 Orden de trabajo con flechita aquí */}
+        <td className="px-6 py-4 whitespace-nowrap text-sm">
+          <div className="flex items-center space-x-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => toggleRowExpansion(order.id)}
+              className="w-6 h-6"
+            >
+              <Icon
+                name={expandedRows.has(order.id) ? "ChevronDown" : "ChevronRight"}
+                size={16}
+              />
+            </Button>
+            <div>{order.ordenTrabajo || "—"}</div>
+          </div>
+        </td>
 
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(order.estado)}`}>
-                      {order.estado}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">{order.fechaLimite}</td>
-                  
-                  {/* 👇 Mostrar nombre del cliente correctamente */}
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {getClientName(order.cliente)}
-                  </td>
-                  
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">{order.tipo || "—"}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
-                    {order.notasAdicionales || "-"}
-                  </td>
+        {/* 🔹 Técnico asignado */}
+        <td className="px-6 py-4 whitespace-nowrap text-sm">
+          {order.tecnicoAsignado?.nombre || "Sin técnico"}
+        </td>
 
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center justify-end space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        iconName="Eye"
-                        iconSize={16}
-                        onClick={() => handleView(order)}
-                      >
-                        Ver
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        iconName="Edit"
-                        iconSize={16}
-                        onClick={() => handleEdit(order)}
-                      >
-                        Editar
-                      </Button>
-                       <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onAssignTechnician(order)}
-                        iconName="UserPlus"
-                        iconSize={16}
-                      >
-                        Asignar
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
+        {/* 🔹 Prioridad */}
+        <td className="px-6 py-4 whitespace-nowrap">
+          <span
+            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(order.prioridad)}`}
+          >
+            {order.prioridad}
+          </span>
+        </td>
 
-                {expandedRows.has(order.id) && (
-                  <tr>
-                    <td colSpan="8" className="px-6 py-4 bg-muted/30">
-                      <div className="space-y-3">
-                        <h4 className="text-sm font-medium text-foreground">Equipo de Protección Personal</h4>
-                        <ul className="text-sm text-muted-foreground grid grid-cols-2 md:grid-cols-3 gap-2">
-                          {[
-                            { key: "cascoSeguridad", label: "Casco de Seguridad" },
-                            { key: "gafasProteccion", label: "Gafas de Protección" },
-                            { key: "guantesTrabajo", label: "Guantes de Trabajo" },
-                            { key: "calzadoSeguridad", label: "Calzado de Seguridad" },
-                            { key: "arnesSeguridad", label: "Arnés de Seguridad" },
-                            { key: "respiradorN95", label: "Respirador N95" },
-                            { key: "chalecoReflectivo", label: "Chaleco Reflectivo" },
-                          ].map(({ key, label }) => (
-                            <li key={key} className="flex items-center space-x-2">
-                              <Icon name={order[key] ? "CheckCircle" : "XCircle"} size={14} />
-                              <span>{label}</span>
-                            </li>
-                          ))}
-                        </ul>
-                        <p className="text-sm text-muted-foreground">
-                          <strong>Requiere estudios médicos actualizados:</strong>{" "}
-                          {order.requiereEstudiosMedicosActualizados ? "Sí" : "No"}
-                        </p>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </React.Fragment>
-            ))}
-          </tbody>
+        {/* 🔹 Estado */}
+        <td className="px-6 py-4 whitespace-nowrap">
+          <span
+            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(order.estado)}`}
+          >
+            {order.estado}
+          </span>
+        </td>
+
+        {/* 🔹 Fecha Límite */}
+        <td className="px-6 py-4 whitespace-nowrap text-sm">
+          {order.fechaLimite}
+        </td>
+
+        {/* 🔹 Cliente */}
+        <td className="px-6 py-4 whitespace-nowrap text-sm">
+          {order.cliente?.nombre || order.cliente?.empresa || "Sin cliente"}
+        </td>
+
+        {/* 🔹 Tipo Proyecto */}
+        <td className="px-6 py-4 whitespace-nowrap text-sm">
+          {order.tipo || "—"}
+        </td>
+
+        {/* 🔹 Notas */}
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+          {order.notasAdicionales || "-"}
+        </td>
+
+        {/* 🔹 Acciones */}
+        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+          <div className="flex items-center justify-end space-x-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              iconName="Eye"
+              iconSize={16}
+              onClick={() => handleView(order)}
+            >
+              Ver
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              iconName="Edit"
+              iconSize={16}
+              onClick={() => handleEdit(order)}
+            >
+              Editar
+            </Button>
+          </div>
+        </td>
+      </tr>
+
+      {/* 🔹 Fila expandida con descripción y EPP */}
+      {expandedRows.has(order.id) && (
+        <tr>
+          <td colSpan="9" className="px-6 py-4 bg-muted/30">
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium text-foreground">Descripción del Trabajo</h4>
+              <p className="text-sm text-muted-foreground">
+                {order.descripcion || "Sin descripción"}
+              </p>
+
+              <h4 className="text-sm font-medium text-foreground">
+                Equipo de Protección Personal
+              </h4>
+              <ul className="text-sm text-muted-foreground grid grid-cols-2 md:grid-cols-3 gap-2">
+                {[
+                  { key: "cascoSeguridad", label: "Casco de Seguridad" },
+                  { key: "gafasProteccion", label: "Gafas de Protección" },
+                  { key: "guantesTrabajo", label: "Guantes de Trabajo" },
+                  { key: "calzadoSeguridad", label: "Calzado de Seguridad" },
+                  { key: "arnesSeguridad", label: "Arnés de Seguridad" },
+                  { key: "respiradorN95", label: "Respirador N95" },
+                  { key: "chalecoReflectivo", label: "Chaleco Reflectivo" },
+                ].map(({ key, label }) => (
+                  <li key={key} className="flex items-center space-x-2">
+                    <Icon name={order[key] ? "CheckCircle" : "XCircle"} size={14} />
+                    <span>{label}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <p className="text-sm text-muted-foreground">
+                <strong>Requiere estudios médicos actualizados:</strong>{" "}
+                {order.requiereEstudiosMedicosActualizados ? "Sí" : "No"}
+              </p>
+            </div>
+          </td>
+        </tr>
+      )}
+    </React.Fragment>
+  ))}
+</tbody>
+
         </table>
 
         {/* Modal */}
@@ -297,14 +332,11 @@ const WorkOrderTable = ({ workOrders, onStatusUpdate, onAssignTechnician, onView
             workOrder={selectedOrder}
             mode={modalMode}
             onSaveSuccess={(updatedOrder) => {
-              if (onEditOrder) {
-                onEditOrder(updatedOrder);
-              }
+              if (onEditOrder) onEditOrder(updatedOrder);
               handleCloseModal();
             }}
           />
         )}
-
       </div>
 
       {/* Paginación */}

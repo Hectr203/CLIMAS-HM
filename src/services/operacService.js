@@ -1,7 +1,7 @@
 import httpService from "./httpService";
 
 const operacService = {
-  // ✅ Ahora acepta filtros dinámicos
+  //  Ahora acepta filtros dinámicos
   async getWorkOrders(filters = {}) {
     try {
       const query = new URLSearchParams(filters).toString();
