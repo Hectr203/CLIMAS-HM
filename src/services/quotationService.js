@@ -22,6 +22,15 @@ const quotationService = {
     }
   },
 
+    async crearConstructor(data) {
+      try {
+        const response = await httpService.post('cotizaciones/constructor/crear', data);
+        return response;
+      } catch (error) {
+        console.error('Error creando constructor:', error);
+        throw error;
+      }
+    },
     async getCotizacionById(id) {
       try {
         const response = await httpService.get(`cotizacion/${id}`);

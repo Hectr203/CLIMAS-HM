@@ -67,12 +67,26 @@ const useQuotation = () => {
         setLoading(false);
       }
     };
+  const crearConstructor = async (data) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await quotationService.crearConstructor(data);
+      return response;
+    } catch (err) {
+      setError(err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return {
       createQuotation,
       getCotizaciones,
       getCotizacionById,
       editCotizacion,
+     crearConstructor,
       loading,
       error,
   };

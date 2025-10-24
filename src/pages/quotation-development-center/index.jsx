@@ -33,7 +33,8 @@ const QuotationDevelopmentCenter = () => {
         console.log('Cotizaciones obtenidas:', cotizaciones);
         // Mapeo adaptado a la estructura real del backend
         const mapped = cotizaciones.map(cotizacion => ({
-          id: cotizacion.folio || cotizacion.id || '',
+          id: cotizacion.id || '', // id de Cosmos
+          folio: cotizacion.folio || '', // folio
           clientName: cotizacion.informacion_basica?.cliente?.find?.(c => c?.nombre_cliente)?.nombre_cliente || '',
           projectName: cotizacion.informacion_basica?.proyecto?.find?.(p => p?.nombre_proyecto)?.nombre_proyecto || '',
           status: 'development',
@@ -89,7 +90,8 @@ const QuotationDevelopmentCenter = () => {
       } else {
         const quotationDetail = await getCotizacionById(quotation.id);
         const mappedQuotation = {
-          id: quotationDetail.folio || quotationDetail.id || '',
+          id: quotationDetail.id || '', // id de Cosmos
+          folio: quotationDetail.folio || '', // folio
           clientName: quotationDetail.informacion_basica?.cliente?.find?.(c => c?.nombre_cliente)?.nombre_cliente || '',
           projectName: quotationDetail.informacion_basica?.proyecto?.find?.(p => p?.nombre_proyecto)?.nombre_proyecto || '',
           status: 'development',
@@ -274,11 +276,13 @@ const QuotationDevelopmentCenter = () => {
                           </span>
                         </div>
                         <p className="text-xs text-muted-foreground mb-2">{quotation?.clientName || 'Sin cliente'}</p>
-                        <p className="text-xs text-muted-foreground mb-2">{quotation?.id}</p>
                         <div className="flex items-center space-x-2 mb-2">
                           <Icon name="User" size={12} className="text-muted-foreground" />
                           <span className="text-xs text-muted-foreground">{quotation?.assignedTo || 'Sin responsable'}</span>
                         </div>
+                          {/* Solo mostrar el folio, nunca el id de Cosmos */}
+                        <p className="text-xs text-muted-foreground mb-2">{quotation?.folio || 'Sin folio'}</p>
+                        {/* El id de Cosmos no se muestra */}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-1">
                             <Icon name="Calendar" size={12} className="text-muted-foreground" />

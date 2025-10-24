@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
+import useQuotation from '../../../hooks/useQuotation';
         import Icon from '../../../components/AppIcon';
         import Button from '../../../components/ui/Button';
         import Input from '../../../components/ui/Input';
 
         const QuotationBuilder = ({ quotation, onUpdate, onAddRevision }) => {
-          const [formData, setFormData] = useState(quotation?.quotationData || {
-            scope: '',
-            assumptions: [],
-            timeline: '',
-            conditions: '',
-            warranty: '',
-            totalAmount: 0,
-            validity: '30 días'
+          const { crearConstructor } = useQuotation();
+          const [formData, setFormData] = useState({
+            scope: quotation?.quotationData?.scope || '',
+            assumptions: quotation?.quotationData?.assumptions || [],
+            timeline: quotation?.quotationData?.timeline || '',
+            conditions: quotation?.quotationData?.conditions || '',
+            warranty: quotation?.quotationData?.warranty || '',
+            totalAmount: quotation?.quotationData?.totalAmount || 0,
+            validity: quotation?.quotationData?.validity || '30 días'
           });
 
           const [newAssumption, setNewAssumption] = useState('');
@@ -36,8 +38,28 @@ import React, { useState } from 'react';
             setHasChanges(true);
           };
 
-          const handleSave = () => {
+          const handleSave = async () => {
             onUpdate?.({ quotationData: formData });
+            // Guardar en el backend usando el endpoint constructor/crear
+            const payload = {
+              Constructor: {
+                cotizacionId: quotation?.id, // id de Cosmos
+                Folio: quotation?.folio || quotation?.id, // folio
+                alcance: formData?.scope,
+                condiciones_pago: formData?.conditions,
+                supuestos: formData?.assumptions,
+                garantia: formData?.warranty,
+                monto_total: formData?.totalAmount,
+                tiempo_ejecucion: formData?.timeline,
+                vigencia: formData?.validity
+              }
+            };
+            try {
+              await crearConstructor(payload);
+              alert('Constructor guardado exitosamente');
+            } catch (err) {
+              alert('Error al guardar el constructor');
+            }
             setHasChanges(false);
           };
 
@@ -50,12 +72,35 @@ import React, { useState } from 'react';
             setHasChanges(false);
           };
 
+          const handleSaveConstructor = async () => {
+            const payload = {
+              Constructor: {
+                cotizacionId: quotation?.id,
+                Folio: quotation?.id,
+                alcance: formData?.scope,
+                condiciones_pago: formData?.conditions,
+                supuestos: formData?.assumptions,
+                garantia: formData?.warranty,
+                monto_total: formData?.totalAmount,
+                tiempo_ejecucion: formData?.timeline,
+                vigencia: formData?.validity
+              }
+            };
+            try {
+              const res = await crearConstructor(payload);
+              console.log('Constructor guardado:', res);
+              alert('Constructor guardado exitosamente');
+            } catch (err) {
+              alert('Error al guardar el constructor');
+            }
+          };
+
           return (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-xl font-semibold">{quotation?.projectName}</h3>
-                  <p className="text-muted-foreground">{quotation?.clientName} - {quotation?.id}</p>
+                  <p className="text-muted-foreground">{quotation?.clientName} - {quotation?.folio}</p>
                 </div>
                 <div className="flex items-center space-x-2">
                   {hasChanges && (
@@ -63,15 +108,16 @@ import React, { useState } from 'react';
                       Cambios sin guardar
                     </span>
                   )}
-                  <Button
-                    variant="outline"
-                    onClick={handleSave}
+                  {/* Botón gris superior para guardar */}
+                  <button
+                    className="text-muted-foreground flex items-center space-x-1"
+                    style={{ background: 'none', border: 'none', cursor: hasChanges ? 'pointer' : 'not-allowed', fontSize: '16px', padding: 0 }}
+                    onClick={hasChanges ? handleSave : undefined}
                     disabled={!hasChanges}
-                    iconName="Save"
-                    iconPosition="left"
                   >
-                    Guardar
-                  </Button>
+                    <Icon name="Save" size={20} />
+                    <span>Guardar</span>
+                  </button>
                 </div>
               </div>
 
@@ -250,6 +296,7 @@ import React, { useState } from 'react';
                   >
                     Enviar a Revisión
                   </Button>
+                  {/* Eliminar el botón azul de Guardar aquí */}
                 </div>
               </div>
             </div>
