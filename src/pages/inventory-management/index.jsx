@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import OrderDetailsModal from './components/OrderDetailsModal';
 import Header from '../../components/ui/Header';
 import Sidebar from '../../components/ui/Sidebar';
 import Breadcrumb from '../../components/ui/Breadcrumb';
+import ordenCompraService from '../../services/ordenCompraService';
 import InventoryTable from './components/InventoryTable';
 import InventoryFilters from './components/InventoryFilters';
 import StockAlerts from './components/StockAlerts';
@@ -9,17 +11,38 @@ import PurchaseOrderPanel from './components/PurchaseOrderPanel';
 import MaterialRequirements from './components/MaterialRequirements';
 import InventoryStats from './components/InventoryStats';
 import NewItemModal from './components/NewItemModal';
+import ItemDetailsModal from './components/ItemDetailsModal';
+import EditItemModal from './components/EditItemModal';
+import CreatePOModal from './components/CreatePOModal';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
 import useInventory from '../../hooks/useInventory';
 
+import useOrder from '../../hooks/useOrder';
+
 const InventoryManagement = () => {
-  const { articulos, getArticulos, loading, error } = useInventory();
+  const { articulos, getArticulos, loading: inventoryLoading, error: inventoryError } = useInventory();
+  const { 
+    ordenes, 
+    loading: orderLoading, 
+    error: orderError,
+    createOrden,
+    getOrdenes,
+    updateOrden 
+  } = useOrder();
   
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeView, setActiveView] = useState('overview');
   const [showNewItemModal, setShowNewItemModal] = useState(false);
+  const [showItemDetailsModal, setShowItemDetailsModal] = useState(false);
+  const [showEditItemModal, setShowEditItemModal] = useState(false);
+  const [showCreatePOModal, setShowCreatePOModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const loading = inventoryLoading || orderLoading;
+  const error = inventoryError || orderError;
   const [filters, setFilters] = useState({
     search: '',
     category: '',
@@ -89,8 +112,14 @@ const InventoryManagement = () => {
       });
   }, [inventoryItems]);
 
-  // Purchase orders - to be implemented with backend
-  const purchaseOrders = [];
+  // Artículos con stock bajo para órdenes de compra
+  const lowStockItems = React.useMemo(() => {
+    return inventoryItems.filter(item => {
+      const currentStock = item.currentStock || 0;
+      const reorderPoint = item.reorderPoint || 0;
+      return currentStock === 0 || currentStock <= reorderPoint;
+    });
+  }, [inventoryItems]);
 
   // Material requirements - to be implemented with backend
   const materialRequirements = [];
@@ -178,14 +207,80 @@ const InventoryManagement = () => {
 
   const handleViewDetails = (item) => {
     console.log('View item details:', item);
+    setSelectedItem(item);
+    setShowItemDetailsModal(true);
   };
 
   const handleUpdateStock = (item) => {
     console.log('Update stock for:', item);
+    setSelectedItem(item);
+    setShowEditItemModal(true);
   };
 
   const handleCreatePO = (item) => {
-    console.log('Create purchase order for:', item);
+    // Si recibimos un objeto de alerta, necesitamos encontrar el artículo real de inventario
+    if (item.type && (item.type === 'out-of-stock' || item.type === 'low-stock')) {
+      // Buscar el artículo correspondiente por itemCode en el inventario
+      const inventoryItem = inventoryItems.find(invItem => invItem.itemCode === item.itemCode);
+      if (inventoryItem) {
+        setSelectedItem(inventoryItem);
+      } else {
+        setSelectedItem(item); // Fallback si no se encuentra
+      }
+    } else {
+      // Es un ítem directo del inventario
+      setSelectedItem(item);
+    }
+    setShowCreatePOModal(true);
+  };
+
+  // Handlers para cerrar modales
+  const handleCloseItemDetailsModal = () => {
+    setShowItemDetailsModal(false);
+    setSelectedItem(null);
+  };
+
+  const handleCloseEditItemModal = () => {
+    setShowEditItemModal(false);
+    setSelectedItem(null);
+  };
+
+  const handleClosePOModal = () => {
+    setShowCreatePOModal(false);
+    setSelectedItem(null);
+    // No necesitamos resetear el estado del modal aquí,
+    // ya que useEffect en el modal se encarga de eso cuando cambia initialItem
+  };
+
+  const handleSubmitPO = async (orderData) => {
+    try {
+      // Crear la orden en el backend
+      await createOrden({
+        ...orderData,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        estado: 'pending'  // Cambiado de status a estado para coincidir con el backend
+      });
+
+      // Recargar las órdenes para obtener la lista actualizada
+      await getOrdenes();
+      
+      // Cerrar el modal y cambiar a la vista de órdenes
+      setShowCreatePOModal(false);
+      setSelectedItem(null);
+      setActiveView('orders');
+    } catch (error) {
+      console.error('Error al crear la orden de compra:', error);
+    }
+  };
+
+  // Handler para actualización exitosa
+  const handleUpdateSuccess = async () => {
+    try {
+      await getArticulos(); // Recargar la lista de artículos
+    } catch (error) {
+      console.error('Error recargando artículos después de actualizar:', error);
+    }
   };
 
   const handleApproveRequirement = (requirement) => {
@@ -201,15 +296,80 @@ const InventoryManagement = () => {
   };
 
   const handleViewOrder = (order) => {
-    console.log('View order:', order);
+    setSelectedOrder(order);
+    setShowOrderDetailsModal(true);
   };
 
-  const handleApproveOrder = (order) => {
-    console.log('Approve order:', order);
+  const handleCloseOrderDetails = () => {
+    setShowOrderDetailsModal(false);
+    setSelectedOrder(null);
+  };
+
+  const handleDownloadOrder = async (order) => {
+    try {
+      // Crear el contenido del PDF-like
+      const content = `
+ORDEN DE COMPRA ${order.numeroOrden}
+=============================
+Fecha: ${new Date(order.fechaCreacion).toLocaleDateString()}
+Proveedor: ${order.proveedor.nombre}
+Estado: ${order.estado}
+${order.esUrgente ? 'URGENTE\n' : ''}
+
+ARTÍCULOS:
+${order.articulos.map(item => `
+${item.codigoArticulo} - ${item.descripcion}
+Cantidad: ${item.cantidadOrdenada} ${item.unidad}
+Precio unitario: ${item.costoUnitario.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}
+Subtotal: ${item.subtotal.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}
+`).join('\n')}
+
+TOTAL: ${order.totalOrden.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}
+
+Notas:
+${order.notas || 'Sin notas adicionales'}
+`;
+
+      // Crear y descargar el archivo
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `orden-compra-${order.numeroOrden}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error al descargar la orden:', error);
+    }
+  };
+
+  const handleDeleteOrder = async (order) => {
+    try {
+      await ordenCompraService.deleteOrden(order.id);
+      await getOrdenes(); // Recargar la lista
+    } catch (error) {
+      console.error('Error al eliminar la orden:', error);
+    }
+  };
+
+  const handleApproveOrder = async (order) => {
+    try {
+      await updateOrden(order.id, {
+        ...order,
+        status: 'approved',
+        updatedAt: new Date().toISOString()
+      });
+      await getOrdenes(); // Recargar la lista de órdenes
+    } catch (error) {
+      console.error('Error al aprobar la orden:', error);
+    }
   };
 
   const handleCreateOrder = () => {
-    console.log('Create new purchase order');
+    setSelectedItem(null);
+    setShowCreatePOModal(true);
   };
 
   const handleExport = async () => {
@@ -322,7 +482,8 @@ const InventoryManagement = () => {
   // Cargar artículos al montar el componente
   useEffect(() => {
     getArticulos();
-  }, [getArticulos]);
+    getOrdenes();
+  }, [getArticulos, getOrdenes]);
 
   useEffect(() => {
     document.title = 'Gestión de Inventario - AireFlow Pro';
@@ -345,50 +506,54 @@ const InventoryManagement = () => {
           <Breadcrumb />
           
           {/* Page Header */}
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground mb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 sm:mb-8 space-y-4 sm:space-y-0">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
                 Gestión de Inventario
               </h1>
-              <p className="text-muted-foreground">
+              <p className="text-sm sm:text-base text-muted-foreground">
                 Control integral de partes, materiales y recursos para proyectos de Aire Acondicionado
               </p>
             </div>
             
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
               <Button
                 variant="outline"
                 onClick={handleImportInventory}
                 iconName="Upload"
                 iconSize={16}
+                className="text-sm"
               >
-                Importar
+                <span className="hidden sm:inline">Importar</span>
+                <span className="sm:hidden">Import</span>
               </Button>
               <Button
                 variant="default"
                 onClick={handleOpenNewItemModal}
                 iconName="Plus"
                 iconSize={16}
+                className="text-sm"
               >
-                Nuevo Artículo
+                <span className="hidden sm:inline">Nuevo Artículo</span>
+                <span className="sm:hidden">Nuevo</span>
               </Button>
             </div>
           </div>
 
           {/* View Tabs */}
-          <div className="flex space-x-1 mb-6 bg-muted p-1 rounded-lg w-fit">
+          <div className="flex flex-wrap space-x-1 mb-4 sm:mb-6 bg-muted p-1 rounded-lg w-fit max-w-full overflow-x-auto">
             {viewTabs?.map((tab) => (
               <button
                 key={tab?.id}
                 onClick={() => setActiveView(tab?.id)}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-smooth ${
+                className={`flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-smooth whitespace-nowrap ${
                   activeView === tab?.id
                     ? 'bg-background text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                <Icon name={tab?.icon} size={16} />
-                <span>{tab?.label}</span>
+                <Icon name={tab?.icon} size={14} className="sm:w-4 sm:h-4" />
+                <span className="hidden xs:inline sm:inline">{tab?.label}</span>
                 {tab?.id === 'alerts' && stockAlerts?.length > 0 && (
                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-warning text-warning-foreground">
                     {stockAlerts?.length}
@@ -412,6 +577,7 @@ const InventoryManagement = () => {
                 onExport={handleExport}
                 totalItems={inventoryItems?.length}
                 filteredItems={filteredItems?.length}
+                inventoryItems={inventoryItems}
               />
               <InventoryTable
                 items={filteredItems}
@@ -433,10 +599,12 @@ const InventoryManagement = () => {
 
           {activeView === 'orders' && (
             <PurchaseOrderPanel
-              orders={purchaseOrders}
+              orders={ordenes}
               onViewOrder={handleViewOrder}
               onApproveOrder={handleApproveOrder}
               onCreateOrder={handleCreateOrder}
+              onDownloadOrder={handleDownloadOrder}
+              onDeleteOrder={handleDeleteOrder}
             />
           )}
 
@@ -454,6 +622,37 @@ const InventoryManagement = () => {
             isOpen={showNewItemModal}
             onClose={handleCloseNewItemModal}
             onAddItem={handleAddNewItem}
+          />
+
+          {/* Item Details Modal */}
+          <ItemDetailsModal
+            isOpen={showItemDetailsModal}
+            onClose={handleCloseItemDetailsModal}
+            item={selectedItem}
+          />
+
+          {/* Edit Item Modal */}
+          <EditItemModal
+            isOpen={showEditItemModal}
+            onClose={handleCloseEditItemModal}
+            item={selectedItem}
+            onUpdateSuccess={handleUpdateSuccess}
+          />
+
+          {/* Create Purchase Order Modal */}
+          <CreatePOModal
+            isOpen={showCreatePOModal}
+            onClose={handleClosePOModal}
+            onSubmit={handleSubmitPO}
+            initialItem={selectedItem}
+            lowStockItems={lowStockItems}
+          />
+
+          {/* Order Details Modal */}
+          <OrderDetailsModal
+            isOpen={showOrderDetailsModal}
+            onClose={handleCloseOrderDetails}
+            order={selectedOrder}
           />
         </div>
       </main>
