@@ -238,11 +238,6 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
         nombreCliente: formData?.nombreCliente?.trim(),
         proyectoId: formData?.proyectoId,
         nombreProyecto: formData?.nombreProyecto?.trim(),
-        personalAsignadoId: formData?.personalAsignadoId,
-        asignadoA: formData?.asignadoA,
-        prioridad: formData?.prioridad,
-        tipoProyecto: formData?.tipoProyecto,
-        notas: formData?.notas,
         personaContacto: formData?.personaContacto?.trim(),
         telefono: formData?.telefono?.trim(),
         email: formData?.email?.trim(),
@@ -253,7 +248,12 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
           direccion: formData?.direccion,
         },
         presupuestoEstimado: Number(formData?.montoTotal),
-        cronograma: formData?.cronograma,
+        tiempoEjecucion: formData?.cronograma,
+        prioridad: formData?.prioridad,
+        Responsable: formData?.asignadoA,
+        idResponsable: formData?.personalAsignadoId,
+        tipoProyecto: formData?.tipoProyecto,
+        notas: formData?.notas
       };
       console.log('Objeto enviado al backend:', quotationPayload);
       const response = await createQuotation(quotationPayload);

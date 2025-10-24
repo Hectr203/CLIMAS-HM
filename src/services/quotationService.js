@@ -50,6 +50,16 @@ const quotationService = {
         throw error;
       }
     },
+
+    async getConstructorByCotizacionId(id) {
+      try {
+        const response = await httpService.get(`cotizaciones/constructor/obtener?idCotizacion=${id}`);
+        return response.data;
+      } catch (error) {
+        console.error('Error obteniendo constructor:', error);
+        throw error;
+      }
+    },
 };
 
 export default quotationService;

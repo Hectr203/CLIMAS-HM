@@ -1,20 +1,72 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import useQuotation from '../../../hooks/useQuotation';
-        import Icon from '../../../components/AppIcon';
-        import Button from '../../../components/ui/Button';
-        import Input from '../../../components/ui/Input';
+import Icon from '../../../components/AppIcon';
+import Button from '../../../components/ui/Button';
+import Input from '../../../components/ui/Input';
+import { useNotification } from '../../../context/NotificationContext';
 
-        const QuotationBuilder = ({ quotation, onUpdate, onAddRevision }) => {
-          const { crearConstructor } = useQuotation();
+const QuotationBuilder = ({ cotizacion, onUpdate, onAddRevision }) => {
+  const { crearConstructor, getConstructorByCotizacionId } = useQuotation();
+  const notification = useNotification();
           const [formData, setFormData] = useState({
-            scope: quotation?.quotationData?.scope || '',
-            assumptions: quotation?.quotationData?.assumptions || [],
-            timeline: quotation?.quotationData?.timeline || '',
-            conditions: quotation?.quotationData?.conditions || '',
-            warranty: quotation?.quotationData?.warranty || '',
-            totalAmount: quotation?.quotationData?.totalAmount || 0,
-            validity: quotation?.quotationData?.validity || '30 días'
+            scope: cotizacion?.quotationData?.scope || '',
+            assumptions: cotizacion?.quotationData?.assumptions || [],
+            timeline: cotizacion?.quotationData?.timeline || '',
+            conditions: cotizacion?.quotationData?.conditions || '',
+            warranty: cotizacion?.quotationData?.warranty || '',
+            totalAmount: cotizacion?.quotationData?.totalAmount || 0,
+            validity: cotizacion?.quotationData?.validity || '30 días'
           });
+          const [loading, setLoading] = useState(false);
+          const [error, setError] = useState('');
+          // Cargar datos del constructor existente si hay
+          useEffect(() => {
+            async function fetchConstructor() {
+              // Limpiar el formulario al cambiar de cotización
+              setFormData({
+                scope: '',
+                assumptions: [],
+                timeline: '',
+                conditions: '',
+                warranty: '',
+                totalAmount: 0,
+                validity: '30 días'
+              });
+              if (!cotizacion?.id) return;
+              setLoading(true);
+              setError('');
+              try {
+                const existing = await getConstructorByCotizacionId(cotizacion.id);
+                console.log('Guardado', cotizacion.id, ':', existing);
+                if (existing) {
+                  setFormData({
+                    scope: existing.alcance || '',
+                    assumptions: existing.supuestos || [],
+                    timeline: existing.tiempo_ejecucion || '',
+                    conditions: existing.condiciones_pago || '',
+                    warranty: existing.garantia || '',
+                    totalAmount: existing.monto_total || 0,
+                    validity: existing.vigencia || '30 días',
+                  });
+                } else {
+                  setFormData({
+                    scope: cotizacion?.quotationData?.scope || '',
+                    assumptions: cotizacion?.quotationData?.assumptions || [],
+                    timeline: cotizacion?.quotationData?.timeline || '',
+                    conditions: cotizacion?.quotationData?.conditions || '',
+                    warranty: cotizacion?.quotationData?.warranty || '',
+                    totalAmount: cotizacion?.quotationData?.totalAmount || 0,
+                    validity: cotizacion?.quotationData?.validity || '30 días'
+                  });
+                }
+              } catch (err) {
+                setError('Error al cargar constructor');
+              } finally {
+                setLoading(false);
+              }
+            }
+            fetchConstructor();
+          }, [cotizacion?.id]);
 
           const [newAssumption, setNewAssumption] = useState('');
           const [hasChanges, setHasChanges] = useState(false);
@@ -38,35 +90,34 @@ import useQuotation from '../../../hooks/useQuotation';
             setHasChanges(true);
           };
 
-          const handleSave = async () => {
-            onUpdate?.({ quotationData: formData });
-            // Guardar en el backend usando el endpoint constructor/crear
-            const payload = {
-              Constructor: {
-                cotizacionId: quotation?.id, // id de Cosmos
-                Folio: quotation?.folio || quotation?.id, // folio
-                alcance: formData?.scope,
-                condiciones_pago: formData?.conditions,
-                supuestos: formData?.assumptions,
-                garantia: formData?.warranty,
-                monto_total: formData?.totalAmount,
-                tiempo_ejecucion: formData?.timeline,
-                vigencia: formData?.validity
-              }
-            };
-            try {
-              await crearConstructor(payload);
-              alert('Constructor guardado exitosamente');
-            } catch (err) {
-              alert('Error al guardar el constructor');
-            }
-            setHasChanges(false);
-          };
+  const handleSave = async () => {
+    onUpdate?.({ quotationData: formData });
+    const payload = {
+      Constructor: {
+        cotizacionId: cotizacion?.id,
+        Folio: cotizacion?.folio || cotizacion?.id,
+        alcance: formData?.scope,
+        condiciones_pago: formData?.conditions,
+        supuestos: formData?.assumptions,
+        garantia: formData?.warranty,
+        monto_total: formData?.totalAmount,
+        tiempo_ejecucion: formData?.timeline,
+        vigencia: formData?.validity
+      }
+    };
+    try {
+      await crearConstructor(payload);
+      notification.showSuccess('guardado');
+    } catch (err) {
+      notification.showError('Error al guardar el constructor');
+    }
+    setHasChanges(false);
+  };
 
           const handleCreateRevision = () => {
             const revision = {
               changes: "Actualización de alcance y condiciones",
-              author: quotation?.assignedTo || "Usuario Actual"
+              author: cotizacion?.assignedTo || "Usuario Actual"
             };
             onAddRevision?.(revision);
             setHasChanges(false);
@@ -75,8 +126,8 @@ import useQuotation from '../../../hooks/useQuotation';
           const handleSaveConstructor = async () => {
             const payload = {
               Constructor: {
-                cotizacionId: quotation?.id,
-                Folio: quotation?.id,
+                cotizacionId: cotizacion?.id,
+                Folio: cotizacion?.id,
                 alcance: formData?.scope,
                 condiciones_pago: formData?.conditions,
                 supuestos: formData?.assumptions,
@@ -99,8 +150,8 @@ import useQuotation from '../../../hooks/useQuotation';
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl font-semibold">{quotation?.projectName}</h3>
-                  <p className="text-muted-foreground">{quotation?.clientName} - {quotation?.folio}</p>
+                  <h3 className="text-xl font-semibold">{cotizacion?.projectName}</h3>
+                  <p className="text-muted-foreground">{cotizacion?.clientName} - {cotizacion?.folio}</p>
                 </div>
                 <div className="flex items-center space-x-2">
                   {hasChanges && (
@@ -277,7 +328,7 @@ import useQuotation from '../../../hooks/useQuotation';
                 <div className="flex items-center space-x-2">
                   <Icon name="Info" size={16} className="text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">
-                    Última actualización: {quotation?.lastModified}
+                     Última actualización: {cotizacion?.lastModified}
                   </span>
                 </div>
                 <div className="flex space-x-2">

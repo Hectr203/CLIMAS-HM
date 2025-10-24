@@ -335,7 +335,7 @@ const QuotationDevelopmentCenter = () => {
                     <div className="p-6">
                       {activeTab === 'builder' && (
                         <QuotationBuilder
-                          quotation={selectedQuotation}
+                          cotizacion={selectedQuotation}
                           onUpdate={(updates) => handleQuotationUpdate(selectedQuotation?.id, updates)}
                           onAddRevision={(revision) => handleAddRevision(selectedQuotation?.id, revision)}
                         />
