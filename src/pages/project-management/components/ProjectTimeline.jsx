@@ -97,6 +97,14 @@ const getRoleLabel = (role) => {
   if (typeof role === 'string') return role;
   return role?.name ?? role?.nombre ?? role?.id ?? 'Sin rol';
 };
+const getBudgetTotal = (p) => {
+  const b =
+    p?.presupuesto?.total ??
+    p?.totalPresupuesto ??
+    p?.budgetTotal ??
+    (Number(p?.presupuesto?.manoObra||0)+Number(p?.presupuesto?.piezas||0)+Number(p?.presupuesto?.equipos||0)+Number(p?.presupuesto?.materiales||0)+Number(p?.presupuesto?.transporte||0)+Number(p?.presupuesto?.otros||0));
+  return Number(b) || 0;
+};
 
 /* ================= Visual helpers ================= */
 
@@ -119,7 +127,7 @@ const statusPill = (canon) => {
 
 /* ================= Component ================= */
 
-function ProjectTimeline({ projects }) {
+function ProjectTimeline({ projects, onNewProject }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
@@ -223,6 +231,81 @@ function ProjectTimeline({ projects }) {
     }
     return acc;
   }, [rows]);
+
+  // Abrir modal "Nuevo Proyecto" desde Acciones Rápidas
+  const handleNewProjectClick = () => {
+    if (typeof onNewProject === 'function') onNewProject();
+  };
+
+  /* ================= Export (CSV para Excel) ================= */
+
+  const csvEscape = (v) => {
+    const s = String(v ?? '');
+    // escapar comillas y envolver en comillas si contiene coma, salto o comillas
+    const needsWrap = /[",\n]/.test(s);
+    const escaped = s.replace(/"/g, '""');
+    return needsWrap ? `"${escaped}"` : escaped;
+  };
+
+  const handleExportReport = () => {
+    // si no hay nada, mostramos aviso
+    if (!filteredRows || filteredRows.length === 0) {
+      alert('No hay proyectos para exportar en el período seleccionado.');
+      return;
+    }
+
+    const headers = [
+      'Código',
+      'Nombre',
+      'Cliente',
+      'Estado',
+      'Inicio',
+      'Fin',
+      'Prioridad',
+      'Presupuesto Total (MXN)',
+      'Progreso (%)'
+    ];
+
+    const rowsCsv = filteredRows.map((p) => {
+      const code   = getCode(p);
+      const name   = getName(p);
+      const client = getClient(p);
+      const canon  = getCanon(p) || '';
+      const inicio = fmtDate(getStart(p));
+      const fin    = fmtDate(getEnd(p));
+      const prior  = p?.prioridad ?? p?.priority ?? '';
+      const budget = getBudgetTotal(p);
+      const prog   = Math.max(0, Math.min(100, getProg(p)));
+
+      return [
+        csvEscape(code),
+        csvEscape(name),
+        csvEscape(client),
+        csvEscape(canon),
+        csvEscape(inicio),
+        csvEscape(fin),
+        csvEscape(prior),
+        csvEscape(budget.toLocaleString('es-MX')),
+        csvEscape(String(prog))
+      ].join(',');
+    });
+
+    const titleMap = { week: 'semana', month: 'mes', q: 'trimestre', year: 'anio' };
+    const fileSuffix = titleMap[period] || 'periodo';
+    const fileName = `reporte_proyectos_${fileSuffix}_${new Date().toISOString().slice(0,10)}.csv`;
+
+    const csvContent = [headers.join(','), ...rowsCsv].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -405,10 +488,24 @@ function ProjectTimeline({ projects }) {
         <div className="bg-card border border-border rounded-lg p-6">
           <h3 className="text-lg font-semibold text-foreground mb-4">Acciones Rápidas</h3>
           <div className="space-y-2">
-            <Button variant="outline" size="sm" iconName="Plus" iconPosition="left" className="w-full justify-start">
+            <Button
+              variant="outline"
+              size="sm"
+              iconName="Plus"
+              iconPosition="left"
+              className="w-full justify-start"
+              onClick={handleNewProjectClick}
+            >
               Nuevo Proyecto
             </Button>
-            <Button variant="outline" size="sm" iconName="FileText" iconPosition="left" className="w-full justify-start">
+            <Button
+              variant="outline"
+              size="sm"
+              iconName="FileText"
+              iconPosition="left"
+              className="w-full justify-start"
+              onClick={handleExportReport}   // ← exporta CSV para Excel según periodo
+            >
               Generar Reporte
             </Button>
             <Button variant="outline" size="sm" iconName="Calendar" iconPosition="left" className="w-full justify-start">
