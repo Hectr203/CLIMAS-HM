@@ -4,9 +4,12 @@ import Button from "../../../components/ui/Button";
 import Input from "../../../components/ui/Input";
 import Select from "../../../components/ui/Select";
 import useRequisi from "../../../hooks/useRequisi";
+import useOperac from "../../../hooks/useOperac";
+
 
 const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
   const { createRequisition, updateRequisition } = useRequisi();
+   const { oportunities, getOportunities } = useOperac();
 
   const [formData, setFormData] = useState({
     requestNumber: "",
@@ -64,6 +67,12 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
       });
     }
   }, [requisition, isOpen]);
+
+   useEffect(() => {
+  if (isOpen) {
+    getOportunities(); 
+  }
+}, [isOpen]);
 
   const priorityOptions = [
     { value: "Crítica", label: "Crítica" },
@@ -206,16 +215,18 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
   {/* Información básica */}
   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
     <Select
-      label="Número de Orden de Trabajo"
-      options={[
-        { label: "OT-2025-001", value: "OT-2025-001" },
-        { label: "OT-2025-002", value: "OT-2025-002" },
-        { label: "OT-2025-003", value: "OT-2025-003" },
-      ]}
-      value={formData?.orderNumber}
-      onChange={(value) => handleInputChange("orderNumber", value)}
-      required
-    />
+  label="Número de Orden de Trabajo"
+  options={
+    oportunities?.map((op) => ({
+      label: op.ordenTrabajo,
+      value: op.ordenTrabajo,
+    })) || []
+  }
+  value={formData?.orderNumber}
+  onChange={(value) => handleInputChange("orderNumber", value)}
+  required
+/>
+
 
     <Input
       label="Nombre del Proyecto"

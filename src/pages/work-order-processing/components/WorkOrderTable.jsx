@@ -7,6 +7,7 @@ import WorkOrderModal from "../components/WorkOrderModal";
 
 const WorkOrderTable = ({
   workOrders,
+  requisitions,
   onStatusUpdate,
   onAssignTechnician,
   onViewDetails,
@@ -20,6 +21,7 @@ const WorkOrderTable = ({
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [sortConfig, setSortConfig] = useState({ key: "prioridad", direction: "asc" });
   const [currentPage, setCurrentPage] = useState(1);
+  const [localRequisitions, setLocalRequisitions] = useState([]);
   const itemsPerPage = 5;
 
   // Modal
@@ -31,6 +33,11 @@ const WorkOrderTable = ({
     if (!workOrders?.length) getOportunities();
     getClients();
   }, []);
+
+  // Sincroniza requisiciones automáticamente
+  useEffect(() => {
+    if (requisitions) setLocalRequisitions(requisitions);
+  }, [requisitions]);
 
   const dataSource = useMemo(
     () => (workOrders?.length ? workOrders : oportunities || []),
@@ -173,155 +180,178 @@ const WorkOrderTable = ({
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-muted">
-  <tr>
-    <SortableHeader label="Orden de Trabajo" sortKey="ordenTrabajo" /> {/* 👈 flechita aquí */}
-    <SortableHeader label="Técnico Asignado" sortKey="tecnicoAsignado" />
-    <SortableHeader label="Prioridad" sortKey="prioridad" />
-    <SortableHeader label="Estado" sortKey="estado" />
-    <SortableHeader label="Fecha Límite" sortKey="fechaLimite" />
-    <SortableHeader label="Cliente" sortKey="cliente" />
-    <SortableHeader label="Tipo Proyecto" sortKey="tipo" />
-    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-      Notas
-    </th>
-    <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
-      Acciones
-    </th>
-  </tr>
-</thead>
+            <tr>
+              <SortableHeader label="Orden de Trabajo" sortKey="ordenTrabajo" />
+              <SortableHeader label="Técnico Asignado" sortKey="tecnicoAsignado" />
+              <SortableHeader label="Prioridad" sortKey="prioridad" />
+              <SortableHeader label="Estado" sortKey="estado" />
+              <SortableHeader label="Fecha Límite" sortKey="fechaLimite" />
+              <SortableHeader label="Cliente" sortKey="cliente" />
+              <SortableHeader label="Tipo Proyecto" sortKey="tipo" />
+              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Notas
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Acciones
+              </th>
+            </tr>
+          </thead>
 
-<tbody className="bg-card divide-y divide-border">
-  {paginatedData.map((order) => (
-    <React.Fragment key={order.id}>
-      <tr className="hover:bg-muted/50 transition-colors">
-        {/* 🔹 Orden de trabajo con flechita aquí */}
-        <td className="px-6 py-4 whitespace-nowrap text-sm">
-          <div className="flex items-center space-x-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => toggleRowExpansion(order.id)}
-              className="w-6 h-6"
-            >
-              <Icon
-                name={expandedRows.has(order.id) ? "ChevronDown" : "ChevronRight"}
-                size={16}
-              />
-            </Button>
-            <div>{order.ordenTrabajo || "—"}</div>
-          </div>
-        </td>
+          <tbody className="bg-card divide-y divide-border">
+            {paginatedData.map((order) => (
+              <React.Fragment key={order.id}>
+                <tr className="hover:bg-muted/50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <div className="flex items-center space-x-3">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => toggleRowExpansion(order.id)}
+                        className="w-6 h-6"
+                      >
+                        <Icon
+                          name={expandedRows.has(order.id) ? "ChevronDown" : "ChevronRight"}
+                          size={16}
+                        />
+                      </Button>
+                      <div>{order.ordenTrabajo || "—"}</div>
+                    </div>
+                  </td>
 
-        {/* 🔹 Técnico asignado */}
-        <td className="px-6 py-4 whitespace-nowrap text-sm">
-          {order.tecnicoAsignado?.nombre || "Sin técnico"}
-        </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    {order.tecnicoAsignado?.nombre || "Sin técnico"}
+                  </td>
 
-        {/* 🔹 Prioridad */}
-        <td className="px-6 py-4 whitespace-nowrap">
-          <span
-            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(order.prioridad)}`}
-          >
-            {order.prioridad}
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span
+                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(
+                        order.prioridad
+                      )}`}
+                    >
+                      {order.prioridad}
+                    </span>
+                  </td>
+
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span
+                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
+                        order.estado
+                      )}`}
+                    >
+                      {order.estado}
+                    </span>
+                  </td>
+
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">{order.fechaLimite}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    {order.cliente?.nombre || order.cliente?.empresa || "Sin cliente"}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">{order.tipo || "—"}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                    {order.notasAdicionales || "-"}
+                  </td>
+
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div className="flex items-center justify-end space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        iconName="Eye"
+                        iconSize={16}
+                        onClick={() => handleView(order)}
+                      >
+                        Ver
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        iconName="Edit"
+                        iconSize={16}
+                        onClick={() => handleEdit(order)}
+                      >
+                        Editar
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+
+                {/* 🔹 Fila expandida con descripción, EPP y materiales */}
+                {expandedRows.has(order.id) && (
+                  <tr>
+                    <td colSpan="9" className="px-6 py-4 bg-muted/30">
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-medium text-foreground">Descripción del Trabajo</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {order.descripcion || "Sin descripción"}
+                        </p>
+
+                        {/* === EQUIPO DE PROTECCIÓN PERSONAL === */}
+                        <h4 className="text-sm font-medium text-foreground">
+                          Equipo de Protección Personal
+                        </h4>
+                        <ul className="text-sm text-muted-foreground grid grid-cols-2 md:grid-cols-3 gap-2">
+                          {[
+                            { key: "cascoSeguridad", label: "Casco de Seguridad" },
+                            { key: "gafasProteccion", label: "Gafas de Protección" },
+                            { key: "guantesTrabajo", label: "Guantes de Trabajo" },
+                            { key: "calzadoSeguridad", label: "Calzado de Seguridad" },
+                            { key: "arnesSeguridad", label: "Arnés de Seguridad" },
+                            { key: "respiradorN95", label: "Respirador N95" },
+                            { key: "chalecoReflectivo", label: "Chaleco Reflectivo" },
+                          ].map(({ key, label }) => (
+                            <li key={key} className="flex items-center space-x-2">
+                              <Icon name={order[key] ? "CheckCircle" : "XCircle"} size={14} />
+                              <span>{label}</span>
+                            </li>
+                          ))}
+                        </ul>
+
+                        {/* === MATERIALES REGISTRADOS === */}
+                        <h4 className="text-sm font-medium text-foreground mt-4">
+  Materiales Registrados
+</h4>
+<ul className="text-sm text-muted-foreground grid grid-cols-2 md:grid-cols-3 gap-2">
+  {(() => {
+    // Filtrar las requisiciones que pertenezcan a esta orden
+    const materialsForOrder = requisitions
+      ?.filter((req) => req.numeroOrdenTrabajo === order.ordenTrabajo)
+      ?.flatMap((req) => req.materiales || req.items || []);
+
+    if (!materialsForOrder || materialsForOrder.length === 0) {
+      return (
+        <li className="text-muted-foreground col-span-3">
+          No hay materiales registrados para esta orden
+        </li>
+      );
+    }
+
+    return materialsForOrder.map((item, index) => (
+      <li key={index} className="flex items-center space-x-2">
+        <Icon name="Package" size={14} />
+        <span>
+          {item.nombreMaterial || item.nombre || item.descripcionEspecificaciones || "Material sin nombre"} —{" "}
+          <span className="text-muted-foreground">
+            Cantidad: {item.cantidad || item.quantity || 0}{" "}
+            {item.unidad || ""}
           </span>
-        </td>
+        </span>
+      </li>
+    ));
+  })()}
+</ul>
 
-        {/* 🔹 Estado */}
-        <td className="px-6 py-4 whitespace-nowrap">
-          <span
-            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(order.estado)}`}
-          >
-            {order.estado}
-          </span>
-        </td>
 
-        {/* 🔹 Fecha Límite */}
-        <td className="px-6 py-4 whitespace-nowrap text-sm">
-          {order.fechaLimite}
-        </td>
-
-        {/* 🔹 Cliente */}
-        <td className="px-6 py-4 whitespace-nowrap text-sm">
-          {order.cliente?.nombre || order.cliente?.empresa || "Sin cliente"}
-        </td>
-
-        {/* 🔹 Tipo Proyecto */}
-        <td className="px-6 py-4 whitespace-nowrap text-sm">
-          {order.tipo || "—"}
-        </td>
-
-        {/* 🔹 Notas */}
-        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
-          {order.notasAdicionales || "-"}
-        </td>
-
-        {/* 🔹 Acciones */}
-        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-          <div className="flex items-center justify-end space-x-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              iconName="Eye"
-              iconSize={16}
-              onClick={() => handleView(order)}
-            >
-              Ver
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              iconName="Edit"
-              iconSize={16}
-              onClick={() => handleEdit(order)}
-            >
-              Editar
-            </Button>
-          </div>
-        </td>
-      </tr>
-
-      {/* 🔹 Fila expandida con descripción y EPP */}
-      {expandedRows.has(order.id) && (
-        <tr>
-          <td colSpan="9" className="px-6 py-4 bg-muted/30">
-            <div className="space-y-3">
-              <h4 className="text-sm font-medium text-foreground">Descripción del Trabajo</h4>
-              <p className="text-sm text-muted-foreground">
-                {order.descripcion || "Sin descripción"}
-              </p>
-
-              <h4 className="text-sm font-medium text-foreground">
-                Equipo de Protección Personal
-              </h4>
-              <ul className="text-sm text-muted-foreground grid grid-cols-2 md:grid-cols-3 gap-2">
-                {[
-                  { key: "cascoSeguridad", label: "Casco de Seguridad" },
-                  { key: "gafasProteccion", label: "Gafas de Protección" },
-                  { key: "guantesTrabajo", label: "Guantes de Trabajo" },
-                  { key: "calzadoSeguridad", label: "Calzado de Seguridad" },
-                  { key: "arnesSeguridad", label: "Arnés de Seguridad" },
-                  { key: "respiradorN95", label: "Respirador N95" },
-                  { key: "chalecoReflectivo", label: "Chaleco Reflectivo" },
-                ].map(({ key, label }) => (
-                  <li key={key} className="flex items-center space-x-2">
-                    <Icon name={order[key] ? "CheckCircle" : "XCircle"} size={14} />
-                    <span>{label}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <p className="text-sm text-muted-foreground">
-                <strong>Requiere estudios médicos actualizados:</strong>{" "}
-                {order.requiereEstudiosMedicosActualizados ? "Sí" : "No"}
-              </p>
-            </div>
-          </td>
-        </tr>
-      )}
-    </React.Fragment>
-  ))}
-</tbody>
-
+                        <p className="text-sm text-muted-foreground">
+                          <strong>Requiere estudios médicos actualizados:</strong>{" "}
+                          {order.requiereEstudiosMedicosActualizados ? "Sí" : "No"}
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            ))}
+          </tbody>
         </table>
 
         {/* Modal */}
@@ -339,7 +369,7 @@ const WorkOrderTable = ({
         )}
       </div>
 
-      {/* Paginación */}
+      {/* 🔹 Paginación */}
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-2 p-4 border-t border-border">
           <Button
