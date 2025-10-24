@@ -9,6 +9,7 @@ import { renewToken, logout } from "../utils/auth";
  * @param {string} token - El token JWT actual.
  * @param {function} onTokenRenewed - Callback para actualizar el token en el estado global.
  */
+
 export default function useTokenExpiration(token, onTokenRenewed) {
   const { showInfo } = useNotifications();
   const { showConfirm } = useConfirmDialog();
@@ -49,9 +50,9 @@ export default function useTokenExpiration(token, onTokenRenewed) {
     });
     if (confirmed) {
       try {
-  console.log("Renovando token... token actual:", token);
-  const newToken = await renewToken(token);
-  console.log("Respuesta de renovación, nuevo token:", newToken);
+        console.log("Renovando token... token actual:", token);
+        const newToken = await renewToken(token);
+        console.log("Respuesta de renovación, nuevo token:", newToken);
         // Decodifica el nuevo token para mostrar la expiración
         let decodedNew;
         try {
@@ -64,11 +65,14 @@ export default function useTokenExpiration(token, onTokenRenewed) {
           console.log("Nuevo token expira en:", expDate.toLocaleString());
           showInfo(`Nuevo token expira: ${expDate.toLocaleString()}`);
         }
-  if (onTokenRenewed) onTokenRenewed(newToken);
-  showInfo("Sesión extendida correctamente.");
+        if (onTokenRenewed) onTokenRenewed(newToken);
+        showInfo("Sesión extendida correctamente.");
       } catch (error) {
         console.warn("Error al renovar el token:", error);
-        showInfo("No se pudo extender la sesión. Detalle: " + (error?.message || JSON.stringify(error)));
+        showInfo(
+          "No se pudo extender la sesión. Detalle: " +
+            (error?.message || JSON.stringify(error))
+        );
         setTimeout(() => {
           logout();
         }, 2000);
