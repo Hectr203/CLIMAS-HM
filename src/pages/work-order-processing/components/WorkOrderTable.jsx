@@ -198,160 +198,180 @@ const WorkOrderTable = ({
           </thead>
 
           <tbody className="bg-card divide-y divide-border">
-            {paginatedData.map((order) => (
-              <React.Fragment key={order.id}>
-                <tr className="hover:bg-muted/50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <div className="flex items-center space-x-3">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => toggleRowExpansion(order.id)}
-                        className="w-6 h-6"
-                      >
-                        <Icon
-                          name={expandedRows.has(order.id) ? "ChevronDown" : "ChevronRight"}
-                          size={16}
-                        />
-                      </Button>
-                      <div>{order.ordenTrabajo || "—"}</div>
-                    </div>
-                  </td>
+  {paginatedData.length === 0 ? (
+    <tr>
+      <td colSpan="9" className="py-10 text-center text-muted-foreground">
+        <Icon name="SearchX" className="inline-block mr-2" size={18} />
+        No se encontraron resultados con los filtros aplicados.
+      </td>
+    </tr>
+  ) : (
+    paginatedData.map((order) => (
+      <React.Fragment key={order.id}>
+        <tr className="hover:bg-muted/50 transition-colors">
+          <td className="px-6 py-4 whitespace-nowrap text-sm">
+            <div className="flex items-center space-x-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => toggleRowExpansion(order.id)}
+                className="w-6 h-6"
+              >
+                <Icon
+                  name={expandedRows.has(order.id) ? "ChevronDown" : "ChevronRight"}
+                  size={16}
+                />
+              </Button>
+              <div>{order.ordenTrabajo || "—"}</div>
+            </div>
+          </td>
 
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {order.tecnicoAsignado?.nombre || "Sin técnico"}
-                  </td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm">
+            {order.tecnicoAsignado?.nombre || "Sin técnico"}
+          </td>
 
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(
-                        order.prioridad
-                      )}`}
-                    >
-                      {order.prioridad}
-                    </span>
-                  </td>
+          <td className="px-6 py-4 whitespace-nowrap">
+            <span
+              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(
+                order.prioridad
+              )}`}
+            >
+              {order.prioridad}
+            </span>
+          </td>
 
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
-                        order.estado
-                      )}`}
-                    >
-                      {order.estado}
-                    </span>
-                  </td>
+          <td className="px-6 py-4 whitespace-nowrap">
+            <span
+              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
+                order.estado
+              )}`}
+            >
+              {order.estado}
+            </span>
+          </td>
 
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">{order.fechaLimite}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {order.cliente?.nombre || order.cliente?.empresa || "Sin cliente"}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">{order.tipo || "—"}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
-                    {order.notasAdicionales || "-"}
-                  </td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm">{order.fechaLimite}</td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm">
+            {order.cliente?.nombre || order.cliente?.empresa || "Sin cliente"}
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm">{order.tipo || "—"}</td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+            {order.notasAdicionales || "-"}
+          </td>
 
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center justify-end space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        iconName="Eye"
-                        iconSize={16}
-                        onClick={() => handleView(order)}
-                      >
-                        Ver
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        iconName="Edit"
-                        iconSize={16}
-                        onClick={() => handleEdit(order)}
-                      >
-                        Editar
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
+          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+            <div className="flex items-center justify-end space-x-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                iconName="Eye"
+                iconSize={16}
+                onClick={() => handleView(order)}
+              >
+                Ver
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                iconName="Edit"
+                iconSize={16}
+                onClick={() => handleEdit(order)}
+              >
+                Editar
+              </Button>
+            </div>
+          </td>
+        </tr>
 
-                {/* 🔹 Fila expandida con descripción, EPP y materiales */}
-                {expandedRows.has(order.id) && (
-                  <tr>
-                    <td colSpan="9" className="px-6 py-4 bg-muted/30">
-                      <div className="space-y-3">
-                        <h4 className="text-sm font-medium text-foreground">Descripción del Trabajo</h4>
-                        <p className="text-sm text-muted-foreground">
-                          {order.descripcion || "Sin descripción"}
-                        </p>
+        {/* 🔹 Fila expandida con descripción, EPP y materiales */}
+        {expandedRows.has(order.id) && (
+          <tr>
+            <td colSpan="9" className="px-6 py-4 bg-muted/30">
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium text-foreground">
+                  Descripción del Trabajo
+                </h4>
+                <p className="text-sm text-muted-foreground">
+                  {order.descripcion || "Sin descripción"}
+                </p>
 
-                        {/* === EQUIPO DE PROTECCIÓN PERSONAL === */}
-                        <h4 className="text-sm font-medium text-foreground">
-                          Equipo de Protección Personal
-                        </h4>
-                        <ul className="text-sm text-muted-foreground grid grid-cols-2 md:grid-cols-3 gap-2">
-                          {[
-                            { key: "cascoSeguridad", label: "Casco de Seguridad" },
-                            { key: "gafasProteccion", label: "Gafas de Protección" },
-                            { key: "guantesTrabajo", label: "Guantes de Trabajo" },
-                            { key: "calzadoSeguridad", label: "Calzado de Seguridad" },
-                            { key: "arnesSeguridad", label: "Arnés de Seguridad" },
-                            { key: "respiradorN95", label: "Respirador N95" },
-                            { key: "chalecoReflectivo", label: "Chaleco Reflectivo" },
-                          ].map(({ key, label }) => (
-                            <li key={key} className="flex items-center space-x-2">
-                              <Icon name={order[key] ? "CheckCircle" : "XCircle"} size={14} />
-                              <span>{label}</span>
-                            </li>
-                          ))}
-                        </ul>
+                {/* === EQUIPO DE PROTECCIÓN PERSONAL === */}
+                <h4 className="text-sm font-medium text-foreground">
+                  Equipo de Protección Personal
+                </h4>
+                <ul className="text-sm text-muted-foreground grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {[
+                    { key: "cascoSeguridad", label: "Casco de Seguridad" },
+                    { key: "gafasProteccion", label: "Gafas de Protección" },
+                    { key: "guantesTrabajo", label: "Guantes de Trabajo" },
+                    { key: "calzadoSeguridad", label: "Calzado de Seguridad" },
+                    { key: "arnesSeguridad", label: "Arnés de Seguridad" },
+                    { key: "respiradorN95", label: "Respirador N95" },
+                    { key: "chalecoReflectivo", label: "Chaleco Reflectivo" },
+                  ].map(({ key, label }) => (
+                    <li key={key} className="flex items-center space-x-2">
+                      <Icon
+                        name={order[key] ? "CheckCircle" : "XCircle"}
+                        size={14}
+                      />
+                      <span>{label}</span>
+                    </li>
+                  ))}
+                </ul>
 
-                        {/* === MATERIALES REGISTRADOS === */}
-                        <h4 className="text-sm font-medium text-foreground mt-4">
-  Materiales Registrados
-</h4>
-<ul className="text-sm text-muted-foreground grid grid-cols-2 md:grid-cols-3 gap-2">
-  {(() => {
-    // Filtrar las requisiciones que pertenezcan a esta orden
-    const materialsForOrder = requisitions
-      ?.filter((req) => req.numeroOrdenTrabajo === order.ordenTrabajo)
-      ?.flatMap((req) => req.materiales || req.items || []);
+                {/* === MATERIALES REGISTRADOS === */}
+                <h4 className="text-sm font-medium text-foreground mt-4">
+                  Materiales Registrados
+                </h4>
+                <ul className="text-sm text-muted-foreground grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {(() => {
+                    // Filtrar las requisiciones que pertenezcan a esta orden
+                    const materialsForOrder = requisitions
+                      ?.filter(
+                        (req) => req.numeroOrdenTrabajo === order.ordenTrabajo
+                      )
+                      ?.flatMap((req) => req.materiales || req.items || []);
 
-    if (!materialsForOrder || materialsForOrder.length === 0) {
-      return (
-        <li className="text-muted-foreground col-span-3">
-          No hay materiales registrados para esta orden
-        </li>
-      );
-    }
+                    if (!materialsForOrder || materialsForOrder.length === 0) {
+                      return (
+                        <li className="text-muted-foreground col-span-3">
+                          No hay materiales registrados para esta orden
+                        </li>
+                      );
+                    }
 
-    return materialsForOrder.map((item, index) => (
-      <li key={index} className="flex items-center space-x-2">
-        <Icon name="Package" size={14} />
-        <span>
-          {item.nombreMaterial || item.nombre || item.descripcionEspecificaciones || "Material sin nombre"} —{" "}
-          <span className="text-muted-foreground">
-            Cantidad: {item.cantidad || item.quantity || 0}{" "}
-            {item.unidad || ""}
-          </span>
-        </span>
-      </li>
-    ));
-  })()}
-</ul>
+                    return materialsForOrder.map((item, index) => (
+                      <li key={index} className="flex items-center space-x-2">
+                        <Icon name="Package" size={14} />
+                        <span>
+                          {item.nombreMaterial ||
+                            item.nombre ||
+                            item.descripcionEspecificaciones ||
+                            "Material sin nombre"}{" "}
+                          —{" "}
+                          <span className="text-muted-foreground">
+                            Cantidad: {item.cantidad || item.quantity || 0}{" "}
+                            {item.unidad || ""}
+                          </span>
+                        </span>
+                      </li>
+                    ));
+                  })()}
+                </ul>
 
+                <p className="text-sm text-muted-foreground">
+                  <strong>Requiere estudios médicos actualizados:</strong>{" "}
+                  {order.requiereEstudiosMedicosActualizados ? "Sí" : "No"}
+                </p>
+              </div>
+            </td>
+          </tr>
+        )}
+      </React.Fragment>
+    ))
+  )}
+</tbody>
 
-                        <p className="text-sm text-muted-foreground">
-                          <strong>Requiere estudios médicos actualizados:</strong>{" "}
-                          {order.requiereEstudiosMedicosActualizados ? "Sí" : "No"}
-                        </p>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </React.Fragment>
-            ))}
-          </tbody>
         </table>
 
         {/* Modal */}

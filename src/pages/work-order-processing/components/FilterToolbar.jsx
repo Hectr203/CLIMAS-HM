@@ -40,12 +40,12 @@ const FilterToolbar = ({ onFiltersChange, totalCount, filteredCount }) => {
   ];
 
   const projectOptions = [
-    { value: "", label: "Todos los Proyectos" },
-    { value: "HVAC-2024-001", label: "Torre Corporativa ABC" },
-    { value: "HVAC-2024-002", label: "Centro Comercial Plaza Norte" },
-    { value: "HVAC-2024-003", label: "Hospital General San José" },
-    { value: "HVAC-2024-004", label: "Edificio Residencial Vista Mar" },
-  ];
+  { value: "", label: "Todos los Proyectos" },
+  { value: "Instalación", label: "Instalación" },
+  { value: "Mantenimiento Preventivo", label: "Mantenimiento Preventivo" },
+  { value: "Mantenimiento Correctivo", label: "Mantenimiento Correctivo" },
+  { value: "Inspección", label: "Inspección" },
+];
 
   const dateRangeOptions = [
     { value: "", label: "Todas las Fechas" },
@@ -89,25 +89,57 @@ const FilterToolbar = ({ onFiltersChange, totalCount, filteredCount }) => {
 
   const hasActiveFilters = Object.values(filters)?.some((value) => value !== "");
 
+  // 🔹 Generar mensaje dinámico de "sin resultados"
+  const getNoResultsMessage = () => {
+    if (filteredCount > 0) return null;
+
+    if (filters.search)
+      return `No se encontraron resultados para "${filters.search}"`;
+    if (filters.status)
+      return `No se encontraron órdenes con estado "${filters.status}"`;
+    if (filters.priority)
+      return `No se encontraron órdenes con prioridad "${filters.priority}"`;
+    if (filters.technician)
+      return `No se encontraron órdenes asignadas a "${filters.technician}"`;
+    if (filters.project)
+      return `No se encontraron órdenes del proyecto "${filters.project}"`;
+    if (filters.dateRange)
+      return `No se encontraron órdenes en el rango de fechas seleccionado`;
+
+    return "No hay órdenes registradas actualmente.";
+  };
+
   return (
     <div className="bg-card border border-border rounded-lg p-4 mb-6">
+      {/* Encabezado */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
         <div className="flex items-center space-x-4">
           <h3 className="text-lg font-semibold text-foreground">Órdenes de Trabajo</h3>
           <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <span>
-              Mostrando {filteredCount} de {totalCount} órdenes
-            </span>
-            {hasActiveFilters && (
-              <span className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs">
-                Filtros activos
-              </span>
-            )}
-          </div>
+  {totalCount === 0 ? (
+    <span>No hay órdenes registradas</span>
+  ) : filteredCount === 0 ? (
+    <span>No se encontraron resultados</span>
+  ) : filteredCount === totalCount ? (
+    <span>Mostrando todas las {totalCount} órdenes</span>
+  ) : (
+    <span>
+      Mostrando {filteredCount} de {totalCount} órdenes
+    </span>
+  )}
+  {hasActiveFilters && (
+    <span className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs">
+      Filtros activos
+    </span>
+  )}
+</div>
+
         </div>
       </div>
 
+      {/* Filtros */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+        {/* Buscar */}
         <div className="lg:col-span-2">
           <div className="relative">
             <Input
@@ -125,6 +157,7 @@ const FilterToolbar = ({ onFiltersChange, totalCount, filteredCount }) => {
           </div>
         </div>
 
+        {/* Estado */}
         <Select
           placeholder="Estado"
           options={statusOptions}
@@ -132,6 +165,7 @@ const FilterToolbar = ({ onFiltersChange, totalCount, filteredCount }) => {
           onChange={(value) => handleFilterChange("status", value)}
         />
 
+        {/* Prioridad */}
         <Select
           placeholder="Prioridad"
           options={priorityOptions}
@@ -139,7 +173,7 @@ const FilterToolbar = ({ onFiltersChange, totalCount, filteredCount }) => {
           onChange={(value) => handleFilterChange("priority", value)}
         />
 
-        {/* Select dinámico de técnicos */}
+        {/* Técnico */}
         <Select
           placeholder="Técnico"
           options={technicianOptions}
@@ -149,6 +183,7 @@ const FilterToolbar = ({ onFiltersChange, totalCount, filteredCount }) => {
           loading={loadingPersons}
         />
 
+        {/* Proyecto */}
         <Select
           placeholder="Proyecto"
           options={projectOptions}
@@ -158,6 +193,7 @@ const FilterToolbar = ({ onFiltersChange, totalCount, filteredCount }) => {
         />
       </div>
 
+      {/* Rango de fechas y botón limpiar */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-4 pt-4 border-t border-border">
         <Select
           placeholder="Rango de fechas"
@@ -179,6 +215,14 @@ const FilterToolbar = ({ onFiltersChange, totalCount, filteredCount }) => {
           </Button>
         )}
       </div>
+
+      {/* Mensaje dinámico cuando no hay resultados */}
+      {filteredCount === 0 && (
+        <div className="mt-4 flex items-center text-sm text-muted-foreground italic">
+          <Icon name="SearchX" size={16} className="mr-2" />
+          {getNoResultsMessage()}
+        </div>
+      )}
     </div>
   );
 };
