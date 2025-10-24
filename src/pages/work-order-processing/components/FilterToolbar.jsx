@@ -112,7 +112,7 @@ const FilterToolbar = ({ onFiltersChange, totalCount, filteredCount }) => {
           <div className="relative">
             <Input
               type="search"
-              placeholder="Buscar por número de orden, proyecto..."
+              placeholder="Buscar por número de orden..."
               value={filters?.search}
               onChange={(e) => handleFilterChange("search", e?.target?.value)}
               className="pl-10"

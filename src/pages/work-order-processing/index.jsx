@@ -203,18 +203,20 @@ const WorkOrderProcessing = () => {
 
   // Guardar requisición
   const handleSaveRequisition = async (savedRequisition) => {
-    let newReq = { ...savedRequisition };
+  let newReq = { ...savedRequisition };
 
-    if (!newReq?.id) {
-      newReq.id = Date.now();
-      newReq.requestNumber = `REQ-${new Date().getFullYear()}-${String(newReq.id).slice(-3)}`;
-    }
+  if (!newReq?.id) {
+    newReq.id = Date.now();
+    newReq.requestNumber = `REQ-${new Date().getFullYear()}-${String(newReq.id).slice(-3)}`;
+  }
 
-    setLocalRequisitions(prev => [newReq, ...prev]);
-    getRequisitions(); // sincroniza backend
-    setIsRequisitionModalOpen(false);
-    setSelectedRequisition(null);
-  };
+  setLocalRequisitions(prev => [newReq, ...prev]);
+  setLocalOrders(prev => [newReq, ...prev]); // 🔹 esto hará que se muestre también en WorkOrderTable
+
+  getRequisitions(); // sincroniza backend
+  setIsRequisitionModalOpen(false);
+  setSelectedRequisition(null);
+};
 
   const handleExportData = () => {
     const csvData = filteredOrders.map(order => ({
@@ -290,6 +292,7 @@ const WorkOrderProcessing = () => {
 
               <WorkOrderTable
                 workOrders={filteredOrders}
+                requisitions={localRequisitions}
                 onStatusUpdate={handleStatusUpdate}
                 onAssignTechnician={setSelectedOrder}
                 onViewDetails={setSelectedOrder}
