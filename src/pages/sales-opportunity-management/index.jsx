@@ -4,7 +4,6 @@ import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
 import Sidebar from '../../components/ui/Sidebar';
 import Header from '../../components/ui/Header';
-
 import ClientRegistrationPanel from './components/ClientRegistrationPanel';
 import CommunicationPanel from './components/CommunicationPanel';
 import QuotationRequestPanel from './components/QuotationRequestPanel';
@@ -334,9 +333,17 @@ const SalesOpportunityManagement = () => {
 
   const handleStageTransition = async (opportunityId, newStage) => {
     try {
-      // Actualiza en backend y refresca oportunidades
+      // Si se selecciona "Desarrollo de Cotización", redirigir antes de la actualización
+      if (newStage === 'quotation-development') {
+        // Actualiza primero el estado
+        await actualizarOportunidad(opportunityId, { etapa: newStage });
+        // Redirige a quotation-development-center con los parámetros necesarios
+        window.location.href = `/quotation-development-center?opportunityId=${opportunityId}&newQuotation=true`;
+        return;
+      }
+
+      // Para otras etapas, continúa con el flujo normal
       await actualizarOportunidad(opportunityId, { etapa: newStage });
-      // El hook ya refresca oportunidades, solo actualiza selección si corresponde
       if (selectedOpportunity?.id === opportunityId) {
         setSelectedOpportunity(prev => ({ ...prev, stage: newStage, stageDuration: 0 }));
       }

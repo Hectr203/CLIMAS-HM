@@ -31,6 +31,50 @@ function formatearDinero(valor) {
 }
 
 const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
+  // Obtener el ID de oportunidad de los parámetros de URL
+  const [opportunityId] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('opportunityId');
+  });
+
+  // Cargar información de la oportunidad si existe
+  React.useEffect(() => {
+    if (!opportunityId) return;
+
+    // TODO: Reemplazar con la llamada real a la API
+    // Por ahora simulamos una carga de datos
+    const mockOpportunityData = {
+      clientName: "Cliente de la Oportunidad",
+      contactInfo: {
+        contactPerson: "Contacto",
+        phone: "555-1234",
+        email: "contacto@cliente.com"
+      },
+      projectDetails: {
+        description: "Descripción del proyecto",
+        location: "Ubicación del proyecto",
+        estimatedBudget: 100000,
+        timeline: "3 meses"
+      },
+      priority: "high"
+    };
+
+    // Actualizar el formulario con los datos de la oportunidad
+    setFormData(prev => ({
+      ...prev,
+      nombreCliente: mockOpportunityData.clientName,
+      personaContacto: mockOpportunityData.contactInfo.contactPerson,
+      telefono: mockOpportunityData.contactInfo.phone,
+      email: mockOpportunityData.contactInfo.email,
+      descripcionProyecto: mockOpportunityData.projectDetails.description,
+      ubicacion: mockOpportunityData.projectDetails.location,
+      montoTotal: mockOpportunityData.projectDetails.estimatedBudget.toString(),
+      cronograma: mockOpportunityData.projectDetails.timeline,
+      prioridad: mockOpportunityData.priority === 'high' ? 'alta' : 
+                mockOpportunityData.priority === 'medium' ? 'media' : 'baja'
+    }));
+  }, [opportunityId]);
+
   const [formData, setFormData] = useState({
     clienteId: '',
     nombreCliente: '',
@@ -47,7 +91,8 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
     cronograma: '',
     prioridad: 'media',
     tipoProyecto: 'hvac',
-    notas: ''
+    notas: '',
+    oportunidadVentaId: opportunityId || '' // Agregar el ID de oportunidad
   });
 
   // Proyectos y clientes

@@ -19,6 +19,17 @@ const QuotationDevelopmentCenter = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [isNewQuotationModalOpen, setIsNewQuotationModalOpen] = useState(false);
+  
+  // Verificar parámetros de URL al cargar
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const opportunityId = params.get('opportunityId');
+    const newQuotation = params.get('newQuotation');
+    
+    if (opportunityId && newQuotation === 'true') {
+      setIsNewQuotationModalOpen(true);
+    }
+  }, []);
 
   // Mock quotation data following the development workflow
   const mockQuotations = [
