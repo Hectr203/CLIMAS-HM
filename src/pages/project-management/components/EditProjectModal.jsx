@@ -19,16 +19,16 @@ const estadoOptionsBackend = [
 const ALLOWED_ESTADOS = estadoOptionsBackend.map(o => o.value);
 
 /* Mapeos de estado (API solo “activo” | “en proceso”) */
-const backendToUiDefault = (apiEstado) => {
-  const v = String(apiEstado || '').toLowerCase();
-  if (v === 'en proceso') return 'en proceso';
-  if (v === 'activo') return 'planificación';
-  return 'planificación';
-};
-const mapUiToBackend = (uiEstado) => {
-  const v = String(uiEstado || '').toLowerCase();
-  return v === 'en proceso' ? 'en proceso' : 'activo';
-};
+// const backendToUiDefault = (apiEstado) => {
+//   const v = String(apiEstado || '').toLowerCase();
+//   if (v === 'en proceso') return 'en proceso';
+//   if (v === 'activo') return 'planificación';
+//   return 'planificación';
+// };
+// const mapUiToBackend = (uiEstado) => {
+//   const v = String(uiEstado || '').toLowerCase();
+//   return v === 'en proceso' ? 'en proceso' : 'activo';
+// };
 
 /* Cache local del estado UI por proyecto (no toca API) */
 const UI_ESTADO_KEY = 'proyectos_ui_estado_v1';
@@ -146,7 +146,7 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
     const p = doc.presupuesto || {};
     const cron = doc.cronograma || {};
     const id = doc.id || project?.id;
-    const estadoUi = uiEstadoCache.get(id) || backendToUiDefault(doc.estado);
+    const estadoUi = uiEstadoCache.get(id) || doc.estado;
 
     return {
       id,
@@ -317,7 +317,7 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
       ubicacion: formData.ubicacion,
       descripcion: formData.descripcion,
       personalAsignado: Array.isArray(formData.personalAsignado) ? formData.personalAsignado : [],
-      estado: mapUiToBackend(formData.estado),
+      estado: formData.estado,
       presupuesto: pres,
     };
   };
