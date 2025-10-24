@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import useRequisi from '../../../hooks/useRequisi';
+import useInventario from '../../../hooks/useInventario';
 
 const InventoryPanel = ({
   onCreatePurchaseOrder,
@@ -11,7 +12,8 @@ const InventoryPanel = ({
   onRequisitionUpdated,
 }) => {
   const [activeTab, setActiveTab] = useState('inventory');
-  const { requisitions, loading, getRequisitions, updateRequisition } = useRequisi();
+  const { requisitions, loading: loadingRequis, getRequisitions, updateRequisition } = useRequisi();
+  const { inventario, getInventario, loading: loadingInventario } = useInventario();
   const [localRequisitions, setLocalRequisitions] = useState([]);
 
   const displayedRequisitions =
@@ -19,58 +21,12 @@ const InventoryPanel = ({
       ? externalRequisitions
       : localRequisitions;
 
-  const inventoryItems = [
-    {
-      id: 1,
-      name: 'Compresor Rotativo 5HP',
-      sku: 'COMP-5HP-001',
-      currentStock: 3,
-      minStock: 5,
-      maxStock: 15,
-      unit: 'unidades',
-      location: 'Almacén A-1',
-      status: 'Bajo Stock',
-      lastUpdated: '28/09/2024',
-    },
-    {
-      id: 2,
-      name: 'Filtro de Aire HEPA',
-      sku: 'FILT-HEPA-002',
-      currentStock: 25,
-      minStock: 10,
-      maxStock: 50,
-      unit: 'unidades',
-      location: 'Almacén B-2',
-      status: 'En Stock',
-      lastUpdated: '29/09/2024',
-    },
-    {
-      id: 3,
-      name: 'Refrigerante R-410A',
-      sku: 'REF-410A-003',
-      currentStock: 2,
-      minStock: 8,
-      maxStock: 20,
-      unit: 'cilindros',
-      location: 'Almacén C-1',
-      status: 'Crítico',
-      lastUpdated: '27/09/2024',
-    },
-    {
-      id: 4,
-      name: 'Termostato Digital',
-      sku: 'TERM-DIG-004',
-      currentStock: 15,
-      minStock: 5,
-      maxStock: 25,
-      unit: 'unidades',
-      location: 'Almacén A-2',
-      status: 'En Stock',
-      lastUpdated: '30/09/2024',
-    },
-  ];
+  // 🔹 Cargar inventario dinámico
+  useEffect(() => {
+    getInventario();
+  }, []);
 
-  // Cargar requisiciones al montar
+  // 🔹 Cargar requisiciones al montar
   useEffect(() => {
     const fetchRequisitions = async () => {
       const data = await getRequisitions();
@@ -79,12 +35,18 @@ const InventoryPanel = ({
     fetchRequisitions();
   }, []);
 
-  // Actualizar cuando cambian las externas
+  // 🔹 Actualizar cuando cambian las externas
   useEffect(() => {
     if (externalRequisitions && externalRequisitions.length > 0) {
       setLocalRequisitions(externalRequisitions);
     }
   }, [externalRequisitions]);
+
+  const getStockStatus = (currentStock, reorderPoint) => {
+    if (currentStock <= 0) return 'Crítico';
+    if (currentStock <= reorderPoint) return 'Bajo Stock';
+    return 'En Stock';
+  };
 
   const getStockStatusColor = (status) => {
     switch (status) {
@@ -112,30 +74,28 @@ const InventoryPanel = ({
     }
   };
 
-  // Funciones para aprobar o rechazar requisiciones (actualiza en tiempo real)
-const handleApprove = async (request) => {
-  const updated = await updateRequisition(request.id, { estado: 'Aprobada' });
-  if (updated) {
-    const updatedList = localRequisitions.map((r) =>
-      r.id === request.id ? { ...r, estado: 'Aprobada' } : r
-    );
-    setLocalRequisitions(updatedList);
-    if (onRequisitionUpdated) onRequisitionUpdated(updatedList); //
-  }
-};
+  // 🔹 Funciones para aprobar o rechazar requisiciones (actualiza en tiempo real)
+  const handleApprove = async (request) => {
+    const updated = await updateRequisition(request.id, { estado: 'Aprobada' });
+    if (updated) {
+      const updatedList = localRequisitions.map((r) =>
+        r.id === request.id ? { ...r, estado: 'Aprobada' } : r
+      );
+      setLocalRequisitions(updatedList);
+      if (onRequisitionUpdated) onRequisitionUpdated(updatedList);
+    }
+  };
 
-const handleReject = async (request) => {
-  const updated = await updateRequisition(request.id, { estado: 'Rechazada' });
-  if (updated) {
-    const updatedList = localRequisitions.map((r) =>
-      r.id === request.id ? { ...r, estado: 'Rechazada' } : r
-    );
-    setLocalRequisitions(updatedList);
-    if (onRequisitionUpdated) onRequisitionUpdated(updatedList); 
-  }
-};
-
-
+  const handleReject = async (request) => {
+    const updated = await updateRequisition(request.id, { estado: 'Rechazada' });
+    if (updated) {
+      const updatedList = localRequisitions.map((r) =>
+        r.id === request.id ? { ...r, estado: 'Rechazada' } : r
+      );
+      setLocalRequisitions(updatedList);
+      if (onRequisitionUpdated) onRequisitionUpdated(updatedList);
+    }
+  };
 
   return (
     <div className="bg-card border border-border rounded-lg overflow-hidden h-[600px]">
@@ -182,64 +142,86 @@ const handleReject = async (request) => {
                 size="sm"
                 iconName="RefreshCw"
                 iconSize={16}
-                onClick={getRequisitions}
+                onClick={getInventario}
               >
                 Actualizar
               </Button>
             </div>
 
-            <div className="space-y-3">
-              {inventoryItems.map((item) => (
-                <div key={item.id} className="border border-border rounded-lg p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-foreground">{item.name}</h4>
-                      <p className="text-xs text-muted-foreground">SKU: {item.sku}</p>
-                    </div>
-                    <span
-                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStockStatusColor(
-                        item.status
-                      )}`}
-                    >
-                      {item.status}
-                    </span>
-                  </div>
+            {loadingInventario ? (
+              <p className="text-sm text-muted-foreground">Cargando inventario...</p>
+            ) : inventario.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No hay artículos en el inventario.</p>
+            ) : (
+              <div className="space-y-3">
+                {inventario.map((item) => {
+                  const nombre =
+                    item.descripcion ||
+                    item.description ||
+                    item.codigoArticulo ||
+                    item.itemCode ||
+                    'Artículo sin nombre';
+                  const stock = item.stockActual ?? item.currentStock ?? 0;
+                  const puntoReorden = item.puntoReorden ?? item.reorderPoint ?? 0;
+                  const unidad = item.unidad ?? item.unit ?? '';
+                  const ubicacion = item.ubicacion ?? item.location ?? 'Sin ubicación';
+                  const estado = getStockStatus(stock, puntoReorden);
 
-                  <div className="grid grid-cols-2 gap-4 mb-3">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Stock Actual</p>
-                      <p className="text-sm font-medium text-foreground">
-                        {item.currentStock} {item.unit}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Stock Mínimo</p>
-                      <p className="text-sm font-medium text-foreground">
-                        {item.minStock} {item.unit}
-                      </p>
-                    </div>
-                  </div>
+                  return (
+                    <div key={item.id} className="border border-border rounded-lg p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium text-foreground">{nombre}</h4>
+                          <p className="text-xs text-muted-foreground">
+                            SKU: {item.codigoArticulo || item.itemCode || 'N/A'}
+                          </p>
+                        </div>
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStockStatusColor(
+                            estado
+                          )}`}
+                        >
+                          {estado}
+                        </span>
+                      </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs text-muted-foreground">
-                      <Icon name="MapPin" size={12} className="inline mr-1" />
-                      {item.location}
+                      <div className="grid grid-cols-2 gap-4 mb-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Stock Actual</p>
+                          <p className="text-sm font-medium text-foreground">
+                            {stock} {unidad}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Punto de Reorden</p>
+                          <p className="text-sm font-medium text-foreground">
+                            {puntoReorden} {unidad}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs text-muted-foreground">
+                          <Icon name="MapPin" size={12} className="inline mr-1" />
+                          {ubicacion}
+                        </div>
+                        {(estado === 'Crítico' || estado === 'Bajo Stock') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onCreatePurchaseOrder(item)}
+                            iconName="ShoppingCart"
+                            iconSize={14}
+                          >
+                            Ordenar
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    {(item.status === 'Crítico' || item.status === 'Bajo Stock') && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onCreatePurchaseOrder(item)}
-                        iconName="ShoppingCart"
-                        iconSize={14}
-                      >
-                        Ordenar
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -258,7 +240,7 @@ const handleReject = async (request) => {
               </Button>
             </div>
 
-            {loading ? (
+            {loadingRequis ? (
               <p>Cargando requisiciones...</p>
             ) : (
               <div className="space-y-3">

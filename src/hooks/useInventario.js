@@ -13,7 +13,16 @@ const useInventario = () => {
     setError(null);
     try {
       const response = await inventarioService.getInventario();
-      setInventario(Array.isArray(response) ? response : response?.data || []);
+      setInventario(
+  Array.isArray(response?.data?.datos)
+    ? response.data.datos
+    : Array.isArray(response?.data)
+    ? response.data
+    : Array.isArray(response)
+    ? response
+    : []
+);
+
       return response;
     } catch (err) {
       setError(err);
