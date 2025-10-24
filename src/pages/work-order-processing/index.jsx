@@ -9,239 +9,156 @@ import InventoryPanel from './components/InventoryPanel';
 import WorkOrderModal from './components/WorkOrderModal';
 import RequisitionModal from './components/RequisitionModal';
 import StatsCards from './components/StatsCards';
+import useOperac from '../../hooks/useOperac';
+import useRequisi from '../../hooks/useRequisi';
 
 const WorkOrderProcessing = () => {
+  const { oportunities, loading, error, getOportunities } = useOperac();
+  const { requisitions, loading: loadingRequisitions, getRequisitions } = useRequisi();
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [workOrders, setWorkOrders] = useState([]);
+
+  // Estados locales
+  const [localOrders, setLocalOrders] = useState([]); // para sincronizar órdenes
+  const [localRequisitions, setLocalRequisitions] = useState([]); // para requisiciones
+
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [stats, setStats] = useState({});
-  const [isRequisitionModalOpen, setIsRequisitionModalOpen] = useState(false);
   const [selectedRequisition, setSelectedRequisition] = useState(null);
 
-  const handleSidebarToggle = () => {
-    setSidebarCollapsed(!sidebarCollapsed);
-  };
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isRequisitionModalOpen, setIsRequisitionModalOpen] = useState(false);
+  const [stats, setStats] = useState({});
 
-  const handleMobileMenuToggle = () => {
-    setMobileMenuOpen(!mobileMenuOpen);
-  };
-
-  // Mock data for work orders
-  const mockWorkOrders = [
-    {
-      id: 1,
-      orderNumber: 'OT-2024-015',
-      projectName: 'Torre Corporativa ABC',
-      clientName: 'Corporación ABC S.A.',
-      type: 'Instalación HVAC',
-      priority: 'Alta',
-      status: 'En Progreso',
-      assignedTechnician: 'Carlos Mendoza',
-      technicianRole: 'Técnico Senior',
-      dueDate: '05/10/2024',
-      progress: 65,
-      description: `Instalación completa del sistema HVAC en torre corporativa de 15 pisos.\nIncluye unidades manejadoras de aire, ductos, y sistema de control automatizado.\nSe requiere coordinación con otros contratistas para acceso a áreas técnicas.`,
-      requiredMaterials: [
-        { name: 'Compresor Rotativo 5HP', quantity: '2 unidades' },
-        { name: 'Filtro de Aire HEPA', quantity: '8 unidades' },
-        { name: 'Ductos Galvanizados', quantity: '150 metros' }
-      ],
-      attachments: [
-        { name: 'Planos_HVAC_ABC.pdf', type: 'pdf' },
-        { name: 'Especificaciones_Técnicas.docx', type: 'doc' }
-      ],
-      requiredPPE: ['Casco de Seguridad', 'Arnés de Seguridad', 'Calzado de Seguridad'],
-      medicalRequirements: true,
-      notes: 'Trabajo en altura requiere certificación vigente'
-    },
-    {
-      id: 2,
-      orderNumber: 'OT-2024-016',
-      projectName: 'Centro Comercial Plaza Norte',
-      clientName: 'Inmobiliaria Plaza Norte',
-      type: 'Mantenimiento Preventivo',
-      priority: 'Media',
-      status: 'Pendiente',
-      assignedTechnician: 'Ana García',
-      technicianRole: 'Especialista HVAC',
-      dueDate: '08/10/2024',
-      progress: 0,
-      description: `Mantenimiento preventivo trimestral del sistema HVAC del centro comercial.\nIncluye limpieza de filtros, revisión de compresores y calibración de termostatos.\nProgramado durante horarios de menor afluencia de público.`,
-      requiredMaterials: [
-        { name: 'Filtros de Aire', quantity: '20 unidades' },
-        { name: 'Refrigerante R-410A', quantity: '2 cilindros' },
-        { name: 'Aceite para Compresor', quantity: '5 litros' }
-      ],
-      attachments: [
-        { name: 'Checklist_Mantenimiento.pdf', type: 'pdf' }
-      ],
-      requiredPPE: ['Casco de Seguridad', 'Gafas de Protección', 'Guantes de Trabajo'],
-      medicalRequirements: false,
-      notes: 'Coordinar con administración del centro comercial'
-    },
-    {
-      id: 3,
-      orderNumber: 'OT-2024-017',
-      projectName: 'Hospital General San José',
-      clientName: 'Hospital General San José',
-      type: 'Reparación de Emergencia',
-      priority: 'Crítica',
-      status: 'En Progreso',
-      assignedTechnician: 'Roberto Silva',
-      technicianRole: 'Técnico Junior',
-      dueDate: '02/10/2024',
-      progress: 85,
-      description: `Reparación urgente del sistema de climatización en área de cuidados intensivos.\nFalla en compresor principal requiere reemplazo inmediato.\nTrabajo 24/7 hasta completar la reparación crítica.`,
-      requiredMaterials: [
-        { name: 'Compresor Scroll 10HP', quantity: '1 unidad' },
-        { name: 'Kit de Conexiones', quantity: '1 set' },
-        { name: 'Refrigerante R-134A', quantity: '3 cilindros' }
-      ],
-      attachments: [
-        { name: 'Reporte_Falla_UCI.pdf', type: 'pdf' },
-        { name: 'Foto_Compresor_Dañado.jpg', type: 'image' }
-      ],
-      requiredPPE: ['Casco de Seguridad', 'Respirador N95', 'Guantes de Trabajo', 'Calzado de Seguridad'],
-      medicalRequirements: true,
-      notes: 'Ambiente hospitalario - seguir protocolos de bioseguridad'
-    },
-    {
-      id: 4,
-      orderNumber: 'OT-2024-018',
-      projectName: 'Edificio Residencial Vista Mar',
-      clientName: 'Constructora Vista Mar',
-      type: 'Instalación Nueva',
-      priority: 'Media',
-      status: 'Completada',
-      assignedTechnician: 'María López',
-      technicianRole: 'Supervisora',
-      dueDate: '28/09/2024',
-      progress: 100,
-      description: `Instalación de sistema HVAC en edificio residencial de 8 pisos.\nSistema VRF con unidades individuales por apartamento.\nIncluye programación de controles remotos y capacitación a usuarios.`,
-      requiredMaterials: [
-        { name: 'Unidades VRF', quantity: '24 unidades' },
-        { name: 'Controles Remotos', quantity: '24 unidades' },
-        { name: 'Tubería de Cobre', quantity: '200 metros' }
-      ],
-      attachments: [
-        { name: 'Manual_Usuario_VRF.pdf', type: 'pdf' },
-        { name: 'Certificado_Instalación.pdf', type: 'pdf' }
-      ],
-      requiredPPE: ['Casco de Seguridad', 'Calzado de Seguridad', 'Guantes de Trabajo'],
-      medicalRequirements: false,
-      notes: 'Proyecto completado satisfactoriamente - cliente aprobó entrega'
-    },
-    {
-      id: 5,
-      orderNumber: 'OT-2024-019',
-      projectName: 'Oficinas Corporativas TechSoft',
-      clientName: 'TechSoft Solutions',
-      type: 'Actualización de Sistema',
-      priority: 'Baja',
-      status: 'En Pausa',
-      assignedTechnician: 'Diego Ramírez',
-      technicianRole: 'Técnico Senior',
-      dueDate: '15/10/2024',
-      progress: 30,
-      description: `Actualización del sistema de control HVAC a tecnología IoT.\nInstalación de sensores inteligentes y sistema de monitoreo remoto.\nProyecto pausado por disponibilidad de equipos especializados.`,
-      requiredMaterials: [
-        { name: 'Sensores IoT', quantity: '15 unidades' },
-        { name: 'Gateway de Comunicación', quantity: '1 unidad' },
-        { name: 'Cableado de Red', quantity: '100 metros' }
-      ],
-      attachments: [
-        { name: 'Propuesta_IoT_TechSoft.pdf', type: 'pdf' }
-      ],
-      requiredPPE: ['Casco de Seguridad', 'Gafas de Protección'],
-      medicalRequirements: false,
-      notes: 'Esperando llegada de sensores IoT - fecha estimada 10/10/2024'
-    }
-  ];
-
-  const mockStats = {
-    activeOrders: 24,
-    pendingOrders: 8,
-    inProgressOrders: 12,
-    completedToday: 4,
-    activeTechnicians: 15,
-    criticalMaterials: 3
-  };
-
+  // Obtener requisiciones y oportunidades al iniciar
   useEffect(() => {
-    setWorkOrders(mockWorkOrders);
-    setFilteredOrders(mockWorkOrders);
-    setStats(mockStats);
+    const fetchData = async () => {
+      const reqData = await getRequisitions();
+      setLocalRequisitions(reqData || []);
+
+      const oppData = await getOportunities();
+      setLocalOrders(oppData || []);
+      setFilteredOrders(oppData || []);
+    };
+    fetchData();
   }, []);
 
+  // Mantener sincronía si cambian los datos del hook
+  useEffect(() => {
+    if (oportunities && oportunities.length > 0) {
+      setLocalOrders(oportunities);
+      setFilteredOrders(oportunities);
+    }
+  }, [oportunities]);
+
+  useEffect(() => {
+    if (requisitions && requisitions.length > 0) {
+      setLocalRequisitions(requisitions);
+    }
+  }, [requisitions]);
+
+  // Filtros dinámicos
   const handleFiltersChange = (filters) => {
-    let filtered = [...workOrders];
+    let filtered = [...(localOrders || [])];
 
     if (filters?.search) {
-      filtered = filtered?.filter(order => 
-        order?.orderNumber?.toLowerCase()?.includes(filters?.search?.toLowerCase()) ||
-        order?.projectName?.toLowerCase()?.includes(filters?.search?.toLowerCase()) ||
-        order?.clientName?.toLowerCase()?.includes(filters?.search?.toLowerCase())
+      const search = filters.search.toLowerCase();
+      filtered = filtered.filter(order =>
+        order?.cliente?.toLowerCase()?.includes(search) ||
+        order?.tipo?.toLowerCase()?.includes(search) ||
+        order?.tecnicoAsignado?.toLowerCase()?.includes(search) ||
+        order?.notasAdicionales?.toLowerCase()?.includes(search)
       );
     }
 
-    if (filters?.status) {
-      filtered = filtered?.filter(order => order?.status === filters?.status);
-    }
+    if (filters?.status)
+      filtered = filtered.filter(order => order?.estado === filters.status);
 
-    if (filters?.priority) {
-      filtered = filtered?.filter(order => order?.priority === filters?.priority);
-    }
+    if (filters?.priority)
+      filtered = filtered.filter(order => order?.prioridad === filters.priority);
 
-    if (filters?.technician) {
-      filtered = filtered?.filter(order => order?.assignedTechnician === filters?.technician);
-    }
+    if (filters?.technician)
+      filtered = filtered.filter(order => order?.tecnicoAsignado === filters.technician);
 
-    if (filters?.project) {
-      filtered = filtered?.filter(order => order?.orderNumber === filters?.project);
+    if (filters?.project)
+      filtered = filtered.filter(order =>
+        order?.tipo === filters.project || order?.cliente === filters.project
+      );
+
+    if (filters?.dateRange) {
+      const today = new Date();
+      filtered = filtered.filter(order => {
+        const dueDate = new Date(order?.fechaLimite);
+        if (isNaN(dueDate)) return false;
+        switch (filters.dateRange) {
+          case 'today':
+            return dueDate.toDateString() === today.toDateString();
+          case 'week': {
+            const startOfWeek = new Date(today);
+            startOfWeek.setDate(today.getDate() - today.getDay());
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(startOfWeek.getDate() + 6);
+            return dueDate >= startOfWeek && dueDate <= endOfWeek;
+          }
+          case 'month':
+            return (
+              dueDate.getMonth() === today.getMonth() &&
+              dueDate.getFullYear() === today.getFullYear()
+            );
+          case 'overdue':
+            return dueDate < today;
+          default:
+            return true;
+        }
+      });
     }
 
     setFilteredOrders(filtered);
   };
 
+  // Actualizar estatus
   const handleStatusUpdate = (order, newStatus) => {
-    const updatedOrders = workOrders?.map(wo => 
-      wo?.id === order?.id ? { ...wo, status: newStatus } : wo
+    const updatedOrders = localOrders.map(wo =>
+      wo.id === order.id ? { ...wo, estado: newStatus } : wo
     );
-    setWorkOrders(updatedOrders);
+    setLocalOrders(updatedOrders);
     setFilteredOrders(updatedOrders);
   };
 
-  const handleAssignTechnician = (order) => {
-    setSelectedOrder(order);
-    setIsModalOpen(true);
+  // CRUD de órdenes
+  const handleSaveOrder = async (savedOrder) => {
+    let newOrder = { ...savedOrder };
+
+    if (!newOrder?.id) {
+      newOrder.id = Date.now();
+      newOrder.estado = 'Pendiente';
+      newOrder.fechaCreacion = new Date().toISOString();
+    }
+
+    setLocalOrders(prev => {
+      const exists = prev.some(o => o.id === newOrder.id);
+      return exists
+        ? prev.map(o => (o.id === newOrder.id ? newOrder : o))
+        : [newOrder, ...prev];
+    });
+
+    setFilteredOrders(prev => {
+      const exists = prev.some(o => o.id === newOrder.id);
+      return exists
+        ? prev.map(o => (o.id === newOrder.id ? newOrder : o))
+        : [newOrder, ...prev];
+    });
+
+    setIsModalOpen(false);
+    setSelectedOrder(null);
   };
 
-  const handleViewDetails = (order) => {
-    setSelectedOrder(order);
-    setIsModalOpen(true);
-  };
-
-  const handleEditOrder = (order) => {
-    setSelectedOrder(order);
-    setIsModalOpen(true);
-  };
-
-  const handleSaveOrder = (updatedOrder) => {
-    const updatedOrders = workOrders?.map(wo => 
-      wo?.id === updatedOrder?.id ? updatedOrder : wo
-    );
-    setWorkOrders(updatedOrders);
-    setFilteredOrders(updatedOrders);
-  };
-
+  // Crear nueva orden
   const handleCreateNewOrder = () => {
-    // Create empty order structure for new order creation
     const newOrder = {
-      id: null, // Will be generated when saved
-      orderNumber: '', // Will be auto-generated
+      id: null,
+      orderNumber: '',
       projectName: '',
       clientName: '',
       type: '',
@@ -258,20 +175,19 @@ const WorkOrderProcessing = () => {
       medicalRequirements: false,
       notes: ''
     };
-    
     setSelectedOrder(newOrder);
     setIsModalOpen(true);
   };
 
+  // Crear nueva requisición
   const handleCreateNewRequisition = () => {
-    // Create empty requisition structure for new requisition creation
     const newRequisition = {
-      id: null, // Will be generated when saved
-      requestNumber: '', // Will be auto-generated
+      id: null,
+      requestNumber: '',
       orderNumber: '',
       projectName: '',
       requestedBy: 'Usuario Actual',
-      requestDate: new Date()?.toISOString()?.split('T')?.[0],
+      requestDate: new Date().toISOString().split('T')[0],
       status: 'Pendiente',
       priority: 'Media',
       description: '',
@@ -281,41 +197,29 @@ const WorkOrderProcessing = () => {
       approvalDate: '',
       notes: ''
     };
-    
     setSelectedRequisition(newRequisition);
     setIsRequisitionModalOpen(true);
   };
 
-  const handleSaveRequisition = (updatedRequisition) => {
-    console.log('Saving requisition:', updatedRequisition);
-    
-    // Generate a unique ID if it's a new requisition
-    if (!updatedRequisition?.id) {
-      updatedRequisition.id = Date.now();
-      updatedRequisition.requestNumber = `REQ-${new Date()?.getFullYear()}-${String(updatedRequisition?.id)?.slice(-3)}`;
-    }
-    
-    // Here you would typically save to your backend
-    // For now, just show success message and close modal
-    alert(`Requisición ${updatedRequisition?.requestNumber} ${updatedRequisition?.id ? 'actualizada' : 'creada'} exitosamente`);
-    
-    setIsRequisitionModalOpen(false);
-    setSelectedRequisition(null);
-  };
+  // Guardar requisición
+  const handleSaveRequisition = async (savedRequisition) => {
+  let newReq = { ...savedRequisition };
 
-  const handleCreatePurchaseOrder = (item) => {
-    console.log('Creating purchase order for:', item);
-    // Navigate to purchase order creation
-  };
+  if (!newReq?.id) {
+    newReq.id = Date.now();
+    newReq.requestNumber = `REQ-${new Date().getFullYear()}-${String(newReq.id).slice(-3)}`;
+  }
 
-  const handleRequestMaterial = (request) => {
-    console.log('Processing material request:', request);
-    // Update request status
-  };
+  setLocalRequisitions(prev => [newReq, ...prev]);
+  setLocalOrders(prev => [newReq, ...prev]); // 🔹 esto hará que se muestre también en WorkOrderTable
+
+  getRequisitions(); // sincroniza backend
+  setIsRequisitionModalOpen(false);
+  setSelectedRequisition(null);
+};
 
   const handleExportData = () => {
-    // Generate CSV data with work orders
-    const csvData = filteredOrders?.map(order => ({
+    const csvData = filteredOrders.map(order => ({
       'Número de Orden': order?.orderNumber,
       'Proyecto': order?.projectName,
       'Cliente': order?.clientName,
@@ -327,46 +231,32 @@ const WorkOrderProcessing = () => {
       'Progreso': `${order?.progress}%`
     }));
 
-    // Convert to CSV format
-    const headers = Object.keys(csvData?.[0] || {});
+    const headers = Object.keys(csvData[0] || {});
     const csvContent = [
-      headers?.join(','),
-      ...csvData?.map(row => headers?.map(header => `"${row?.[header]}"`)?.join(','))
-    ]?.join('\n');
+      headers.join(','),
+      ...csvData.map(row => headers.map(header => `"${row[header]}"`).join(','))
+    ].join('\n');
 
-    // Create and download file
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link?.setAttribute('href', url);
-    link?.setAttribute('download', `ordenes_trabajo_${new Date()?.toISOString()?.split('T')?.[0]}.csv`);
-    document.body?.appendChild(link);
-    link?.click();
-    document.body?.removeChild(link);
+    link.setAttribute('href', URL.createObjectURL(blob));
+    link.setAttribute('download', `ordenes_trabajo_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Desktop Sidebar */}
       <div className="hidden lg:block">
-        <Sidebar 
-          isCollapsed={sidebarCollapsed} 
-          onToggle={handleSidebarToggle}
-        />
+        <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
       </div>
-      {/* Mobile Header */}
       <div className="lg:hidden">
-        <Header 
-          onMenuToggle={handleMobileMenuToggle}
-          isMenuOpen={mobileMenuOpen}
-        />
+        <Header onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)} isMenuOpen={mobileMenuOpen} />
       </div>
-      {/* Main Content */}
-      <div className={`transition-all duration-300 ${
-        sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'
-      } lg:pt-0 pt-16`}>
+
+      <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'} lg:pt-0 pt-16`}>
         <div className="p-6">
-          {/* Header Section */}
           <div className="mb-6">
             <Breadcrumb />
             <div className="flex items-center justify-between mt-4">
@@ -377,84 +267,63 @@ const WorkOrderProcessing = () => {
                 </p>
               </div>
               <div className="flex items-center space-x-3">
-                <Button
-                  variant="outline"
-                  iconName="Plus"
-                  iconSize={16}
-                  onClick={handleCreateNewOrder}
-                >
+                <Button variant="outline" iconName="Plus" iconSize={16} onClick={handleCreateNewOrder}>
                   Nueva Orden
                 </Button>
-                <Button
-                  variant="outline"
-                  iconName="ClipboardList"
-                  iconSize={16}
-                  onClick={handleCreateNewRequisition}
-                >
+                <Button variant="outline" iconName="ClipboardList" iconSize={16} onClick={handleCreateNewRequisition}>
                   Nueva Requisición
                 </Button>
-                <Button
-                  variant="default"
-                  iconName="Download"
-                  iconSize={16}
-                  onClick={handleExportData}
-                >
+                <Button variant="default" iconName="Download" iconSize={16} onClick={handleExportData}>
                   Exportar
                 </Button>
               </div>
             </div>
           </div>
 
-          {/* Stats Cards */}
           <StatsCards stats={stats} />
 
-          {/* Main Content */}
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* Work Orders Section */}
             <div className="xl:col-span-2 space-y-6">
               <FilterToolbar
                 onFiltersChange={handleFiltersChange}
-                totalCount={workOrders?.length}
+                totalCount={localOrders?.length}
                 filteredCount={filteredOrders?.length}
               />
 
               <WorkOrderTable
                 workOrders={filteredOrders}
+                requisitions={localRequisitions}
                 onStatusUpdate={handleStatusUpdate}
-                onAssignTechnician={handleAssignTechnician}
-                onViewDetails={handleViewDetails}
-                onEditOrder={handleEditOrder}
+                onAssignTechnician={setSelectedOrder}
+                onViewDetails={setSelectedOrder}
+                onEditOrder={handleSaveOrder}
+                loading={loading}
+                error={error}
               />
             </div>
 
-            {/* Inventory Panel */}
             <div className="xl:col-span-1">
               <InventoryPanel
-                onCreatePurchaseOrder={handleCreatePurchaseOrder}
-                onRequestMaterial={handleRequestMaterial}
+                onCreatePurchaseOrder={() => {}}
+                onRequestMaterial={() => {}}
                 onCreateRequisition={handleCreateNewRequisition}
+                requisitions={localRequisitions}
+                loading={loadingRequisitions}
+                 onRequisitionUpdated={setLocalRequisitions}
               />
             </div>
           </div>
 
-          {/* Work Order Modal */}
           <WorkOrderModal
             isOpen={isModalOpen}
-            onClose={() => {
-              setIsModalOpen(false);
-              setSelectedOrder(null);
-            }}
+            onClose={() => { setIsModalOpen(false); setSelectedOrder(null); }}
             workOrder={selectedOrder}
-            onSave={handleSaveOrder}
+            onSaveSuccess={handleSaveOrder}
           />
 
-          {/* Requisition Modal */}
           <RequisitionModal
             isOpen={isRequisitionModalOpen}
-            onClose={() => {
-              setIsRequisitionModalOpen(false);
-              setSelectedRequisition(null);
-            }}
+            onClose={() => { setIsRequisitionModalOpen(false); setSelectedRequisition(null); }}
             requisition={selectedRequisition}
             onSave={handleSaveRequisition}
           />
