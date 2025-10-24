@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import OrderDetailsModal from './components/OrderDetailsModal';
 import Header from '../../components/ui/Header';
 import Sidebar from '../../components/ui/Sidebar';
 import Breadcrumb from '../../components/ui/Breadcrumb';
+import ordenCompraService from '../../services/ordenCompraService';
 import InventoryTable from './components/InventoryTable';
 import InventoryFilters from './components/InventoryFilters';
 import StockAlerts from './components/StockAlerts';
@@ -11,12 +13,23 @@ import InventoryStats from './components/InventoryStats';
 import NewItemModal from './components/NewItemModal';
 import ItemDetailsModal from './components/ItemDetailsModal';
 import EditItemModal from './components/EditItemModal';
+import CreatePOModal from './components/CreatePOModal';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
 import useInventory from '../../hooks/useInventory';
 
+import useOrder from '../../hooks/useOrder';
+
 const InventoryManagement = () => {
-  const { articulos, getArticulos, loading, error } = useInventory();
+  const { articulos, getArticulos, loading: inventoryLoading, error: inventoryError } = useInventory();
+  const { 
+    ordenes, 
+    loading: orderLoading, 
+    error: orderError,
+    createOrden,
+    getOrdenes,
+    updateOrden 
+  } = useOrder();
   
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -24,7 +37,12 @@ const InventoryManagement = () => {
   const [showNewItemModal, setShowNewItemModal] = useState(false);
   const [showItemDetailsModal, setShowItemDetailsModal] = useState(false);
   const [showEditItemModal, setShowEditItemModal] = useState(false);
+  const [showCreatePOModal, setShowCreatePOModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const loading = inventoryLoading || orderLoading;
+  const error = inventoryError || orderError;
   const [filters, setFilters] = useState({
     search: '',
     category: '',
@@ -94,8 +112,14 @@ const InventoryManagement = () => {
       });
   }, [inventoryItems]);
 
-  // Purchase orders - to be implemented with backend
-  const purchaseOrders = [];
+  // Artículos con stock bajo para órdenes de compra
+  const lowStockItems = React.useMemo(() => {
+    return inventoryItems.filter(item => {
+      const currentStock = item.currentStock || 0;
+      const reorderPoint = item.reorderPoint || 0;
+      return currentStock === 0 || currentStock <= reorderPoint;
+    });
+  }, [inventoryItems]);
 
   // Material requirements - to be implemented with backend
   const materialRequirements = [];
@@ -194,7 +218,20 @@ const InventoryManagement = () => {
   };
 
   const handleCreatePO = (item) => {
-    console.log('Create purchase order for:', item);
+    // Si recibimos un objeto de alerta, necesitamos encontrar el artículo real de inventario
+    if (item.type && (item.type === 'out-of-stock' || item.type === 'low-stock')) {
+      // Buscar el artículo correspondiente por itemCode en el inventario
+      const inventoryItem = inventoryItems.find(invItem => invItem.itemCode === item.itemCode);
+      if (inventoryItem) {
+        setSelectedItem(inventoryItem);
+      } else {
+        setSelectedItem(item); // Fallback si no se encuentra
+      }
+    } else {
+      // Es un ítem directo del inventario
+      setSelectedItem(item);
+    }
+    setShowCreatePOModal(true);
   };
 
   // Handlers para cerrar modales
@@ -206,6 +243,35 @@ const InventoryManagement = () => {
   const handleCloseEditItemModal = () => {
     setShowEditItemModal(false);
     setSelectedItem(null);
+  };
+
+  const handleClosePOModal = () => {
+    setShowCreatePOModal(false);
+    setSelectedItem(null);
+    // No necesitamos resetear el estado del modal aquí,
+    // ya que useEffect en el modal se encarga de eso cuando cambia initialItem
+  };
+
+  const handleSubmitPO = async (orderData) => {
+    try {
+      // Crear la orden en el backend
+      await createOrden({
+        ...orderData,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        estado: 'pending'  // Cambiado de status a estado para coincidir con el backend
+      });
+
+      // Recargar las órdenes para obtener la lista actualizada
+      await getOrdenes();
+      
+      // Cerrar el modal y cambiar a la vista de órdenes
+      setShowCreatePOModal(false);
+      setSelectedItem(null);
+      setActiveView('orders');
+    } catch (error) {
+      console.error('Error al crear la orden de compra:', error);
+    }
   };
 
   // Handler para actualización exitosa
@@ -230,15 +296,80 @@ const InventoryManagement = () => {
   };
 
   const handleViewOrder = (order) => {
-    console.log('View order:', order);
+    setSelectedOrder(order);
+    setShowOrderDetailsModal(true);
   };
 
-  const handleApproveOrder = (order) => {
-    console.log('Approve order:', order);
+  const handleCloseOrderDetails = () => {
+    setShowOrderDetailsModal(false);
+    setSelectedOrder(null);
+  };
+
+  const handleDownloadOrder = async (order) => {
+    try {
+      // Crear el contenido del PDF-like
+      const content = `
+ORDEN DE COMPRA ${order.numeroOrden}
+=============================
+Fecha: ${new Date(order.fechaCreacion).toLocaleDateString()}
+Proveedor: ${order.proveedor.nombre}
+Estado: ${order.estado}
+${order.esUrgente ? 'URGENTE\n' : ''}
+
+ARTÍCULOS:
+${order.articulos.map(item => `
+${item.codigoArticulo} - ${item.descripcion}
+Cantidad: ${item.cantidadOrdenada} ${item.unidad}
+Precio unitario: ${item.costoUnitario.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}
+Subtotal: ${item.subtotal.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}
+`).join('\n')}
+
+TOTAL: ${order.totalOrden.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}
+
+Notas:
+${order.notas || 'Sin notas adicionales'}
+`;
+
+      // Crear y descargar el archivo
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `orden-compra-${order.numeroOrden}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error al descargar la orden:', error);
+    }
+  };
+
+  const handleDeleteOrder = async (order) => {
+    try {
+      await ordenCompraService.deleteOrden(order.id);
+      await getOrdenes(); // Recargar la lista
+    } catch (error) {
+      console.error('Error al eliminar la orden:', error);
+    }
+  };
+
+  const handleApproveOrder = async (order) => {
+    try {
+      await updateOrden(order.id, {
+        ...order,
+        status: 'approved',
+        updatedAt: new Date().toISOString()
+      });
+      await getOrdenes(); // Recargar la lista de órdenes
+    } catch (error) {
+      console.error('Error al aprobar la orden:', error);
+    }
   };
 
   const handleCreateOrder = () => {
-    console.log('Create new purchase order');
+    setSelectedItem(null);
+    setShowCreatePOModal(true);
   };
 
   const handleExport = async () => {
@@ -351,7 +482,8 @@ const InventoryManagement = () => {
   // Cargar artículos al montar el componente
   useEffect(() => {
     getArticulos();
-  }, [getArticulos]);
+    getOrdenes();
+  }, [getArticulos, getOrdenes]);
 
   useEffect(() => {
     document.title = 'Gestión de Inventario - AireFlow Pro';
@@ -467,10 +599,12 @@ const InventoryManagement = () => {
 
           {activeView === 'orders' && (
             <PurchaseOrderPanel
-              orders={purchaseOrders}
+              orders={ordenes}
               onViewOrder={handleViewOrder}
               onApproveOrder={handleApproveOrder}
               onCreateOrder={handleCreateOrder}
+              onDownloadOrder={handleDownloadOrder}
+              onDeleteOrder={handleDeleteOrder}
             />
           )}
 
@@ -503,6 +637,22 @@ const InventoryManagement = () => {
             onClose={handleCloseEditItemModal}
             item={selectedItem}
             onUpdateSuccess={handleUpdateSuccess}
+          />
+
+          {/* Create Purchase Order Modal */}
+          <CreatePOModal
+            isOpen={showCreatePOModal}
+            onClose={handleClosePOModal}
+            onSubmit={handleSubmitPO}
+            initialItem={selectedItem}
+            lowStockItems={lowStockItems}
+          />
+
+          {/* Order Details Modal */}
+          <OrderDetailsModal
+            isOpen={showOrderDetailsModal}
+            onClose={handleCloseOrderDetails}
+            order={selectedOrder}
           />
         </div>
       </main>
