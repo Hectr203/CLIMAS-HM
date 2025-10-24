@@ -60,62 +60,70 @@ const WorkOrderProcessing = () => {
 
   // Filtros dinámicos
   const handleFiltersChange = (filters) => {
-    let filtered = [...(localOrders || [])];
+  let filtered = [...(localOrders || [])];
 
-    if (filters?.search) {
-      const search = filters.search.toLowerCase();
-      filtered = filtered.filter(order =>
-        order?.cliente?.toLowerCase()?.includes(search) ||
-        order?.tipo?.toLowerCase()?.includes(search) ||
-        order?.tecnicoAsignado?.toLowerCase()?.includes(search) ||
-        order?.notasAdicionales?.toLowerCase()?.includes(search)
-      );
-    }
+  // 🔍 Búsqueda general
+  if (filters?.search) {
+    const search = filters.search.toLowerCase();
+    filtered = filtered.filter(order =>
+      order?.ordenTrabajo?.toLowerCase()?.includes(search) ||
+      order?.cliente?.nombre?.toLowerCase()?.includes(search) ||
+      order?.cliente?.empresa?.toLowerCase()?.includes(search) ||
+      order?.tipo?.toLowerCase()?.includes(search) ||
+      order?.tecnicoAsignado?.nombre?.toLowerCase()?.includes(search) ||
+      order?.notasAdicionales?.toLowerCase()?.includes(search)
+    );
+  }
 
-    if (filters?.status)
-      filtered = filtered.filter(order => order?.estado === filters.status);
+  // 🟨 Estado
+  if (filters?.status)
+    filtered = filtered.filter(order => order?.estado === filters.status);
 
-    if (filters?.priority)
-      filtered = filtered.filter(order => order?.prioridad === filters.priority);
+  // 🔺 Prioridad
+  if (filters?.priority)
+    filtered = filtered.filter(order => order?.prioridad === filters.priority);
 
-    if (filters?.technician)
-      filtered = filtered.filter(order => order?.tecnicoAsignado === filters.technician);
+  // 👷‍♂️ Técnico
+  if (filters?.technician)
+    filtered = filtered.filter(order =>
+      order?.tecnicoAsignado?.nombre === filters.technician
+    );
 
-    if (filters?.project)
-      filtered = filtered.filter(order =>
-        order?.tipo === filters.project || order?.cliente === filters.project
-      );
+  // 🏗 Proyecto (por tipo)
+  if (filters?.project)
+    filtered = filtered.filter(order => order?.tipo === filters.project);
 
-    if (filters?.dateRange) {
-      const today = new Date();
-      filtered = filtered.filter(order => {
-        const dueDate = new Date(order?.fechaLimite);
-        if (isNaN(dueDate)) return false;
-        switch (filters.dateRange) {
-          case 'today':
-            return dueDate.toDateString() === today.toDateString();
-          case 'week': {
-            const startOfWeek = new Date(today);
-            startOfWeek.setDate(today.getDate() - today.getDay());
-            const endOfWeek = new Date(startOfWeek);
-            endOfWeek.setDate(startOfWeek.getDate() + 6);
-            return dueDate >= startOfWeek && dueDate <= endOfWeek;
-          }
-          case 'month':
-            return (
-              dueDate.getMonth() === today.getMonth() &&
-              dueDate.getFullYear() === today.getFullYear()
-            );
-          case 'overdue':
-            return dueDate < today;
-          default:
-            return true;
+  // 📅 Rango de fechas
+  if (filters?.dateRange) {
+    const today = new Date();
+    filtered = filtered.filter(order => {
+      const dueDate = new Date(order?.fechaLimite);
+      if (isNaN(dueDate)) return false;
+      switch (filters.dateRange) {
+        case 'today':
+          return dueDate.toDateString() === today.toDateString();
+        case 'week': {
+          const startOfWeek = new Date(today);
+          startOfWeek.setDate(today.getDate() - today.getDay());
+          const endOfWeek = new Date(startOfWeek);
+          endOfWeek.setDate(startOfWeek.getDate() + 6);
+          return dueDate >= startOfWeek && dueDate <= endOfWeek;
         }
-      });
-    }
+        case 'month':
+          return (
+            dueDate.getMonth() === today.getMonth() &&
+            dueDate.getFullYear() === today.getFullYear()
+          );
+        case 'overdue':
+          return dueDate < today;
+        default:
+          return true;
+      }
+    });
+  }
 
-    setFilteredOrders(filtered);
-  };
+  setFilteredOrders(filtered);
+};
 
   // Actualizar estatus
   const handleStatusUpdate = (order, newStatus) => {

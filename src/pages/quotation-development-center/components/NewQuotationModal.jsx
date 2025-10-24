@@ -2,6 +2,7 @@ import { useNotifications } from '../../../context/NotificationContext';
 import useQuotation from '../../../hooks/useQuotation';
 import useClient from '../../../hooks/useClient';
 import React, { useState } from 'react';
+import { useEstados, useMunicipios } from '../../../hooks/useEstado';
 import useProyecto from '../../../hooks/useProyect';
 import usePerson from '../../../hooks/usePerson';
 import Icon from '../../../components/AppIcon';
@@ -86,7 +87,9 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
     telefono: '',
     email: '',
     descripcionProyecto: '',
-    ubicacion: '',
+    estado: '',
+    municipio: '',
+    direccion: '',
     montoTotal: '',
     cronograma: '',
     prioridad: 'media',
@@ -102,6 +105,17 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
     getProyectos();
     getClients();
   }, []);
+
+  // Estados y municipios (hooks llamados una sola vez)
+  const { estados, loading: loadingEstados, error: errorEstados } = useEstados();
+  const { municipios, loading: loadingMunicipios, error: errorMunicipios } = useMunicipios(formData.estado);
+
+  // Mostrar en consola cómo se obtienen los estados y municipios
+  React.useEffect(() => {
+    console.log('Estados:', estados);
+    console.log('Municipios:', municipios);
+    console.log('Estado seleccionado:', formData.estado);
+  }, [estados, municipios, formData.estado]);
   // Opciones para el select de proyectos (con clientId)
   const projectOptions = proyectos?.map(p => ({
     value: p.id || p._id || p.codigo || p.nombreProyecto,
@@ -143,12 +157,14 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
   React.useEffect(() => { getPersons(); /* solo una vez */ }, []);
   // Opciones para el select de responsables (corregido)
   // Opciones para el select de responsables (corregido)
+  // Clave única para cada responsable (evita duplicados)
   const assignedToOptions = persons?.map((emp, idx) => {
     const idValue = emp.empleadoId || emp.id || `${idx}`;
+    // Si hay duplicados, agrega el índice para asegurar unicidad
     return {
       value: idValue,
       label: emp.nombreCompleto || emp.nombre || emp.empleadoId || emp.id,
-      key: idValue // clave única para React
+      key: `${idValue}-${idx}`
     };
   }) || [];
 
@@ -225,8 +241,14 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
       newErrors.descripcionProyecto = 'La descripción del proyecto es requerida';
     }
 
-    if (!formData?.ubicacion?.trim()) {
-      newErrors.ubicacion = 'La ubicación es requerida';
+    if (!formData?.estado?.trim()) {
+      newErrors.estado = 'El estado es requerido';
+    }
+    if (!formData?.municipio?.trim()) {
+      newErrors.municipio = 'El municipio es requerido';
+    }
+    if (!formData?.direccion?.trim()) {
+      newErrors.direccion = 'La dirección es requerida';
     }
 
     if (!formData?.montoTotal?.trim()) {
@@ -255,23 +277,28 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
     if (!validateForm()) return;
     setIsSubmitting(true);
     try {
+      // Construir el objeto con los campos que espera el backend
       const quotationPayload = {
         clienteId: formData?.clienteId,
         nombreCliente: formData?.nombreCliente?.trim(),
         proyectoId: formData?.proyectoId,
         nombreProyecto: formData?.nombreProyecto?.trim(),
-        personalAsignadoId: formData?.personalAsignadoId,
-        asignadoA: formData?.asignadoA,
-        prioridad: formData?.prioridad,
-        tipoProyecto: formData?.tipoProyecto,
-        notas: formData?.notas,
         personaContacto: formData?.personaContacto?.trim(),
         telefono: formData?.telefono?.trim(),
         email: formData?.email?.trim(),
         descripcionProyecto: formData?.descripcionProyecto?.trim(),
-        ubicacion: formData?.ubicacion?.trim(),
+        ubicacion: {
+          estado: formData?.estado,
+          municipio: formData?.municipio,
+          direccion: formData?.direccion,
+        },
         presupuestoEstimado: Number(formData?.montoTotal),
-        cronograma: formData?.cronograma,
+        tiempoEjecucion: formData?.cronograma,
+        prioridad: formData?.prioridad,
+        Responsable: formData?.asignadoA,
+        idResponsable: formData?.personalAsignadoId,
+        tipoProyecto: formData?.tipoProyecto,
+        notas: formData?.notas
       };
       console.log('Objeto enviado al backend:', quotationPayload);
       const response = await createQuotation(quotationPayload);
@@ -473,16 +500,62 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input
-                    label="Ubicación del Proyecto"
-                    required
-                    value={formData?.ubicacion}
-                    onChange={(e) => handleInputChange('ubicacion', e?.target?.value)}
-                    error={errors?.ubicacion}
-                    placeholder="Ciudad, Estado"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4 items-center">
+                  <div className="flex flex-col justify-end h-full">
+                    <Select
+                      label={<>Estado <span className="text-destructive">*</span></>}
+                      value={formData.estado}
+                      onChange={value => {
+                        handleInputChange('estado', value);
+                        handleInputChange('municipio', '');
+                      }}
+                      options={
+                        estados ? [{ value: '', label: 'Selecciona un estado' }, ...estados.map(e => ({ value: e.code, label: e.name }))] : []
+                      }
+                      loading={loadingEstados}
+                      error={errors?.estado}
+                      required
+                      disabled={loadingEstados || !!errorEstados}
+                      placeholder={loadingEstados ? 'Cargando estados...' : 'Selecciona un estado'}
+                      searchable
+                      className="h-12 md:h-14 w-full text-base"
+                    />
+                  </div>
+                  <div className="flex flex-col justify-end h-full">
+                    <Select
+                      label={<>Municipio <span className="text-destructive">*</span></>}
+                      value={formData.municipio}
+                      onChange={value => handleInputChange('municipio', value)}
+                      options={
+                        formData.estado === ''
+                          ? [{ value: '', label: 'Selecciona un estado primero' }]
+                          : loadingMunicipios
+                            ? [{ value: '', label: 'Cargando municipios...' }]
+                            : errorMunicipios
+                              ? [{ value: '', label: 'Error al cargar municipios' }]
+                              : [{ value: '', label: 'Selecciona un municipio' }, ...(municipios ? Object.values(municipios.municipios || {}).map((m, idx) => ({ value: m, label: m })) : [])]
+                      }
+                      loading={loadingMunicipios}
+                      error={errors?.municipio}
+                      required
+                      disabled={formData.estado === '' || loadingMunicipios || !!errorMunicipios}
+                      placeholder={formData.estado === '' ? 'Selecciona un estado primero' : loadingMunicipios ? 'Cargando municipios...' : 'Selecciona un municipio'}
+                      searchable
+                      className="h-12 md:h-14 w-full text-base"
+                    />
+                  </div>
+                </div>
 
+                <div className="mt-4">
+                  <Input
+                    label="Dirección"
+                    required
+                    value={formData?.direccion}
+                    onChange={(e) => handleInputChange('direccion', e?.target?.value)}
+                    error={errors?.direccion}
+                    placeholder="Dirección completa"
+                    className="h-12 md:h-14 w-full text-base"
+                  />
                   <Input
                     label="Presupuesto Estimado (MXN)"
                     type="text"
@@ -493,6 +566,7 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
                     placeholder="$0.00 MXN"
                     min="0"
                     step="0.01"
+                    className="h-12 md:h-14 w-full text-base"
                   />
                 </div>
 
