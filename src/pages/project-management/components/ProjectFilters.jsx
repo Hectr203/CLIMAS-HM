@@ -1,25 +1,52 @@
 import React, { useState } from 'react';
 import { Search, X, ChevronUp, ChevronDown, Download } from 'lucide-react';
 
-// Componentes UI simplificados para mantener el estilo original
-const Button = ({ children, variant = 'default', size = 'default', onClick, iconName, iconPosition, className = '' }) => {
-  const Icon = iconName === 'X' ? X : iconName === 'ChevronUp' ? ChevronUp : iconName === 'ChevronDown' ? ChevronDown : iconName === 'Download' ? Download : null;
-  
-  const baseClasses = 'inline-flex items-center justify-center font-medium rounded-md transition-colors';
+/* =========================
+   UI básicos (con mejoras)
+========================= */
+const Button = ({
+  children,
+  variant = 'default',
+  size = 'default',
+  onClick,
+  iconName,
+  iconPosition,
+  className = '',
+  disabled = false,
+  type = 'button',
+  title,
+}) => {
+  const Icon =
+    iconName === 'X'
+      ? X
+      : iconName === 'ChevronUp'
+      ? ChevronUp
+      : iconName === 'ChevronDown'
+      ? ChevronDown
+      : iconName === 'Download'
+      ? Download
+      : null;
+
+  const baseClasses =
+    'inline-flex items-center justify-center font-medium rounded-md transition-colors';
   const variantClasses = {
     default: 'bg-primary text-primary-foreground hover:bg-primary/90',
     outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
-    ghost: 'hover:bg-accent hover:text-accent-foreground'
+    ghost: 'hover:bg-accent hover:text-accent-foreground',
   };
   const sizeClasses = {
     default: 'h-10 px-4 py-2',
-    sm: 'h-9 rounded-md px-3 text-sm'
+    sm: 'h-9 rounded-md px-3 text-sm',
   };
+  const disabledClasses = disabled ? 'opacity-60 cursor-not-allowed' : '';
 
   return (
     <button
+      type={type}
       onClick={onClick}
-      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+      disabled={disabled}
+      title={title}
+      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${disabledClasses} ${className}`}
     >
       {Icon && iconPosition === 'left' && <Icon size={16} className="mr-2" />}
       {children}
@@ -52,7 +79,7 @@ const Select = ({ label, options, value, onChange, className = '' }) => {
         onChange={(e) => onChange(e.target.value)}
         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {options.map(option => (
+        {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
           </option>
@@ -62,7 +89,15 @@ const Select = ({ label, options, value, onChange, className = '' }) => {
   );
 };
 
-const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) => {
+/* =========================
+   ProjectFilters conectado
+========================= */
+const ProjectFilters = ({
+  onFiltersChange,
+  totalProjects,
+  filteredProjects,
+  onExport, // 👈 NUEVO: handler para exportar que viene del padre
+}) => {
   const [filters, setFilters] = useState({
     search: '',
     status: '',
@@ -73,7 +108,7 @@ const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) =>
     minBudget: '',
     maxBudget: '',
     startDate: '',
-    endDate: ''
+    endDate: '',
   });
 
   const [isExpanded, setIsExpanded] = useState(false);
@@ -85,7 +120,7 @@ const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) =>
     { value: 'on-hold', label: 'En Pausa' },
     { value: 'review', label: 'En Revisión' },
     { value: 'completed', label: 'Completado' },
-    { value: 'cancelled', label: 'Cancelado' }
+    { value: 'cancelled', label: 'Cancelado' },
   ];
 
   const departmentOptions = [
@@ -94,7 +129,7 @@ const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) =>
     { value: 'engineering', label: 'Ingeniería' },
     { value: 'installation', label: 'Instalación' },
     { value: 'maintenance', label: 'Mantenimiento' },
-    { value: 'administration', label: 'Administración' }
+    { value: 'administration', label: 'Administración' },
   ];
 
   const dateRangeOptions = [
@@ -103,7 +138,7 @@ const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) =>
     { value: 'week', label: 'Esta Semana' },
     { value: 'month', label: 'Este Mes' },
     { value: 'quarter', label: 'Este Trimestre' },
-    { value: 'year', label: 'Este Año' }
+    { value: 'year', label: 'Este Año' },
   ];
 
   const clientTypeOptions = [
@@ -111,7 +146,7 @@ const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) =>
     { value: 'residential', label: 'Residencial' },
     { value: 'commercial', label: 'Comercial' },
     { value: 'industrial', label: 'Industrial' },
-    { value: 'government', label: 'Gubernamental' }
+    { value: 'government', label: 'Gubernamental' },
   ];
 
   const priorityOptions = [
@@ -119,19 +154,17 @@ const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) =>
     { value: 'low', label: 'Baja' },
     { value: 'medium', label: 'Media' },
     { value: 'high', label: 'Alta' },
-    { value: 'urgent', label: 'Urgente' }
+    { value: 'urgent', label: 'Urgente' },
   ];
 
   const handleFilterChange = (key, value) => {
     const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
-    if (onFiltersChange) {
-      onFiltersChange(newFilters);
-    }
+    onFiltersChange?.(newFilters);
   };
 
   const clearAllFilters = () => {
-    const clearedFilters = {
+    const cleared = {
       search: '',
       status: '',
       department: '',
@@ -141,13 +174,22 @@ const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) =>
       minBudget: '',
       maxBudget: '',
       startDate: '',
-      endDate: ''
+      endDate: '',
     };
-    setFilters(clearedFilters);
-    onFiltersChange(clearedFilters);
+    setFilters(cleared);
+    onFiltersChange?.(cleared);
   };
 
-  const hasActiveFilters = Object.values(filters).some(value => value !== '');
+  const hasActiveFilters = Object.values(filters).some((v) => v !== '');
+
+  const handleExportClick = () => {
+    if (!onExport) return;
+    if (!filteredProjects || filteredProjects <= 0) {
+      alert('No hay proyectos para exportar con los filtros actuales.');
+      return;
+    }
+    onExport(); // el padre exporta lo que ya está filtrado/visible
+  };
 
   return (
     <div className="bg-card border border-border rounded-lg p-6 mb-6">
@@ -161,13 +203,7 @@ const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) =>
         </div>
         <div className="flex items-center space-x-2">
           {hasActiveFilters && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={clearAllFilters}
-              iconName="X"
-              iconPosition="left"
-            >
+            <Button variant="outline" size="sm" onClick={clearAllFilters} iconName="X" iconPosition="left">
               Limpiar Filtros
             </Button>
           )}
@@ -182,6 +218,7 @@ const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) =>
           </Button>
         </div>
       </div>
+
       {/* Search Bar */}
       <div className="mb-4">
         <div className="relative">
@@ -192,12 +229,10 @@ const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) =>
             onChange={(e) => handleFilterChange('search', e.target.value)}
             className="pl-10"
           />
-          <Search 
-            size={16} 
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
-          />
+          <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
         </div>
       </div>
+
       {/* Quick Filters */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
         <Select
@@ -242,11 +277,15 @@ const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) =>
             iconName="Download"
             iconPosition="left"
             className="w-full"
+            onClick={handleExportClick}
+            disabled={!filteredProjects}
+            title={filteredProjects ? 'Exportar proyectos filtrados' : 'No hay resultados para exportar'}
           >
             Exportar
           </Button>
         </div>
       </div>
+
       {/* Advanced Filters */}
       {isExpanded && (
         <div className="border-t border-border pt-4">
@@ -284,19 +323,26 @@ const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) =>
           </div>
         </div>
       )}
-      {/* Active Filters Display */}
+
+      {/* Active Filters pills */}
       {hasActiveFilters && (
         <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border">
           <span className="text-sm text-muted-foreground">Filtros activos:</span>
           {Object.entries(filters).map(([key, value]) => {
             if (!value) return null;
-            
+
+            // etiquetas amigables
             let displayValue = value;
-            if (key === 'status') displayValue = statusOptions.find(opt => opt.value === value)?.label || value;
-            if (key === 'department') displayValue = departmentOptions.find(opt => opt.value === value)?.label || value;
-            if (key === 'dateRange') displayValue = dateRangeOptions.find(opt => opt.value === value)?.label || value;
-            if (key === 'clientType') displayValue = clientTypeOptions.find(opt => opt.value === value)?.label || value;
-            if (key === 'priority') displayValue = priorityOptions.find(opt => opt.value === value)?.label || value;
+            if (key === 'status')
+              displayValue = statusOptions.find((opt) => opt.value === value)?.label || value;
+            if (key === 'department')
+              displayValue = departmentOptions.find((opt) => opt.value === value)?.label || value;
+            if (key === 'dateRange')
+              displayValue = dateRangeOptions.find((opt) => opt.value === value)?.label || value;
+            if (key === 'clientType')
+              displayValue = clientTypeOptions.find((opt) => opt.value === value)?.label || value;
+            if (key === 'priority')
+              displayValue = priorityOptions.find((opt) => opt.value === value)?.label || value;
             if (key === 'minBudget' || key === 'maxBudget') displayValue = `$${value}`;
 
             return (
@@ -322,65 +368,72 @@ const ProjectFilters = ({ onFiltersChange, totalProjects, filteredProjects }) =>
 
 export default ProjectFilters;
 
-// Función de filtrado para usar en el componente padre
+/* ==========================================
+   Función de filtrado para el componente padre
+========================================== */
 export const applyProjectFilters = (projects, filters) => {
   let filtered = [...projects];
 
-  // Search filter
+  // Search
   if (filters?.search) {
     const searchTerm = filters.search.toLowerCase();
-    filtered = filtered.filter(project => 
-      project?.name?.toLowerCase()?.includes(searchTerm) ||
-      project?.code?.toLowerCase()?.includes(searchTerm) ||
-      project?.client?.name?.toLowerCase()?.includes(searchTerm)
+    filtered = filtered.filter(
+      (project) =>
+        project?.name?.toLowerCase()?.includes(searchTerm) ||
+        project?.code?.toLowerCase()?.includes(searchTerm) ||
+        project?.client?.name?.toLowerCase()?.includes(searchTerm)
     );
   }
 
-  // Status filter
+  // Status
   if (filters?.status) {
-    filtered = filtered.filter(project => project?.status === filters.status);
+    filtered = filtered.filter((project) => project?.status === filters.status);
   }
 
-  // Department filter
+  // Department
   if (filters?.department) {
-    filtered = filtered.filter(project => 
-      project?.department?.toLowerCase() === filters.department.toLowerCase()
+    filtered = filtered.filter(
+      (project) => project?.department?.toLowerCase() === filters.department.toLowerCase()
     );
   }
 
-  // Client type filter
+  // Client type
   if (filters?.clientType) {
-    filtered = filtered.filter(project => project?.client?.type === filters.clientType);
+    filtered = filtered.filter((project) => project?.client?.type === filters.clientType);
   }
 
-  // Priority filter
+  // Priority
   if (filters?.priority) {
-    filtered = filtered.filter(project => project?.priority === filters.priority);
+    filtered = filtered.filter((project) => project?.priority === filters.priority);
   }
 
-  // Date range filter
+  // Date range (sobre startDate)
   if (filters?.dateRange) {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
-    filtered = filtered.filter(project => {
+
+    filtered = filtered.filter((project) => {
       const startDate = new Date(project?.startDate);
-      
+      if (isNaN(startDate)) return false;
+
       switch (filters.dateRange) {
         case 'today':
           return startDate.toDateString() === today.toDateString();
-        case 'week':
+        case 'week': {
           const weekAgo = new Date(today);
           weekAgo.setDate(weekAgo.getDate() - 7);
           return startDate >= weekAgo && startDate <= now;
+        }
         case 'month':
-          return startDate.getMonth() === now.getMonth() && 
-                 startDate.getFullYear() === now.getFullYear();
-        case 'quarter':
+          return (
+            startDate.getMonth() === now.getMonth() &&
+            startDate.getFullYear() === now.getFullYear()
+          );
+        case 'quarter': {
           const quarter = Math.floor(now.getMonth() / 3);
           const projectQuarter = Math.floor(startDate.getMonth() / 3);
-          return projectQuarter === quarter && 
-                 startDate.getFullYear() === now.getFullYear();
+          return projectQuarter === quarter && startDate.getFullYear() === now.getFullYear();
+        }
         case 'year':
           return startDate.getFullYear() === now.getFullYear();
         default:
@@ -389,36 +442,31 @@ export const applyProjectFilters = (projects, filters) => {
     });
   }
 
-  // Budget filters
+  // Budget
   if (filters?.minBudget) {
     const minBudget = Number(filters.minBudget);
-    filtered = filtered.filter(project => 
-      project?.budget >= minBudget
-    );
+    filtered = filtered.filter((project) => Number(project?.budget) >= minBudget);
   }
-
   if (filters?.maxBudget) {
     const maxBudget = Number(filters.maxBudget);
-    filtered = filtered.filter(project => 
-      project?.budget <= maxBudget
-    );
+    filtered = filtered.filter((project) => Number(project?.budget) <= maxBudget);
   }
 
-  // Start date filter
+  // Start date exacta
   if (filters?.startDate) {
     const filterStartDate = new Date(filters.startDate);
-    filtered = filtered.filter(project => {
+    filtered = filtered.filter((project) => {
       const projectStartDate = new Date(project?.startDate);
-      return projectStartDate >= filterStartDate;
+      return !isNaN(projectStartDate) && projectStartDate >= filterStartDate;
     });
   }
 
-  // End date filter
+  // End date exacta
   if (filters?.endDate) {
     const filterEndDate = new Date(filters.endDate);
-    filtered = filtered.filter(project => {
+    filtered = filtered.filter((project) => {
       const projectEndDate = new Date(project?.endDate);
-      return projectEndDate <= filterEndDate;
+      return !isNaN(projectEndDate) && projectEndDate <= filterEndDate;
     });
   }
 

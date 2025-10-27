@@ -1,14 +1,94 @@
 import React, { useState } from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
-const PurchaseOrderPanel = ({ orders, onViewOrder, onApproveOrder, onCreateOrder }) => {
+const PurchaseOrderPanel = ({ orders, onViewOrder, onApproveOrder, onCreateOrder, onDeleteOrder }) => {
+  const [orderToDelete, setOrderToDelete] = useState(null);
+  
+  const handleDeleteClick = (order) => {
+    if (window.confirm(`¿Estás seguro de que deseas eliminar la orden de compra ${order.numeroOrden}?`)) {
+      onDeleteOrder(order);
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency: 'MXN'
+    }).format(amount);
+  };
+
+  const formatDate = (date) => {
+    return new Intl.DateTimeFormat('es-MX', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(new Date(date));
+  };
+
+  const onDownloadOrder = (order) => {
+    const doc = new jsPDF();
+    
+    // Configuración inicial
+    doc.setFontSize(20);
+    doc.text('Orden de Compra', 105, 15, { align: 'center' });
+    doc.setFontSize(12);
+
+    // Información del encabezado
+    doc.text(`Número: ${order.numeroOrden}`, 15, 30);
+    doc.text(`Fecha: ${formatDate(order.fechaCreacion)}`, 15, 40);
+    doc.text(`Estado: ${getStatusLabel(order.estado)}`, 15, 50);
+    doc.text(`Proveedor: ${order.proveedor?.nombre}`, 15, 60);
+    doc.text(`Términos de Pago: ${order.terminosPago}`, 15, 70);
+    
+    if (order.fechaEntregaEsperada) {
+      doc.text(`Entrega Esperada: ${formatDate(order.fechaEntregaEsperada)}`, 15, 80);
+    }
+
+    // Tabla de artículos
+    const tableHead = [['Código', 'Descripción', 'Cantidad', 'Costo Unit.', 'Subtotal']];
+    const tableBody = order.articulos?.map(item => [
+      item.codigoArticulo,
+      item.descripcion,
+      `${item.cantidadOrdenada} ${item.unidad}`,
+      formatCurrency(item.costoUnitario),
+      formatCurrency(item.subtotal)
+    ]);
+
+    autoTable(doc, {
+      head: tableHead,
+      body: tableBody,
+      startY: 90,
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [41, 128, 185] },
+    });
+
+    // Total
+    const finalY = doc.lastAutoTable.finalY || 90;
+    doc.text(`Total: ${formatCurrency(order.totalOrden)}`, 195, finalY + 10, { align: 'right' });
+
+    // Notas si existen
+    if (order.notas) {
+      doc.text('Notas:', 15, finalY + 20);
+      doc.setFontSize(10);
+      doc.text(order.notas, 15, finalY + 30);
+    }
+
+    // Descargar el PDF
+    doc.save(`orden-compra-${order.numeroOrden}.pdf`);
+  };
   const [activeTab, setActiveTab] = useState('pending');
 
+  console.log('Órdenes recibidas en PurchaseOrderPanel:', orders);
+  
   const tabs = [
-    { id: 'pending', label: 'Pendientes', count: orders?.filter(o => o?.status === 'pending')?.length },
-    { id: 'approved', label: 'Aprobadas', count: orders?.filter(o => o?.status === 'approved')?.length },
-    { id: 'received', label: 'Recibidas', count: orders?.filter(o => o?.status === 'received')?.length }
+    { id: 'pending', label: 'Pendientes', count: orders?.filter(o => o?.estado === 'pending')?.length },
+    { id: 'approved', label: 'Aprobadas', count: orders?.filter(o => o?.estado === 'approved')?.length },
+    { id: 'received', label: 'Recibidas', count: orders?.filter(o => o?.estado === 'received')?.length }
   ];
 
   const getStatusColor = (status) => {
@@ -31,22 +111,8 @@ const PurchaseOrderPanel = ({ orders, onViewOrder, onApproveOrder, onCreateOrder
     }
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('es-MX', {
-      style: 'currency',
-      currency: 'MXN'
-    })?.format(amount);
-  };
 
-  const formatDate = (date) => {
-    return new Intl.DateTimeFormat('es-MX', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    })?.format(new Date(date));
-  };
-
-  const filteredOrders = orders?.filter(order => order?.status === activeTab);
+  const filteredOrders = orders?.filter(order => order?.estado === activeTab);
 
   return (
     <div className="bg-card rounded-lg border border-border">
@@ -111,11 +177,11 @@ const PurchaseOrderPanel = ({ orders, onViewOrder, onApproveOrder, onCreateOrder
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center space-x-3 mb-2">
-                    <h4 className="font-medium text-foreground">{order?.orderNumber}</h4>
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order?.status)}`}>
-                      {getStatusLabel(order?.status)}
+                    <h4 className="font-medium text-foreground">{order?.numeroOrden}</h4>
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order?.estado)}`}>
+                      {getStatusLabel(order?.estado)}
                     </span>
-                    {order?.urgent && (
+                    {order?.esUrgente && (
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-error/10 text-error">
                         <Icon name="AlertCircle" size={12} className="mr-1" />
                         Urgente
@@ -126,19 +192,19 @@ const PurchaseOrderPanel = ({ orders, onViewOrder, onApproveOrder, onCreateOrder
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground mb-3">
                     <div>
                       <span className="font-medium">Proveedor:</span>
-                      <div className="text-foreground">{order?.supplier}</div>
+                      <div className="text-foreground">{order?.proveedor?.nombre}</div>
                     </div>
                     <div>
                       <span className="font-medium">Fecha:</span>
-                      <div className="text-foreground">{formatDate(order?.orderDate)}</div>
+                      <div className="text-foreground">{formatDate(order?.fechaOrden)}</div>
                     </div>
                     <div>
                       <span className="font-medium">Total:</span>
-                      <div className="text-foreground font-medium">{formatCurrency(order?.total)}</div>
+                      <div className="text-foreground font-medium">{formatCurrency(order?.totalOrden)}</div>
                     </div>
                     <div>
                       <span className="font-medium">Artículos:</span>
-                      <div className="text-foreground">{order?.itemCount} artículos</div>
+                      <div className="text-foreground">{order?.cantidadArticulos} artículos</div>
                     </div>
                   </div>
                   
@@ -186,11 +252,22 @@ const PurchaseOrderPanel = ({ orders, onViewOrder, onApproveOrder, onCreateOrder
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => console.log('Download order:', order)}
+                      onClick={() => onDownloadOrder(order)}
                       iconName="Download"
                       iconSize={16}
                     >
                       Descargar
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteClick(order)}
+                      iconName="Trash2"
+                      iconSize={16}
+                      className="text-error hover:text-error"
+                    >
+                      Eliminar
                     </Button>
                   </div>
                 </div>

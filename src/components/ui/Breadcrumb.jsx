@@ -7,13 +7,13 @@ const Breadcrumb = ({ customItems = null }) => {
   const location = useLocation();
 
   const pathMapping = {
-    '/main-dashboard': { label: 'Dashboard', icon: 'LayoutDashboard' },
-    '/project-management': { label: 'Project Management', icon: 'FolderOpen' },
-    '/work-order-processing': { label: 'Work Order Processing', icon: 'ClipboardList' },
-    '/financial-management': { label: 'Financial Management', icon: 'DollarSign' },
-    '/client-management': { label: 'Client Management', icon: 'Users' },
-    '/personnel-management': { label: 'Personnel Management', icon: 'UserCheck' },
-    '/inventory-management': { label: 'Inventory Management', icon: 'Package' }
+    '/main-dashboard': { label: 'Panel', icon: 'LayoutDashboard' },
+    '/project-management': { label: 'Gestión de proyectos', icon: 'FolderOpen' },
+    '/work-order-processing': { label: 'Procesamiento de órdenes de trabajo', icon: 'ClipboardList' },
+    '/financial-management': { label: 'Gestión Financiera', icon: 'DollarSign' },
+    '/client-management': { label: 'Gestión de Clientes', icon: 'Users' },
+    '/personnel-management': { label: 'Gestión de personal', icon: 'UserCheck' },
+    '/inventory-management': { label: 'Gestión de inventario', icon: 'Package' }
   };
 
   const generateBreadcrumbs = () => {

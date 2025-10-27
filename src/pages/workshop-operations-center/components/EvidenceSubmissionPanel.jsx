@@ -267,7 +267,7 @@ const EvidenceSubmissionPanel = ({ workOrders = [], onEvidenceSubmission, onRepo
                         {categoryPhotos?.length > 0 ? (
                           <div className="grid grid-cols-3 gap-2">
                             {categoryPhotos?.map((photo) => (
-                              <div key={photo?.id} className="relative group">
+                                <div key={photo?.id} className="relative group overflow-hidden">
                                 <img
                                   src={photo?.url}
                                   alt={`${category?.name} evidence`}
@@ -286,7 +286,7 @@ const EvidenceSubmissionPanel = ({ workOrders = [], onEvidenceSubmission, onRepo
                                   placeholder="Descripción..."
                                   value={photo?.description}
                                   onChange={(e) => updatePhotoDescription(photo?.id, e?.target?.value)}
-                                  className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 text-white text-xs px-1 py-0.5 rounded-b"
+                                  className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 text-white text-xs px-1 py-0.5 rounded-b truncate"
                                 />
                               </div>
                             ))}
@@ -316,9 +316,9 @@ const EvidenceSubmissionPanel = ({ workOrders = [], onEvidenceSubmission, onRepo
                         docType?.required ? 'bg-indigo-50 border border-indigo-200' : 'bg-muted'
                       }`}>
                         <div className="flex items-center space-x-3">
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
                             uploadedDoc ? 'bg-green-500' : docType?.required ? 'bg-indigo-500' : 'bg-gray-500'
-                          }`}>
+                          } overflow-hidden`}> 
                             <Icon name={docType?.icon} size={16} color="white" />
                           </div>
                           <div>
@@ -332,7 +332,7 @@ const EvidenceSubmissionPanel = ({ workOrders = [], onEvidenceSubmission, onRepo
                             </h5>
                             <p className="text-xs text-muted-foreground">{docType?.description}</p>
                             {uploadedDoc && (
-                              <p className="text-xs text-green-600">Archivo: {uploadedDoc?.name}</p>
+                              <p className="text-xs text-green-600 truncate">Archivo: {uploadedDoc?.name}</p>
                             )}
                           </div>
                         </div>

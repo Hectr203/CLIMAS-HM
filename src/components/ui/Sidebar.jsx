@@ -4,7 +4,7 @@ import Icon from '../AppIcon';
 import Button from './Button';
 import Input from './Input';
 import AppImage from '../AppImage';
-import { getAllowedNavigationItems, logout } from '../../utils/auth';
+import { getAllowedNavigationItems } from '../../utils/auth';
 import useAuth from '../../hooks/useAuth';
 import { useNotifications } from '../../context/NotificationContext';
 import { useConfirmDialog } from '../../ui/ConfirmDialogContext';
@@ -16,7 +16,7 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
   const [searchResults, setSearchResults] = useState([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [navigationItems, setNavigationItems] = useState([]);
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const { showSuccess } = useNotifications();
 
   useEffect(() => {

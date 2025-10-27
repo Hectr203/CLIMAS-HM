@@ -37,13 +37,13 @@ import React from 'react';
 
               {/* Selected Order Info */}
               {selectedOrder && (
-                <div className="mb-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
+                <div className="mb-4 p-3 bg-primary/10 rounded-lg border border-primary/20 overflow-hidden">
                   <div className="font-medium mb-2">Orden Seleccionada</div>
                   <div className="text-sm space-y-1">
-                    <div><strong>ID:</strong> {selectedOrder?.id}</div>
-                    <div><strong>Cliente:</strong> {selectedOrder?.clientName}</div>
-                    <div><strong>Estado:</strong> {selectedOrder?.statusLabel}</div>
-                    <div><strong>Progreso:</strong> {selectedOrder?.progress}%</div>
+                    <div className="truncate"><strong>ID:</strong> <span className="ml-1 inline-block max-w-[18rem] truncate">{selectedOrder?.id}</span></div>
+                    <div className="truncate"><strong>Cliente:</strong> <span className="ml-1 inline-block max-w-[18rem] truncate">{selectedOrder?.clientName}</span></div>
+                    <div className="truncate"><strong>Estado:</strong> <span className="ml-1 inline-block max-w-[18rem] truncate">{selectedOrder?.statusLabel}</span></div>
+                    <div className="truncate"><strong>Progreso:</strong> <span className="ml-1 inline-block">{selectedOrder?.progress}%</span></div>
                   </div>
                 </div>
               )}
