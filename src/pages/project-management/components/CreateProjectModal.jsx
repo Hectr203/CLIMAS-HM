@@ -264,7 +264,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
     setErrors(e);
     return Object.keys(e).length === 0;
   };
-
+ 
   const buildPayloadForBackend = () => {
     const b = formData.budgetBreakdown || {};
     const equipoDolares = isEquipmentInUSD
