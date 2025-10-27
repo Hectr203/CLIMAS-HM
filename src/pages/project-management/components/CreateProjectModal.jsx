@@ -48,12 +48,12 @@ const mapPriorityToEs = (v) => {
   return m[(v || '').toString().toLowerCase()] || v || '';
 };
 
-/** Tu backend de CREAR solo acepta: "activo" | "en proceso" */
-const mapStatusForCreate = (uiStatus) => {
-  const s = (uiStatus || '').toLowerCase();
-  if (s === 'en progreso') return 'en proceso';
-  return 'activo';
-};
+// /** Tu backend de CREAR solo acepta: "activo" | "en proceso" */
+// const mapStatusForCreate = (uiStatus) => {
+//   const s = (uiStatus || '').toLowerCase();
+//   if (s === 'en progreso') return 'en proceso';
+//   return 'activo';
+// };
 
 /* ===================== Helpers ===================== */
 const formatWithCommas = (v, decimals = 2) => {
@@ -264,7 +264,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
     setErrors(e);
     return Object.keys(e).length === 0;
   };
-
+ 
   const buildPayloadForBackend = () => {
     const b = formData.budgetBreakdown || {};
     const equipoDolares = isEquipmentInUSD
@@ -275,7 +275,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
       codigo: formData.code || '',
       nombre: formData.name || '',
       tipoProyecto: formData.type || '',
-      cliente: { id: formData.client || '' },
+      cliente: { id: formData.client || '', nombre: formData.clientName || '' },
       departamento: formData.department || '',
       prioridad: mapPriorityToEs(formData.priority),
       ubicacion: formData.location || '',
@@ -292,7 +292,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
         otros: Number(b.other) || 0,
         _metaEquipos: { capturadoEn: isEquipmentInUSD ? 'USD' : 'MXN' },
       },
-      estado: mapStatusForCreate(formData.status),
+      estado: formData.status,
     };
   };
 
