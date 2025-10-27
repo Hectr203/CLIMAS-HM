@@ -62,7 +62,7 @@ const WorkOrderProcessing = () => {
   const handleFiltersChange = (filters) => {
   let filtered = [...(localOrders || [])];
 
-  // 🔍 Búsqueda general
+  // Búsqueda general
   if (filters?.search) {
     const search = filters.search.toLowerCase();
     filtered = filtered.filter(order =>
@@ -75,25 +75,25 @@ const WorkOrderProcessing = () => {
     );
   }
 
-  // 🟨 Estado
+  //  Estado
   if (filters?.status)
     filtered = filtered.filter(order => order?.estado === filters.status);
 
-  // 🔺 Prioridad
+  // Prioridad
   if (filters?.priority)
     filtered = filtered.filter(order => order?.prioridad === filters.priority);
 
-  // 👷‍♂️ Técnico
+  // Técnico
   if (filters?.technician)
     filtered = filtered.filter(order =>
       order?.tecnicoAsignado?.nombre === filters.technician
     );
 
-  // 🏗 Proyecto (por tipo)
+  // Proyecto (por tipo)
   if (filters?.project)
     filtered = filtered.filter(order => order?.tipo === filters.project);
 
-  // 📅 Rango de fechas
+  // Rango de fechas
   if (filters?.dateRange) {
     const today = new Date();
     filtered = filtered.filter(order => {
