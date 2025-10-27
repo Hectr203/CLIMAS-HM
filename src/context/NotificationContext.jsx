@@ -1,3 +1,4 @@
+// ...existing code...
 import { createContext, useContext, useState, useCallback } from 'react';
 
 /**
@@ -170,5 +171,8 @@ export const useErrorHandler = () => {
     handleSuccess
   };
 };
+
+// Alias para usar el contexto de notificaciones como useNotification
+export const useNotification = useNotifications;
 
 export default NotificationContext;

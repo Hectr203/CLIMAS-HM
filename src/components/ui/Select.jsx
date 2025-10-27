@@ -10,7 +10,7 @@ const Select = React.forwardRef(({
     options = [],
     value,
     defaultValue,
-    placeholder = "Seleccionar una opcion",
+    placeholder = "Seleccionar una opción",
     multiple = false,
     disabled = false,
     required = false,
@@ -126,7 +126,7 @@ const Select = React.forwardRef(({
                     disabled={disabled}
                     aria-expanded={isOpen}
                     aria-haspopup="listbox"
-                    {...props}
+                    {...Object.fromEntries(Object.entries(props).filter(([k]) => k !== 'loading' && k !== 'isLoading'))}
                 >
                     <span className="truncate">{getSelectedDisplay()}</span>
 
@@ -164,8 +164,8 @@ const Select = React.forwardRef(({
                     required={required}
                 >
                     <option value="">Select...</option>
-                    {options?.map(option => (
-                        <option key={option?.value} value={option?.value}>
+                    {options?.map((option, idx) => (
+                        <option key={option?.value ?? idx} value={option?.value}>
                             {option?.label}
                         </option>
                     ))}
@@ -179,7 +179,7 @@ const Select = React.forwardRef(({
                                 <div className="relative">
                                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                                     <Input
-                                        placeholder="Search options..."
+                                        placeholder="Buscar opciones..."
                                         value={searchTerm}
                                         onChange={handleSearchChange}
                                         className="pl-8"
@@ -191,12 +191,12 @@ const Select = React.forwardRef(({
                         <div className="py-1 max-h-60 overflow-auto">
                             {filteredOptions?.length === 0 ? (
                                 <div className="px-3 py-2 text-sm text-muted-foreground">
-                                    {searchTerm ? 'No options found' : 'No options available'}
+                                    {searchTerm ? 'No se encontraron opciones' : 'No hay opciones disponibles'}
                                 </div>
                             ) : (
-                                filteredOptions?.map((option) => (
+                                filteredOptions?.map((option, idx) => (
                                     <div
-                                        key={option?.value}
+                                        key={option?.value ?? idx}
                                         className={cn(
                                             "relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
                                             isSelected(option?.value) && "bg-primary text-primary-foreground",

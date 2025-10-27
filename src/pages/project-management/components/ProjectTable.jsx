@@ -5,7 +5,10 @@ import Button from '../../../components/ui/Button';
 import Image from '../../../components/AppImage';
 import proyectoService from 'services/proyectoService';
 
-/* === Utils (no alteran datos) === */
+/* === Config === */
+const DEFAULT_USD_RATE = 18; // Tipo de cambio por defecto cuando no viene en el doc
+
+/* === Utils === */
 const parseISODate = (value) => {
   if (!value) return null;
   const d = new Date(value);
@@ -15,12 +18,15 @@ const formatCurrency = (amount) => {
   if (amount == null || isNaN(amount)) return '—';
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
 };
+const formatUSD = (amount) => {
+  if (amount == null || isNaN(amount)) return '—';
+  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'USD' }).format(amount);
+};
 const formatDate = (date) => {
   const d = date instanceof Date ? date : parseISODate(date);
   if (!d) return '—';
   return d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
-/* Colores tolerantes (ES/EN), sin cambiar el valor */
 const getStatusColor = (statusValue) => {
   const v = (statusValue || '').toString().toLowerCase().trim();
   const map = {
@@ -61,11 +67,11 @@ const getPriorityColor = (priorityValue) => {
   return map[v] || 'text-gray-600';
 };
 
-/* === Passthrough estricto NoSQL -> ViewModel === */
+/* === Map NoSQL -> ViewModel (con USD derivado) === */
 const mapProjectDocStrict = (doc) => {
   const id = doc.id ?? doc._id ?? (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Math.random()}`);
   const code = doc.codigo ?? doc.code ?? '—';
-  const name = doc.nombreProyecto ?? doc.name ?? 'Proyecto sin nombre';
+  const name = doc.nombreProyecto ?? doc.nombre ?? 'Proyecto sin nombre';
   const type = doc.tipoProyecto ?? doc.type ?? '—';
 
   const clienteNode = doc.cliente ?? doc.client ?? {};
@@ -78,14 +84,32 @@ const mapProjectDocStrict = (doc) => {
   const startDate = doc.cronograma?.fechaInicio ?? doc.startDate ?? null;
   const endDate   = doc.cronograma?.fechaFin    ?? doc.endDate   ?? null;
 
-  // Respetar status/prioridad/labels si llegan
   const status = doc.status ?? null;
   const statusLabel = doc.statusLabel ?? null;
-  const priority = doc.prioridad ?? doc.prioridades ?? doc.priority ?? null; // lectura tolerante
+  const priority = doc.prioridad ?? doc.prioridades ?? doc.priority ?? null;
   const priorityLabel = doc.priorityLabel ?? null;
 
   const p = doc.presupuesto || {};
   const budget = doc.totalPresupuesto ?? doc.budget ?? p.total ?? null;
+
+  // ---- Equipos en USD (mostrar SIEMPRE que "equipos" > 0) ----
+  const equiposUSD = (() => {
+    // 1) valor explícito en USD
+    if (p.equipoDolares != null && !isNaN(Number(p.equipoDolares))) {
+      return Number(p.equipoDolares) || 0;
+    }
+    // 2) meta de captura en USD
+    if (p?._metaEquipos?.capturadoEn === 'USD' && p?._metaEquipos?.valorUSD != null) {
+      const v = Number(p._metaEquipos.valorUSD);
+      if (!isNaN(v)) return v;
+    }
+    // 3) derivar desde MXN y tipoCambio (o default)
+    const mxn = Number(p?.equipos || 0);
+    if (!(mxn > 0)) return 0;
+    const rate = Number(p?._metaEquipos?.tipoCambio);
+    const divisor = (rate && rate > 0) ? rate : DEFAULT_USD_RATE;
+    return mxn / divisor;
+  })();
 
   const department = doc.departamento ?? doc.department ?? null;
   const location   = doc.ubicacion ?? doc.location ?? null;
@@ -113,6 +137,7 @@ const mapProjectDocStrict = (doc) => {
     budget, startDate, endDate,
     department, location, description,
     assignedPersonnel, workOrders,
+    equiposUSD, // <-- agregado
     createdAt: doc.createdAt ?? null,
     updatedAt: doc.updatedAt ?? null,
     raw: doc,
@@ -135,7 +160,6 @@ const ProjectTable = ({
   const [selectedProjects, setSelectedProjects] = useState([]);
   const [expandedRows, setExpandedRows] = useState([]);
 
-  // Si usas listado de proyectos desde el servicio (opcional)
   useEffect(() => {
     let isMounted = true;
     const fetchProyectos = async () => {
@@ -143,7 +167,6 @@ const ProjectTable = ({
         if (projects && projects.length > 0) return;
         setLoading(true);
         setErrorMsg('');
-        // Si no tienes endpoint de listado, elimina esta llamada
         const data = await proyectoService.getProyectos().catch(() => []);
         if (!isMounted) return;
         setRemoteDocs(Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []));
@@ -264,7 +287,6 @@ const ProjectTable = ({
           const maxSize = 5 * 1024 * 1024;
           if (file?.size > maxSize) return alert('Máximo 5MB');
           alert(`Imagen "${file?.name}" cargada para "${project?.name}" (demo)`);
-          // onImageUpload && onImageUpload(project, file);
         }
       };
       fileInput?.click();
@@ -357,7 +379,14 @@ const ProjectTable = ({
                       <span className="text-sm text-foreground">{project?.priorityLabel || project?.priority || '—'}</span>
                     </div>
                   </td>
-                  <td className="p-4"><div className="text-foreground font-medium">{formatCurrency(project?.budget)}</div></td>
+                  <td className="p-4">
+                    <div className="text-foreground font-medium">{formatCurrency(project?.budget)}</div>
+                    {Number(project?.equiposUSD) > 0 && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Equipos: <span className="font-medium">{formatUSD(project?.equiposUSD)}</span>
+                      </div>
+                    )}
+                  </td>
                   <td className="p-4"><div className="text-sm text-foreground">{formatDate(project?.startDate)}</div></td>
                   <td className="p-4">
                     <div className="flex items-center space-x-1">
@@ -434,12 +463,18 @@ const ProjectTable = ({
                   <div className="text-sm text-muted-foreground">{project?.code}</div>
                 </div>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => toggleRowExpansion(project?.id)}><Icon name={expandedRows?.includes(project?.id) ? 'ChevronUp' : 'ChevronDown'} size={16} /></Button>
+              <Button variant="ghost" size="icon" onClick={() => toggleRowExpansion(project?.id)}><Icon name="ChevronUp" size={16} /></Button>
             </div>
 
             <div className="grid grid-cols-2 gap-4 mb-3">
               <div><div className="text-xs text-muted-foreground">Cliente</div><div className="text-sm text-foreground">{project?.client?.name}</div></div>
-              <div><div className="text-xs text-muted-foreground">Presupuesto</div><div className="text-sm text-foreground font-medium">{formatCurrency(project?.budget)}</div></div>
+              <div>
+                <div className="text-xs text-muted-foreground">Presupuesto</div>
+                <div className="text-sm text-foreground font-medium">{formatCurrency(project?.budget)}</div>
+                {Number(project?.equiposUSD) > 0 && (
+                  <div className="text-[11px] text-muted-foreground">Equipos: {formatUSD(project?.equiposUSD)}</div>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center justify-between mb-3">
