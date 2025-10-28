@@ -6,14 +6,17 @@ import usePerson from '../../../hooks/usePerson';
 
 const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE }) => {
   const { persons, loading, error, getPersons } = usePerson();
+
   const [sortConfig, setSortConfig] = useState({ key: 'nombreCompleto', direction: 'asc' });
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // 🔹 Cargar empleados al montar
   useEffect(() => {
     getPersons();
   }, []);
 
-  // 🔹 Seleccionar fuente de datos (props filtradas o hook)
+  // 🔹 Fuente de datos (props o hook)
   const dataSource = useMemo(() => {
     if (!personnel || personnel.length === 0) {
       return persons || [];
@@ -21,7 +24,7 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
     return personnel;
   }, [personnel, persons]);
 
-  // 🔹 Ordenar datos
+  // 🔹 Ordenamiento
   const sortedPersonnel = useMemo(() => {
     const sorted = [...(dataSource || [])];
     if (!sortConfig.key) return sorted;
@@ -35,6 +38,17 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
     return sorted;
   }, [dataSource, sortConfig]);
 
+  // 🔹 Paginación
+  const totalPages = Math.ceil(sortedPersonnel.length / itemsPerPage);
+  const paginatedPersonnel = sortedPersonnel.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) setCurrentPage(page);
+  };
+
   const handleSort = (key) => {
     setSortConfig((prev) => ({
       key,
@@ -45,9 +59,9 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
   // 🔹 Badges de estado
   const getStatusBadge = (status) => {
     const config = {
-      'Activo': { bg: 'bg-success', text: 'text-success-foreground' },
-      'Inactivo': { bg: 'bg-error', text: 'text-error-foreground' },
-      'Suspendido': { bg: 'bg-warning', text: 'text-warning-foreground' },
+      Activo: { bg: 'bg-success', text: 'text-success-foreground' },
+      Inactivo: { bg: 'bg-error', text: 'text-error-foreground' },
+      Suspendido: { bg: 'bg-warning', text: 'text-warning-foreground' },
     }[status] || { bg: 'bg-muted', text: 'text-muted-foreground' };
 
     return (
@@ -59,13 +73,15 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
 
   const getComplianceBadge = (status) => {
     const config = {
-      'Completo': { bg: 'bg-success', text: 'text-success-foreground', icon: 'CheckCircle' },
-      'Pendiente': { bg: 'bg-warning', text: 'text-warning-foreground', icon: 'Clock' },
-      'Vencido': { bg: 'bg-error', text: 'text-error-foreground', icon: 'AlertCircle' },
+      Completo: { bg: 'bg-success', text: 'text-success-foreground', icon: 'CheckCircle' },
+      Pendiente: { bg: 'bg-warning', text: 'text-warning-foreground', icon: 'Clock' },
+      Vencido: { bg: 'bg-error', text: 'text-error-foreground', icon: 'AlertCircle' },
     }[status] || { bg: 'bg-muted', text: 'text-muted-foreground', icon: 'Clock' };
 
     return (
-      <span className={`inline-flex items-center space-x-1 px-2 py-1 text-xs font-medium rounded-full ${config.bg} ${config.text}`}>
+      <span
+        className={`inline-flex items-center space-x-1 px-2 py-1 text-xs font-medium rounded-full ${config.bg} ${config.text}`}
+      >
         <Icon name={config.icon} size={12} />
         <span>{status}</span>
       </span>
@@ -94,26 +110,29 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
   );
 
   // 🔹 Estados de carga y error
-  if (loading) return (
-    <div className="flex justify-center items-center py-10">
-      <Icon name="Loader2" className="animate-spin mr-2" size={18} />
-      <span className="text-muted-foreground">Cargando empleados...</span>
-    </div>
-  );
+  if (loading)
+    return (
+      <div className="flex justify-center items-center py-10">
+        <Icon name="Loader2" className="animate-spin mr-2" size={18} />
+        <span className="text-muted-foreground">Cargando empleados...</span>
+      </div>
+    );
 
-  if (error) return (
-    <div className="text-center py-10 text-error">
-      <Icon name="AlertCircle" className="inline-block mr-2" size={18} />
-      Error al cargar los empleados: {error.userMessage || error.message}
-    </div>
-  );
+  if (error)
+    return (
+      <div className="text-center py-10 text-error">
+        <Icon name="AlertCircle" className="inline-block mr-2" size={18} />
+        Error al cargar los empleados: {error.userMessage || error.message}
+      </div>
+    );
 
-  if (!sortedPersonnel?.length) return (
-    <div className="text-center py-10 text-muted-foreground">
-      <Icon name="UserX" className="inline-block mr-2" size={18} />
-      No hay empleados registrados.
-    </div>
-  );
+  if (!sortedPersonnel?.length)
+    return (
+      <div className="text-center py-10 text-muted-foreground">
+        <Icon name="UserX" className="inline-block mr-2" size={18} />
+        No hay empleados registrados.
+      </div>
+    );
 
   // 🔹 Render principal
   return (
@@ -123,23 +142,38 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
         <table className="min-w-full divide-y divide-border">
           <thead className="bg-muted">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Empleado</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Empleado
+              </th>
               <SortableHeader label="Departamento" sortKey="departamento" />
               <SortableHeader label="Puesto" sortKey="puesto" />
-              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Estado</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Estudios Médicos</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">EPP</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Estado
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Estudios Médicos
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                EPP
+              </th>
               <SortableHeader label="Última Actualización" sortKey="fechaIngreso" />
-              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Acciones</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Acciones
+              </th>
             </tr>
           </thead>
+
           <tbody className="bg-card divide-y divide-border">
-            {sortedPersonnel.map(emp => (
+            {paginatedPersonnel.map((emp) => (
               <tr key={emp.id} className="hover:bg-muted/50 transition-smooth">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center space-x-3">
                     <div className="w-10 h-10 rounded-full overflow-hidden bg-muted">
-                      <Image src={emp.foto || '/default-avatar.png'} alt={emp.nombreCompleto} className="w-full h-full object-cover" />
+                      <Image
+                        src={emp.foto || '/default-avatar.png'}
+                        alt={emp.nombreCompleto}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                     <div>
                       <div className="text-sm font-medium text-foreground">{emp.nombreCompleto}</div>
@@ -150,30 +184,89 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
                 <td className="px-6 py-4 whitespace-nowrap text-sm">{emp.departamento || '-'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">{emp.puesto || '-'}</td>
                 <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(emp.estado)}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">{emp.fechaIngreso}</td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  {getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  {getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                  {emp.fechaIngreso || '-'}
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center space-x-2">
-                    <Button variant="ghost" size="sm" onClick={() => onViewProfile(emp)} iconName="Eye" iconSize={16}>Ver</Button>
-                    <Button variant="ghost" size="sm" onClick={() => onEditPersonnel(emp)} iconName="Edit" iconSize={16}>Editar</Button>
-                    <Button variant="ghost" size="sm" onClick={() => onAssignPPE(emp)} iconName="Shield" iconSize={16}>EPP</Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onViewProfile(emp)}
+                      iconName="Eye"
+                      iconSize={16}
+                    >
+                      Ver
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onEditPersonnel(emp)}
+                      iconName="Edit"
+                      iconSize={16}
+                    >
+                      Editar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onAssignPPE(emp)}
+                      iconName="Shield"
+                      iconSize={16}
+                    >
+                      EPP
+                    </Button>
                   </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+
+        {/* 🔹 Paginación */}
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-2 p-4 border-t border-border">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage === 1}
+              onClick={() => handlePageChange(currentPage - 1)}
+            >
+              <Icon name="ChevronLeft" size={14} />
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Página {currentPage} de {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage === totalPages}
+              onClick={() => handlePageChange(currentPage + 1)}
+            >
+              <Icon name="ChevronRight" size={14} />
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Vista Móvil */}
       <div className="lg:hidden space-y-4 p-4">
-        {sortedPersonnel.map(emp => (
+        {paginatedPersonnel.map((emp) => (
           <div key={emp.id} className="bg-card border border-border rounded-lg p-4">
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 rounded-full overflow-hidden bg-muted">
-                  <Image src={emp.foto || '/default-avatar.png'} alt={emp.nombreCompleto} className="w-full h-full object-cover" />
+                  <Image
+                    src={emp.foto || '/default-avatar.png'}
+                    alt={emp.nombreCompleto}
+                    className="w-full h-full object-cover"
+                  />
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-foreground">{emp.nombreCompleto}</h3>
@@ -184,19 +277,81 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
             </div>
 
             <div className="space-y-2 mb-4">
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Departamento:</span><span>{emp.departamento || '-'}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Puesto:</span><span>{emp.puesto || '-'}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Estudios Médicos:</span>{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</div>
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">EPP:</span>{getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}</div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Departamento:</span>
+                <span>{emp.departamento || '-'}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Puesto:</span>
+                <span>{emp.puesto || '-'}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Estudios Médicos:</span>
+                {getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">EPP:</span>
+                {getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}
+              </div>
             </div>
 
             <div className="flex space-x-2">
-              <Button variant="outline" size="sm" onClick={() => onViewProfile(emp)} iconName="Eye" iconSize={16} className="flex-1">Ver Perfil</Button>
-              <Button variant="ghost" size="sm" onClick={() => onEditPersonnel(emp)} iconName="Edit" iconSize={16}>Editar</Button>
-              <Button variant="ghost" size="sm" onClick={() => onAssignPPE(emp)} iconName="Shield" iconSize={16}>EPP</Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onViewProfile(emp)}
+                iconName="Eye"
+                iconSize={16}
+                className="flex-1"
+              >
+                Ver Perfil
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onEditPersonnel(emp)}
+                iconName="Edit"
+                iconSize={16}
+              >
+                Editar
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onAssignPPE(emp)}
+                iconName="Shield"
+                iconSize={16}
+              >
+                EPP
+              </Button>
             </div>
           </div>
         ))}
+
+        {/* 🔹 Paginación móvil */}
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-2 pt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage === 1}
+              onClick={() => handlePageChange(currentPage - 1)}
+            >
+              <Icon name="ChevronLeft" size={14} />
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Página {currentPage} de {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage === totalPages}
+              onClick={() => handlePageChange(currentPage + 1)}
+            >
+              <Icon name="ChevronRight" size={14} />
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
