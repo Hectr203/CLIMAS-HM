@@ -38,6 +38,7 @@ const CreatePOModal = ({
         setSelectedItems([{
           id: initialItem.id,
           itemCode: initialItem.itemCode,
+          name: initialItem.name || '',
           description: initialItem.description,
           supplier: initialItem.supplier?.name,
           currentStock: initialItem.currentStock,
@@ -84,6 +85,7 @@ const CreatePOModal = ({
       setSelectedItems([...selectedItems, {
         id: item.id,
         itemCode: item.itemCode,
+        name: item.name || '',
         description: item.description,
         supplier: item.supplier?.name,
         currentStock: item.currentStock,
@@ -244,6 +246,7 @@ const CreatePOModal = ({
                                     return {
                                       id: item.id,
                                       itemCode: item.itemCode,
+                                      name: item.name || '',
                                       description: item.description,
                                       supplier: item.supplier?.name,
                                       currentStock: item.currentStock,
@@ -266,6 +269,7 @@ const CreatePOModal = ({
                           />
                         </th>
                         <th className="p-2 text-left">Código</th>
+                        <th className="p-2 text-left">Nombre</th>
                         <th className="p-2 text-left">Descripción</th>
                         <th className="p-2 text-left">Stock</th>
                         <th className="p-2 text-left">Proveedor</th>
@@ -290,6 +294,7 @@ const CreatePOModal = ({
                               />
                             </td>
                             <td className="p-2 font-mono text-sm">{item.itemCode}</td>
+                            <td className="p-2">{item.name}</td>
                             <td className="p-2">{item.description}</td>
                             <td className="p-2">
                               <span className={
@@ -323,6 +328,7 @@ const CreatePOModal = ({
                     <thead className="bg-muted border-b border-border">
                       <tr>
                         <th className="p-2 text-left">Código</th>
+                        <th className="p-2 text-left">Nombre</th>
                         <th className="p-2 text-left">Descripción</th>
                         <th className="p-2 text-left">Precio</th>
                         <th className="p-2 text-left">Cantidad</th>
@@ -333,6 +339,7 @@ const CreatePOModal = ({
                       {selectedItems.map((item) => (
                         <tr key={item.id} className="border-b border-border hover:bg-muted/50 transition-smooth">
                           <td className="p-2 font-mono text-sm">{item.itemCode}</td>
+                          <td className="p-2">{item.name}</td>
                           <td className="p-2">{item.description}</td>
                           <td className="p-2">
                             <div className="font-medium">
