@@ -5,11 +5,14 @@ import Input from "../../../components/ui/Input";
 import Select from "../../../components/ui/Select";
 import useRequisi from "../../../hooks/useRequisi";
 import useOperac from "../../../hooks/useOperac";
+import useInventory from "../../../hooks/useInventory";
+
 
 
 const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
   const { createRequisition, updateRequisition } = useRequisi();
    const { oportunities, getOportunities } = useOperac();
+   const { articulos, getArticulos } = useInventory();
 
   const [formData, setFormData] = useState({
     requestNumber: "",
@@ -71,6 +74,7 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
    useEffect(() => {
   if (isOpen) {
     getOportunities(); 
+    getArticulos();
   }
 }, [isOpen]);
 
@@ -144,13 +148,13 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
   };
 
   const handleSave = async () => {
-    // 🔹 Formatear fecha al formato dd/mm/yyyy
+    //Formatear fecha al formato dd/mm/yyyy
     const formattedDate = new Date(formData.requestDate).toLocaleDateString(
       "es-MX",
       { day: "2-digit", month: "2-digit", year: "numeric" }
     );
 
-    // 🔹 Mapeo exacto según tu backend
+    //Mapeo exacto según tu backend
     const payload = {
       numeroOrdenTrabajo: formData.orderNumber,
       nombreProyecto: formData.projectName,
@@ -160,13 +164,15 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
       estado: formData.status,
       descripcionSolicitud: formData.description,
       materiales: formData.items.map((item) => ({
-        nombreMaterial: item.name,
-        cantidad: Number(item.quantity),
-        unidad:
-          item.unit.charAt(0).toUpperCase() + item.unit.slice(1).toLowerCase(),
-        urgencia: item.urgency,
-        descripcionEspecificaciones: item.description,
-      })),
+  codigoArticulo: item.codigoArticulo || "",
+  nombreMaterial: item.name || "",
+  cantidad: Number(item.quantity),
+  unidad:
+    item.unit.charAt(0).toUpperCase() + item.unit.slice(1).toLowerCase(),
+  urgencia: item.urgency,
+  descripcionEspecificaciones: item.description,
+})),
+
       justificacionSolicitud: formData.justification,
       notasAdicionales: formData.notes,
     };
@@ -289,12 +295,25 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
               Agregar Material
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
-              <Input
-                label="Nombre del Material"
-                placeholder="Ej: Compresor 5HP"
-                value={newItem?.name}
-                onChange={(e) => handleNewItemChange("name", e?.target?.value)}
-              />
+              <Select
+  label="Código del Artículo"
+  options={
+    articulos?.map((art) => ({
+      label: art.codigoArticulo, 
+      value: art.id,            
+    })) || []
+  }
+  value={newItem?.idArticulo}
+  onChange={(value) => {
+    const selected = articulos.find((a) => a.id === value);
+    handleNewItemChange("idArticulo", value);
+    handleNewItemChange("codigoArticulo", selected?.codigoArticulo || "");
+    handleNewItemChange("name", selected?.descripcion || "");
+    handleNewItemChange("unit", selected?.unidad || "unidades");
+  }}
+/>
+
+
 
               <div className="grid grid-cols-2 gap-2">
                 <Input
@@ -306,13 +325,13 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
                     handleNewItemChange("quantity", e?.target?.value)
                   }
                 />
-                <Select
-                  label="Unidad"
-                  options={unitOptions}
-                  value={newItem?.unit}
-                  onChange={(value) => handleNewItemChange("unit", value)}
-                />
-              </div>
+                  <Select
+    label="Unidad"
+    options={unitOptions}
+    value={newItem?.unit}
+    onChange={(value) => handleNewItemChange("unit", value)}
+  />
+</div>
 
               <Select
                 label="Urgencia"
@@ -360,8 +379,9 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
                       <div className="flex-1">
                         <div className="flex items-center space-x-2 mb-1">
                           <h5 className="text-sm font-medium text-foreground">
-                            {item?.name}
-                          </h5>
+  {item?.codigoArticulo || item?.name}
+</h5>
+
                           <span
                             className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                               item?.urgency === "Urgente"
