@@ -10,6 +10,7 @@ const EditItemModal = ({ isOpen, onClose, item, onUpdateSuccess }) => {
   
   const [formData, setFormData] = useState({
     itemCode: '',
+    name: '',
     description: '',
     specifications: '',
     category: '',
@@ -65,6 +66,7 @@ const EditItemModal = ({ isOpen, onClose, item, onUpdateSuccess }) => {
     if (isOpen && item) {
       setFormData({
         itemCode: item.itemCode || '',
+        name: item.name || '',
         description: item.description || '',
         specifications: item.specifications || '',
         category: item.category || '',
@@ -101,6 +103,9 @@ const EditItemModal = ({ isOpen, onClose, item, onUpdateSuccess }) => {
     if (!formData?.itemCode?.trim()) {
       newErrors.itemCode = 'El código de artículo es requerido';
     }
+    if (!formData?.name?.trim()) {
+      newErrors.name = 'El nombre del artículo es requerido';
+    }
     if (!formData?.description?.trim()) {
       newErrors.description = 'La descripción es requerida';
     }
@@ -136,6 +141,7 @@ const EditItemModal = ({ isOpen, onClose, item, onUpdateSuccess }) => {
     try {
       const payload = {
         codigoArticulo: formData?.itemCode?.trim(),
+        nombre: formData?.name?.trim(),
         descripcion: formData?.description?.trim(),
         especificaciones: formData?.specifications?.trim() || '',
         categoria: formData?.category,
@@ -227,6 +233,15 @@ const EditItemModal = ({ isOpen, onClose, item, onUpdateSuccess }) => {
                     onChange={(e) => handleInputChange('itemCode', e.target.value)}
                     error={errors.itemCode}
                     placeholder="Ej: HVAC-001"
+                    disabled={isSubmitting || loading}
+                  />
+
+                  <Input
+                    label="Nombre"
+                    value={formData.name}
+                    onChange={(e) => handleInputChange('name', e.target.value)}
+                    error={errors.name}
+                    placeholder="Nombre del artículo"
                     disabled={isSubmitting || loading}
                   />
                   

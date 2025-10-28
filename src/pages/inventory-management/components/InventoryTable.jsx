@@ -57,6 +57,15 @@ const InventoryTable = ({ items, onViewDetails, onUpdateStock, onCreatePO }) => 
               </th>
               <th className="text-left p-3 lg:p-4">
                 <button
+                  onClick={() => handleSort('name')}
+                  className="flex items-center space-x-2 font-medium text-sm text-foreground hover:text-primary transition-smooth"
+                >
+                  <span>Nombre</span>
+                  <SortIcon field="name" />
+                </button>
+              </th>
+              <th className="text-left p-3 lg:p-4">
+                <button
                   onClick={() => handleSort('description')}
                   className="flex items-center space-x-2 font-medium text-sm text-foreground hover:text-primary transition-smooth"
                 >
@@ -111,6 +120,9 @@ const InventoryTable = ({ items, onViewDetails, onUpdateStock, onCreatePO }) => 
                 <tr key={item?.id} className="border-b border-border hover:bg-muted/50 transition-smooth">
                   <td className="p-3 lg:p-4">
                     <span className="font-mono text-sm text-foreground">{item?.itemCode}</span>
+                  </td>
+                  <td className="p-3 lg:p-4">
+                    <div className="font-medium text-sm text-foreground">{item?.name}</div>
                   </td>
                   <td className="p-3 lg:p-4">
                     <div className="font-medium text-sm text-foreground">{item?.description}</div>
