@@ -34,6 +34,17 @@ const operacService = {
       throw error;
     }
   },
+
+  async deleteWorkOrder(id) {
+  try {
+    const response = await httpService.delete(`/trabajos/${id}`);
+    return response; // { success, data, message }
+  } catch (error) {
+    console.error("Error al eliminar trabajo:", error);
+    throw error;
+  }
+},
+
 };
 
 export default operacService;

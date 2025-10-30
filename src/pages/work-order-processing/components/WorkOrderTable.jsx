@@ -4,6 +4,9 @@ import Button from "../../../components/ui/Button";
 import useOperac from "../../../hooks/useOperac";
 import useClient from "../../../hooks/useClient";
 import WorkOrderModal from "../components/WorkOrderModal";
+import { useNotifications } from "../../../context/NotificationContext";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 
 const WorkOrderTable = ({
   workOrders,
@@ -15,8 +18,9 @@ const WorkOrderTable = ({
   loading,
   error,
 }) => {
-  const { oportunities, getOportunities } = useOperac();
+const { oportunities, getOportunities, deleteWorkOrder } = useOperac();
   const { clients, getClients, loading: loadingClients } = useClient();
+  const { showConfirm, showOperationSuccess, showHttpError } = useNotifications();
 
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [sortConfig, setSortConfig] = useState({ key: "prioridad", direction: "asc" });
@@ -44,6 +48,8 @@ const WorkOrderTable = ({
     [workOrders, oportunities]
   );
 
+  
+
   const sortedOrders = useMemo(() => {
     const sorted = [...dataSource];
     if (!sortConfig.key) return sorted;
@@ -62,6 +68,26 @@ const WorkOrderTable = ({
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+  
+
+const handleDelete = (order) => {
+  showConfirm(`¿Seguro que deseas eliminar la orden "${order.ordenTrabajo}"?`, {
+    onConfirm: async () => {
+      const success = await deleteWorkOrder(order.id);
+
+      if (success) {
+  showOperationSuccess("delete", "Orden de trabajo");
+  onEditOrder?.({ type: "delete", id: order.id });
+} else {
+        showHttpError("No se pudo eliminar la orden");
+      }
+    },
+    onCancel: () => {
+      showInfo("Eliminación cancelada");
+    }
+  });
+};
+
 
   const handleSort = (key) => {
     setSortConfig((prev) => ({
@@ -150,6 +176,7 @@ const WorkOrderTable = ({
       </div>
     </th>
   );
+  
 
   if (loading || loadingClients)
     return (
@@ -174,6 +201,78 @@ const WorkOrderTable = ({
         No hay órdenes registradas.
       </div>
     );
+
+      // Exportar datos a PDF
+  const handleExportPDF = () => {
+    if (!sortedOrders || sortedOrders.length === 0) {
+      alert("No hay datos disponibles para exportar.");
+      return;
+    }
+
+    const doc = new jsPDF({
+      orientation: "landscape",
+      unit: "pt",
+      format: "A4",
+    });
+
+    //  Encabezado del reporte
+    doc.setFontSize(16);
+    doc.text("Reporte de Órdenes de Trabajo", 40, 40);
+
+    //  Fecha actual
+    const fechaActual = new Date().toLocaleDateString("es-MX", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    doc.setFontSize(10);
+    doc.text(`Generado el ${fechaActual}`, 40, 60);
+
+    //  Columnas del PDF
+    const tableColumn = [
+      "N° Orden",
+      "Técnico Asignado",
+      "Prioridad",
+      "Estado",
+      "Fecha Límite",
+      "Cliente",
+      "Tipo Proyecto",
+      "Notas",
+    ];
+
+    //  Filas de la tabla
+    const tableRows = sortedOrders.map((order) => [
+      order?.ordenTrabajo || "—",
+      order?.tecnicoAsignado?.nombre || "Sin técnico",
+      order?.prioridad || "—",
+      order?.estado || "—",
+      order?.fechaLimite || "—",
+      order?.cliente?.empresa || order?.cliente?.nombre || "Sin cliente",
+      order?.tipo || "—",
+      order?.notasAdicionales || "—",
+    ]);
+
+    //  Generar tabla
+    doc.autoTable({
+      head: [tableColumn],
+      body: tableRows,
+      startY: 80,
+      styles: {
+        fontSize: 9,
+        cellPadding: 5,
+      },
+      headStyles: {
+        fillColor: [25, 118, 210],
+        textColor: 255,
+        fontStyle: "bold",
+      },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+    });
+
+    //  Descargar archivo
+    doc.save(`ordenes_trabajo_${new Date().toISOString().split("T")[0]}.pdf`);
+  };
+
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
@@ -279,11 +378,19 @@ const WorkOrderTable = ({
               >
                 Editar
               </Button>
+              <Button
+  variant="ghost"
+  size="icon"
+  onClick={() => handleDelete(order)}
+  title="Eliminar orden"
+>
+  <Icon name="Trash2" size={16} className="text-destructive" />
+</Button>
             </div>
           </td>
         </tr>
 
-        {/* 🔹 Fila expandida con descripción, EPP y materiales */}
+        {/*  Fila expandida con descripción, EPP y materiales */}
         {expandedRows.has(order.id) && (
           <tr>
             <td colSpan="9" className="px-6 py-4 bg-muted/30">
@@ -324,40 +431,36 @@ const WorkOrderTable = ({
                   Materiales Registrados
                 </h4>
                 <ul className="text-sm text-muted-foreground grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {(() => {
-                    // Filtrar las requisiciones que pertenezcan a esta orden
-                    const materialsForOrder = requisitions
-                      ?.filter(
-                        (req) => req.numeroOrdenTrabajo === order.ordenTrabajo
-                      )
-                      ?.flatMap((req) => req.materiales || req.items || []);
+  {(() => {
+    const materialsForOrder = requisitions
+      ?.filter((req) => req.numeroOrdenTrabajo === order.ordenTrabajo)
+      ?.flatMap((req) => [
+        ...(req.materiales || req.items || []),
+        ...(req.materialesManuales || req.manualItems || [])
+      ]);
 
-                    if (!materialsForOrder || materialsForOrder.length === 0) {
-                      return (
-                        <li className="text-muted-foreground col-span-3">
-                          No hay materiales registrados para esta orden
-                        </li>
-                      );
-                    }
+    if (!materialsForOrder || materialsForOrder.length === 0) {
+      return (
+        <li className="text-muted-foreground col-span-3">
+          No hay materiales registrados para esta orden
+        </li>
+      );
+    }
 
-                    return materialsForOrder.map((item, index) => (
-                      <li key={index} className="flex items-center space-x-2">
-                        <Icon name="Package" size={14} />
-                        <span>
-                          {item.nombreMaterial ||
-                            item.nombre ||
-                            item.descripcionEspecificaciones ||
-                            "Material sin nombre"}{" "}
-                          —{" "}
-                          <span className="text-muted-foreground">
-                            Cantidad: {item.cantidad || item.quantity || 0}{" "}
-                            {item.unidad || ""}
-                          </span>
-                        </span>
-                      </li>
-                    ));
-                  })()}
-                </ul>
+    return materialsForOrder.map((item, index) => (
+      <li key={index} className="flex items-center space-x-2">
+        <Icon name="Package" size={14} />
+        <span>
+          {item.nombreMaterial || item.nombre || item.descripcionEspecificaciones || "Material sin nombre"} —{" "}
+          <span className="text-muted-foreground">
+            Cantidad: {item.cantidad || item.quantity || 0} {item.unidad || ""}
+          </span>
+        </span>
+      </li>
+    ));
+  })()}
+</ul>
+
 
                 <p className="text-sm text-muted-foreground">
                   <strong>Requiere estudios médicos actualizados:</strong>{" "}
@@ -389,7 +492,7 @@ const WorkOrderTable = ({
         )}
       </div>
 
-      {/* 🔹 Paginación */}
+      {/*  Paginación */}
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-2 p-4 border-t border-border">
           <Button

@@ -73,8 +73,31 @@ const useOperac = () => {
       setLoading(false);
     }
   };
+  const deleteWorkOrder = async (id) => {
+  setLoading(true);
+  setError(null);
+  try {
+    const response = await operacService.deleteWorkOrder(id);
+    if (response.success) {
+      showOperationSuccess(response.message || "Orden eliminada ✅");
+      setOportunities(prev => prev.filter(o => o.id !== id));
+      return true;
+    } else {
+      showHttpError(response.message || "Error al eliminar la orden");
+      return false;
+    }
+  } catch (err) {
+    console.error(err);
+    showHttpError("No se pudo eliminar la orden ❌");
+    setError(err);
+    return false;
+  } finally {
+    setLoading(false);
+  }
+};
 
-  return { oportunities, loading, error, getOportunities, createWorkOrder, updateWorkOrder };
+
+  return { oportunities, loading, error, getOportunities, createWorkOrder, updateWorkOrder, deleteWorkOrder, };
 };
 
 export default useOperac;
