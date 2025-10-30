@@ -14,7 +14,7 @@ const InventoryPanel = ({
   onRequisitionUpdated,
 }) => {
   const [activeTab, setActiveTab] = useState('inventory');
-  const { showConfirm, showSuccess, showHttpError, showInfo, showOperationSuccess } = useNotifications();
+  const { showConfirm, showHttpError, showInfo, showOperationSuccess } = useNotifications();
   const { requisitions, loading: loadingRequis, getRequisitions, updateRequisition, deleteRequisition } = useRequisi();
   const { inventario, getInventario, loading: loadingInventario } = useInventario();
   const [localRequisitions, setLocalRequisitions] = useState([]);
@@ -62,11 +62,7 @@ const InventoryPanel = ({
     try {
       const updated = await updateRequisition(request.id, { estado: 'Aprobada' });
       if (!updated) return;
-
-      const updatedList = localRequisitions.map((r) =>
-        r.id === request.id ? { ...r, estado: 'Aprobada' } : r
-      );
-
+      const updatedList = localRequisitions.map((r) => r.id === request.id ? { ...r, estado: 'Aprobada' } : r);
       setLocalRequisitions(updatedList);
       onRequisitionUpdated?.(updatedList);
       showOperationSuccess();
@@ -79,11 +75,7 @@ const InventoryPanel = ({
     try {
       const updated = await updateRequisition(request.id, { estado: 'Rechazada' });
       if (!updated) return;
-
-      const updatedList = localRequisitions.map((r) =>
-        r.id === request.id ? { ...r, estado: 'Rechazada' } : r
-      );
-
+      const updatedList = localRequisitions.map((r) => r.id === request.id ? { ...r, estado: 'Rechazada' } : r);
       setLocalRequisitions(updatedList);
       onRequisitionUpdated?.(updatedList);
       showOperationSuccess();
@@ -98,7 +90,6 @@ const InventoryPanel = ({
         try {
           const success = await deleteRequisition(request.id);
           if (!success) return;
-
           const updatedList = localRequisitions.filter((r) => r.id !== request.id);
           setLocalRequisitions(updatedList);
           onRequisitionUpdated?.(updatedList);
@@ -113,7 +104,6 @@ const InventoryPanel = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRequisition, setSelectedRequisition] = useState(null);
 
-  // Mantiene la reactividad y carga materiales manuales e inventario correctamente
   const handleEditRequisition = (req) => {
     const mappedReq = {
       id: req.id,
@@ -126,39 +116,34 @@ const InventoryPanel = ({
       status: req.estado || "Pendiente",
       priority: req.prioridad || "Media",
       description: req.descripcionSolicitud || "",
-      items:
-        req.materiales?.map((m) => ({
-          id: Date.now() + Math.random(),
-          codigoArticulo: m.codigoArticulo || "",
-          name: m.nombreMaterial || "",
-          quantity: m.cantidad,
-          unit: m.unidad?.toLowerCase() || "unidades",
-          urgency: m.urgencia || "Normal",
-          description: m.descripcionEspecificaciones || "",
-          type: "inventario",
-        })) || [],
-      manualItems:
-        req.materialesManuales?.map((m) => ({
-          id: Date.now() + Math.random(),
-          name: m.nombreMaterial || "",
-          quantity: m.cantidad || 1,
-          unit: m.unidad || "pieza",
-          urgency: m.urgencia || "Normal",
-          description: m.descripcionEspecificaciones || "",
-          type: "manual",
-        })) || [],
+      items: req.materiales?.map((m) => ({
+        id: Date.now() + Math.random(),
+        codigoArticulo: m.codigoArticulo || "",
+        name: m.nombreMaterial || "",
+        quantity: m.cantidad,
+        unit: m.unidad?.toLowerCase() || "unidades",
+        urgency: m.urgencia || "Normal",
+        description: m.descripcionEspecificaciones || "",
+        type: "inventario",
+      })) || [],
+      manualItems: req.materialesManuales?.map((m) => ({
+        id: Date.now() + Math.random(),
+        name: m.nombreMaterial || "",
+        quantity: m.cantidad || 1,
+        unit: m.unidad || "pieza",
+        urgency: m.urgencia || "Normal",
+        description: m.descripcionEspecificaciones || "",
+        type: "manual",
+      })) || [],
       justification: req.justificacionSolicitud || "",
       notes: req.notasAdicionales || "",
     };
-
     setSelectedRequisition(mappedReq);
     setIsModalOpen(true);
   };
 
   const handleSaveRequisition = (updatedReq) => {
-    const updatedList = localRequisitions.map((r) =>
-      r.id === updatedReq.id ? updatedReq : r
-    );
+    const updatedList = localRequisitions.map((r) => (r.id === updatedReq.id ? updatedReq : r));
     setLocalRequisitions(updatedList);
     onRequisitionUpdated?.(updatedList);
     setIsModalOpen(false);
@@ -172,9 +157,7 @@ const InventoryPanel = ({
           <button
             onClick={() => setActiveTab('inventory')}
             className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'inventory'
-                ? 'border-primary text-primary bg-primary/5'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
+              activeTab === 'inventory' ? 'border-primary text-primary bg-primary/5' : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             <div className="flex items-center space-x-2">
@@ -186,9 +169,7 @@ const InventoryPanel = ({
           <button
             onClick={() => setActiveTab('requests')}
             className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'requests'
-                ? 'border-primary text-primary bg-primary/5'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
+              activeTab === 'requests' ? 'border-primary text-primary bg-primary/5' : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             <div className="flex items-center space-x-2">
@@ -201,11 +182,63 @@ const InventoryPanel = ({
 
       {/* Contenido */}
       <div className="p-4 h-[calc(100%-48px)]">
-
         {/* INVENTARIO */}
         {activeTab === 'inventory' && (
           <div className="space-y-4 h-full overflow-y-auto">
-            {/* ... se mantiene igual ... */}
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-foreground">Estado del Inventario</h3>
+              <Button variant="outline" size="sm" iconName="RefreshCw" iconSize={16} onClick={getInventario}>
+                Actualizar
+              </Button>
+            </div>
+
+            {loadingInventario ? (
+              <p className="text-sm text-muted-foreground">Cargando inventario...</p>
+            ) : inventario.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No hay artículos en el inventario.</p>
+            ) : (
+              <div className="space-y-3">
+                {inventario.map((item) => {
+                  const nombre = item.descripcion || item.description || item.codigoArticulo || 'Artículo sin nombre';
+                  const stock = item.stockActual ?? 0;
+                  const puntoReorden = item.puntoReorden ?? 0;
+                  const unidad = item.unidad ?? '';
+                  const ubicacion = item.ubicacion ?? 'Sin ubicación';
+                  const estado = getStockStatus(stock, puntoReorden);
+
+                  return (
+                    <div key={item.id} className="border border-border rounded-lg p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium text-foreground">{nombre}</h4>
+                          <p className="text-xs text-muted-foreground">SKU: {item.codigoArticulo || 'N/A'}</p>
+                        </div>
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStockStatusColor(estado)}`}>{estado}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 mb-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Stock Actual</p>
+                          <p className="text-sm font-medium text-foreground">{stock} {unidad}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Punto de Reorden</p>
+                          <p className="text-sm font-medium text-foreground">{puntoReorden} {unidad}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs text-muted-foreground">
+                          <Icon name="MapPin" size={12} className="inline mr-1" />
+                          {ubicacion}
+                        </div>
+                        {(estado === 'Crítico' || estado === 'Bajo Stock') && (
+                          <Button variant="outline" size="sm" onClick={() => onCreatePurchaseOrder(item)} iconName="ShoppingCart" iconSize={14}>Ordenar</Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -227,10 +260,9 @@ const InventoryPanel = ({
                   <p className="text-sm text-muted-foreground">No hay requisiciones disponibles.</p>
                 ) : (
                   displayedRequisitions.map((request) => {
-                    // Combinar materiales normales + manuales
                     const allMaterials = [
                       ...(request.materiales || []),
-                      ...(request.materialesManuales || []),
+                      ...(request.materialesManuales || [])
                     ];
 
                     return (
@@ -240,12 +272,9 @@ const InventoryPanel = ({
                             <h4 className="text-sm font-medium text-foreground">{request.numeroOrdenTrabajo}</h4>
                             <p className="text-xs text-muted-foreground">{request.nombreProyecto}</p>
                           </div>
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRequestStatusColor(request.estado)}`}>
-                            {request.estado}
-                          </span>
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRequestStatusColor(request.estado)}`}>{request.estado}</span>
                         </div>
 
-                        {/* ✅ Ahora muestra inventario + manuales */}
                         <div className="mb-3">
                           <p className="text-xs text-muted-foreground mb-2">Materiales Solicitados:</p>
                           {allMaterials.length > 0 ? (
@@ -267,7 +296,6 @@ const InventoryPanel = ({
                           )}
                         </div>
 
-                        {/* Controles inferiores */}
                         <div className="flex items-center justify-between">
                           <div className="text-xs text-muted-foreground">
                             <Icon name="User" size={12} className="inline mr-1" />
@@ -276,50 +304,14 @@ const InventoryPanel = ({
 
                           <div className="flex flex-col items-center gap-2 mt-2">
                             <div className="flex items-center justify-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                iconName="Edit"
-                                iconSize={16}
-                                onClick={() => handleEditRequisition(request)}
-                                className="p-2 border-gray-300 hover:bg-gray-100"
-                                title="Editar"
-                              />
-
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                iconName="Trash2"
-                                iconSize={16}
-                                onClick={() => handleDelete(request)}
-                                className="p-2 text-red-600 border-gray-300 hover:bg-red-50"
-                                title="Eliminar"
-                              />
+                              <Button variant="outline" size="sm" iconName="Edit" iconSize={16} onClick={() => handleEditRequisition(request)} className="p-2 border-gray-300 hover:bg-gray-100" title="Editar" />
+                              <Button variant="outline" size="sm" iconName="Trash2" iconSize={16} onClick={() => handleDelete(request)} className="p-2 text-red-600 border-gray-300 hover:bg-red-50" title="Eliminar" />
                             </div>
 
                             {request.estado === "Pendiente" && (
                               <div className="flex justify-center gap-2 mt-1">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  iconName="X"
-                                  iconSize={14}
-                                  onClick={() => handleReject(request)}
-                                  className="min-w-[100px] text-gray-700 border-gray-400 hover:bg-gray-100"
-                                >
-                                  Rechazar
-                                </Button>
-
-                                <Button
-                                  variant="default"
-                                  size="sm"
-                                  iconName="Check"
-                                  iconSize={14}
-                                  onClick={() => handleApprove(request)}
-                                  className="min-w-[100px]"
-                                >
-                                  Aprobar
-                                </Button>
+                                <Button variant="outline" size="sm" iconName="X" iconSize={14} onClick={() => handleReject(request)} className="min-w-[100px] text-gray-700 border-gray-400 hover:bg-gray-100">Rechazar</Button>
+                                <Button variant="default" size="sm" iconName="Check" iconSize={14} onClick={() => handleApprove(request)} className="min-w-[100px]">Aprobar</Button>
                               </div>
                             )}
                           </div>
