@@ -11,6 +11,9 @@ import RequisitionModal from './components/RequisitionModal';
 import StatsCards from './components/StatsCards';
 import useOperac from '../../hooks/useOperac';
 import useRequisi from '../../hooks/useRequisi';
+import jsPDF from "jspdf";
+import "jspdf-autotable";
+
 
 const WorkOrderProcessing = () => {
   const { oportunities, loading, error, getOportunities } = useOperac();
@@ -135,32 +138,41 @@ const WorkOrderProcessing = () => {
   };
 
   // CRUD de órdenes
-  const handleSaveOrder = async (savedOrder) => {
-    let newOrder = { ...savedOrder };
+  const handleSaveOrder = async (data) => {
+  // 🗑 Si es eliminación
+  if (data?.type === "delete") {
+    setLocalOrders(prev => prev.filter(o => o.id !== data.id));
+    setFilteredOrders(prev => prev.filter(o => o.id !== data.id));
+    return;
+  }
 
-    if (!newOrder?.id) {
-      newOrder.id = Date.now();
-      newOrder.estado = 'Pendiente';
-      newOrder.fechaCreacion = new Date().toISOString();
-    }
+  //Si es creación o edición
+  let newOrder = { ...data };
 
-    setLocalOrders(prev => {
-      const exists = prev.some(o => o.id === newOrder.id);
-      return exists
-        ? prev.map(o => (o.id === newOrder.id ? newOrder : o))
-        : [newOrder, ...prev];
-    });
+  if (!newOrder?.id) {
+    newOrder.id = Date.now();
+    newOrder.estado = 'Pendiente';
+    newOrder.fechaCreacion = new Date().toISOString();
+  }
 
-    setFilteredOrders(prev => {
-      const exists = prev.some(o => o.id === newOrder.id);
-      return exists
-        ? prev.map(o => (o.id === newOrder.id ? newOrder : o))
-        : [newOrder, ...prev];
-    });
+  setLocalOrders(prev => {
+    const exists = prev.some(o => o.id === newOrder.id);
+    return exists
+      ? prev.map(o => (o.id === newOrder.id ? newOrder : o))
+      : [newOrder, ...prev];
+  });
 
-    setIsModalOpen(false);
-    setSelectedOrder(null);
-  };
+  setFilteredOrders(prev => {
+    const exists = prev.some(o => o.id === newOrder.id);
+    return exists
+      ? prev.map(o => (o.id === newOrder.id ? newOrder : o))
+      : [newOrder, ...prev];
+  });
+
+  setIsModalOpen(false);
+  setSelectedOrder(null);
+};
+
 
   // Crear nueva orden
   const handleCreateNewOrder = () => {
@@ -219,7 +231,7 @@ const WorkOrderProcessing = () => {
   }
 
   setLocalRequisitions(prev => [newReq, ...prev]);
-  setLocalOrders(prev => [newReq, ...prev]); // 🔹 esto hará que se muestre también en WorkOrderTable
+  setLocalOrders(prev => [newReq, ...prev]); // sto hará que se muestre también en WorkOrderTable
 
   getRequisitions(); // sincroniza backend
   setIsRequisitionModalOpen(false);
@@ -227,32 +239,76 @@ const WorkOrderProcessing = () => {
 };
 
   const handleExportData = () => {
-    const csvData = filteredOrders.map(order => ({
-      'Número de Orden': order?.orderNumber,
-      'Proyecto': order?.projectName,
-      'Cliente': order?.clientName,
-      'Tipo': order?.type,
-      'Prioridad': order?.priority,
-      'Estado': order?.status,
-      'Técnico Asignado': order?.assignedTechnician,
-      'Fecha Límite': order?.dueDate,
-      'Progreso': `${order?.progress}%`
-    }));
+  if (!filteredOrders || filteredOrders.length === 0) {
+    alert("No hay datos disponibles para exportar.");
+    return;
+  }
 
-    const headers = Object.keys(csvData[0] || {});
-    const csvContent = [
-      headers.join(','),
-      ...csvData.map(row => headers.map(header => `"${row[header]}"`).join(','))
-    ].join('\n');
+  const doc = new jsPDF({
+    orientation: "landscape",
+    unit: "pt",
+    format: "A4",
+  });
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.setAttribute('href', URL.createObjectURL(blob));
-    link.setAttribute('download', `ordenes_trabajo_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  // Título
+  doc.setFontSize(16);
+  doc.text("Reporte de Órdenes de Trabajo", 40, 40);
+
+  // Fecha de generación
+  const fechaActual = new Date().toLocaleDateString("es-MX", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  doc.setFontSize(10);
+  doc.text(`Generado el ${fechaActual}`, 40, 60);
+
+  //Columnas del PDF
+  const tableColumn = [
+    "N° Orden",
+    "Proyecto / Tipo",
+    "Cliente",
+    "Técnico Asignado",
+    "Prioridad",
+    "Estado",
+    "Fecha Límite",
+    "Progreso",
+  ];
+
+  //Filas de la tabla
+  const tableRows = filteredOrders.map((order) => [
+    order?.orderNumber || order?.ordenTrabajo || "—",
+    order?.projectName || order?.tipo || "—",
+    order?.clientName || order?.cliente?.empresa || order?.cliente?.nombre || "—",
+    order?.assignedTechnician || order?.tecnicoAsignado?.nombre || "Sin técnico",
+    order?.priority || order?.prioridad || "—",
+    order?.status || order?.estado || "—",
+    order?.dueDate || order?.fechaLimite || "—",
+    `${order?.progress || order?.progreso || 0}%`,
+  ]);
+
+  // Crear la tabla
+  doc.autoTable({
+    head: [tableColumn],
+    body: tableRows,
+    startY: 80,
+    styles: {
+      fontSize: 9,
+      cellPadding: 5,
+    },
+    headStyles: {
+      fillColor: [25, 118, 210],
+      textColor: 255,
+      fontStyle: "bold",
+    },
+    alternateRowStyles: { fillColor: [245, 245, 245] },
+    margin: { top: 80 },
+  });
+
+  // Guardar PDF
+  doc.save(`ordenes_trabajo_${new Date().toISOString().split("T")[0]}.pdf`);
+};
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -281,9 +337,18 @@ const WorkOrderProcessing = () => {
                 <Button variant="outline" iconName="ClipboardList" iconSize={16} onClick={handleCreateNewRequisition}>
                   Nueva Requisición
                 </Button>
-                <Button variant="default" iconName="Download" iconSize={16} onClick={handleExportData}>
-                  Exportar
-                </Button>
+                <div className="flex justify-end p-4">
+ <Button
+  variant="default"
+  iconName="Download"
+  iconSize={16}
+  onClick={handleExportData} 
+>
+  Exportar
+</Button>
+</div>
+
+
               </div>
             </div>
           </div>
