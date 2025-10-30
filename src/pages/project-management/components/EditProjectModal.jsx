@@ -18,67 +18,17 @@ const estadoOptionsBackend = [
 ];
 const ALLOWED_ESTADOS = estadoOptionsBackend.map(o => o.value);
 
-/*
-  Mapeos estado <-> backend:
-
-  Tu backend /proyectos/estadisticas regresa claves como:
-    - "activo"
-    - "en proceso"
-    - "en pausa"
-    - "completado"
-    - "sin_estado"
-    (a futuro quizá "en revisión", "cancelado")
-
-  En tu UI el usuario elige valores como:
-    - "planificación"
-    - "en proceso"
-    - "en pausa"
-    - "en revisión"
-    - "completado"
-    - "cancelado"
-
-  Reglas:
-  - "planificación" en UI se guarda como "activo" en backend
-  - El resto se manda tal cual
-*/
-
-// backend -> UI
-const backendToUiDefault = (apiEstado) => {
-  const v = String(apiEstado || '').toLowerCase().trim();
-
-  if (v === 'en proceso')   return 'en proceso';
-  if (v === 'en pausa')     return 'en pausa';
-  if (v === 'en revisión')  return 'en revisión';
-  if (v === 'completado')   return 'completado';
-  if (v === 'cancelado')    return 'cancelado';
-
-  // "activo" lo mostramos como "planificación"
-  if (v === 'activo' || v === 'planificación' || v === 'planificacion') {
-    return 'planificación';
-  }
-
-  // fallback si viene "sin_estado" o algo raro
-  return 'planificación';
-};
-
-// UI -> backend
-const mapUiToBackend = (uiEstado) => {
-  const v = String(uiEstado || '').toLowerCase().trim();
-
-  if (v === 'en proceso')   return 'en proceso';
-  if (v === 'en pausa')     return 'en pausa';
-  if (v === 'en revisión')  return 'en revisión';
-  if (v === 'completado')   return 'completado';
-  if (v === 'cancelado')    return 'cancelado';
-
-  // "planificación" la guardamos como "activo" porque así la agrupa tu API
-  if (v === 'planificación' || v === 'planificacion') {
-    return 'activo';
-  }
-
-  // fallback
-  return 'activo';
-};
+/* Mapeos de estado (API solo “activo” | “en proceso”) */
+// const backendToUiDefault = (apiEstado) => {
+//   const v = String(apiEstado || '').toLowerCase();
+//   if (v === 'en proceso') return 'en proceso';
+//   if (v === 'activo') return 'planificación';
+//   return 'planificación';
+// };
+// const mapUiToBackend = (uiEstado) => {
+//   const v = String(uiEstado || '').toLowerCase();
+//   return v === 'en proceso' ? 'en proceso' : 'activo';
+// };
 
 /* Cache local del estado UI por proyecto (para recordar lo que eligió el user en vez de lo que vino del backend) */
 const UI_ESTADO_KEY = 'proyectos_ui_estado_v1';

@@ -90,7 +90,7 @@ const getPriorityColor = (priorityValue) => {
 const mapProjectDocStrict = (doc) => {
   const id = doc.id ?? doc._id ?? safeUUID();
   const code = doc.codigo ?? doc.code ?? '—';
-  const name = doc.nombreProyecto ?? doc.name ?? 'Proyecto sin nombre';
+  const name = doc.nombreProyecto ?? doc.nombre ?? 'Proyecto sin nombre';
   const type = doc.tipoProyecto ?? doc.type ?? '—';
 
   const clienteNode = doc.cliente ?? doc.client ?? {};

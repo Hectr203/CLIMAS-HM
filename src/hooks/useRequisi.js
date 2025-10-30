@@ -72,7 +72,32 @@ const useRequisi = () => {
     }
   };
 
-  return { requisitions, loading, error, getRequisitions, createRequisition, updateRequisition };
+const deleteRequisition = async (id) => {
+  setLoading(true);
+  setError(null);
+  try {
+    const response = await requisiService.deleteRequisition(id);
+    if (response.success) {
+      showOperationSuccess(response.message || "Requisición eliminada ✅");
+      setRequisitions(prev => prev.filter(r => r.id !== id));
+      return true;
+    } else {
+      showHttpError(response.message || "No se pudo eliminar ❌");
+      return false;
+    }
+  } catch (err) {
+    console.error(err);
+    showHttpError("Error al eliminar la requisición ❌");
+    setError(err);
+    return false;
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
+  return { requisitions, loading, error, getRequisitions, createRequisition, updateRequisition, deleteRequisition };
 };
 
 export default useRequisi;

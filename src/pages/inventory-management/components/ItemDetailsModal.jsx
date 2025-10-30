@@ -80,6 +80,13 @@ const ItemDetailsModal = ({ isOpen, onClose, item }) => {
                       {item.itemCode}
                     </p>
                   </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Nombre</label>
+                    <p className="text-sm text-foreground bg-background rounded px-2 py-1">
+                      {item.name}
+                    </p>
+                  </div>
                   
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Descripción</label>
