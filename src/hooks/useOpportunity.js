@@ -15,8 +15,10 @@ export function useOpportunity() {
       const response = await opportunityService.obtenerTodasLasOportunidades();
       const raw = response.data || [];
       const mapped = raw.map((opp) => ({
-        id: opp.id,
-        clientName: opp.nombreCliente,
+  id: opp.id,
+  clienteId: opp.clienteId,
+  proyectoId: opp.proyectoId,
+  clientName: opp.nombreCliente,
         contactChannel: opp.canalContacto,
         projectType: opp.tipoProyecto,
         salesRep: opp.ejecutivoVentas,
