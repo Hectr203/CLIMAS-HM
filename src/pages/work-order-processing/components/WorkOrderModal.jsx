@@ -7,9 +7,14 @@ import { Checkbox } from "../../../components/ui/Checkbox";
 import useOperac from "../../../hooks/useOperac";
 import useClient from "../../../hooks/useClient";
 import usePerson from "../../../hooks/usePerson";
+import useProyecto from "../../../hooks/useProyect";
+
 
 const WorkOrderModal = ({ isOpen, onClose, workOrder, mode = "edit", onSaveSuccess }) => {
   const { createWorkOrder, updateWorkOrder } = useOperac();
+  const { getProyectos } = useProyecto();
+  const [clientProjects, setClientProjects] = useState([]);
+
   const { clients, getClients, loading: loadingClients, error: errorClients } = useClient();
   const { getPersonsByDepartment, departmentPersons, loading: loadingPersons } = usePerson();
 
@@ -17,20 +22,22 @@ const WorkOrderModal = ({ isOpen, onClose, workOrder, mode = "edit", onSaveSucce
 
   const [formData, setFormData] = useState({
     orderNumber: "",
-  assignedTechnician: { id: "", nombre: "" },
-  priority: "Media",
-  status: "Pendiente",
-  dueDate: "",
-  workDescription: "", 
-  additionalNotes: "", 
-  requiredPPE: [],
-  medicalRequirements: false,
-  client: { id: "", nombre: "", contacto: "", email: "", telefono: "" },
-  type: "",
-});
+    assignedTechnician: { id: "", nombre: "" },
+    priority: "Media",
+    status: "Pendiente",
+    dueDate: "",
+    workDescription: "",
+    additionalNotes: "",
+    requiredPPE: [],
+    medicalRequirements: false,
+    client: { id: "", nombre: "", contacto: "", email: "", telefono: "" },
+    type: "",
+    projectName: "", 
+  });
 
   const [assignClient, setAssignClient] = useState(false);
 
+  //Carga de clientes y técnicos
   useEffect(() => {
     if (isOpen) {
       getClients();
@@ -38,50 +45,122 @@ const WorkOrderModal = ({ isOpen, onClose, workOrder, mode = "edit", onSaveSucce
     }
   }, [isOpen]);
 
+  //Carga de proyectos según cliente seleccionado
   useEffect(() => {
-  if (workOrder) {
-    setFormData({
-      orderNumber: workOrder.ordenTrabajo || "",
-      assignedTechnician: {
-        id: workOrder.tecnicoAsignado?.id || "",
-        nombre: workOrder.tecnicoAsignado?.nombre || "",
-      },
-      priority: workOrder.prioridad || "Media",
-      status: workOrder.estado || "Pendiente",
-      dueDate: workOrder.fechaLimite || "",
-      workDescription: workOrder.descripcion || "",
-      additionalNotes: workOrder.notasAdicionales || "",
-      requiredPPE: [
-        ...(workOrder.cascoSeguridad ? ["Casco de Seguridad"] : []),
-        ...(workOrder.gafasProteccion ? ["Gafas de Protección"] : []),
-        ...(workOrder.guantesTrabajo ? ["Guantes de Trabajo"] : []),
-        ...(workOrder.calzadoSeguridad ? ["Calzado de Seguridad"] : []),
-        ...(workOrder.arnesSeguridad ? ["Arnés de Seguridad"] : []),
-        ...(workOrder.respiradorN95 ? ["Respirador N95"] : []),
-        ...(workOrder.chalecoReflectivo ? ["Chaleco Reflectivo"] : []),
-      ],
-      medicalRequirements: workOrder.requiereEstudiosMedicosActualizados || false,
-      client: {
-  id: workOrder.cliente?.id || "",
-  nombre:
-    workOrder.cliente?.nombre ||
-    workOrder.cliente?.empresa ||
-    workOrder.cliente?.companyName ||
-    "",
-  contacto: workOrder.cliente?.contacto || "",
-  email: workOrder.cliente?.email || "",
-  telefono: workOrder.cliente?.telefono || "",
-},
+    const fetchProjectsByClient = async () => {
+      if (!formData.client.id) {
+        setClientProjects([]);
+        return;
+      }
 
-      type: workOrder.tipo || "",
-    });
+      try {
+        const allProjects = await getProyectos({ force: true });
+        const filtered = allProjects.filter(
+          (p) =>
+            p.cliente?.id === formData.client.id ||
+            p.cliente?._id === formData.client.id
+        );
+        setClientProjects(filtered);
+      } catch (error) {
+        console.error("Error al obtener proyectos del cliente:", error);
+        setClientProjects([]);
+      }
+    };
 
-    // 👇 Activa automáticamente el checkbox de cliente si tiene uno asignado
-    setAssignClient(!!workOrder.cliente?.id);
-  }
+    fetchProjectsByClient();
+  }, [formData.client.id]);
+
+  //Cuando se edita o visualiza una orden existente
+  useEffect(() => {
+  const loadWorkOrderData = async () => {
+    if (workOrder) {
+      setFormData({
+        orderNumber: workOrder.ordenTrabajo || "",
+        assignedTechnician: {
+          id: workOrder.tecnicoAsignado?.id || "",
+          nombre: workOrder.tecnicoAsignado?.nombre || "",
+        },
+        priority: workOrder.prioridad || "Media",
+        status: workOrder.estado || "Pendiente",
+        dueDate: workOrder.fechaLimite || "",
+        workDescription: workOrder.descripcion || "",
+        additionalNotes: workOrder.notasAdicionales || "",
+        requiredPPE: [
+          ...(workOrder.cascoSeguridad ? ["Casco de Seguridad"] : []),
+          ...(workOrder.gafasProteccion ? ["Gafas de Protección"] : []),
+          ...(workOrder.guantesTrabajo ? ["Guantes de Trabajo"] : []),
+          ...(workOrder.calzadoSeguridad ? ["Calzado de Seguridad"] : []),
+          ...(workOrder.arnesSeguridad ? ["Arnés de Seguridad"] : []),
+          ...(workOrder.respiradorN95 ? ["Respirador N95"] : []),
+          ...(workOrder.chalecoReflectivo ? ["Chaleco Reflectivo"] : []),
+        ],
+        medicalRequirements: workOrder.requiereEstudiosMedicosActualizados || false,
+        client: {
+          id: workOrder.cliente?.id || "",
+          nombre:
+            workOrder.cliente?.nombre ||
+            workOrder.cliente?.empresa ||
+            workOrder.cliente?.companyName ||
+            "",
+          contacto: workOrder.cliente?.contacto || "",
+          email: workOrder.cliente?.email || "",
+          telefono: workOrder.cliente?.telefono || "",
+        },
+        type: workOrder.tipo || "",
+        projectName: workOrder.proyecto?.id || workOrder.proyecto?._id || "",
+      });
+
+      setAssignClient(!!workOrder.cliente?.id);
+
+      // 🔥 Carga los proyectos del cliente al editar
+      if (workOrder.cliente?.id) {
+        try {
+          const allProjects = await getProyectos({ force: true });
+          const filtered = allProjects.filter(
+            (p) =>
+              p.cliente?.id === workOrder.cliente.id ||
+              p.cliente?._id === workOrder.cliente.id
+          );
+          setClientProjects(filtered);
+        } catch (error) {
+          console.error("❌ Error al cargar proyectos del cliente:", error);
+          setClientProjects([]);
+        }
+      }
+    }
+  };
+
+  loadWorkOrderData();
 }, [workOrder, isOpen]);
 
 
+// ⬇️ Agrega esto después
+useEffect(() => {
+  if (workOrder?.cliente?.id && clients.length > 0) {
+    const selected = clients.find(
+      (c) => c.id === workOrder.cliente.id || c._id === workOrder.cliente.id
+    );
+
+    if (selected) {
+      setFormData((prev) => ({
+        ...prev,
+        client: {
+          id: selected.id || selected._id,
+          nombre:
+            selected.companyName || selected.empresa || selected.nombre || "",
+          contacto: selected.contacto || "",
+          email: selected.email || "",
+          telefono: selected.telefono || "",
+        },
+      }));
+      setAssignClient(true);
+    }
+  }
+}, [clients, workOrder]);
+
+
+
+  // Opciones
   const priorityOptions = [
     { value: "Crítica", label: "Crítica" },
     { value: "Alta", label: "Alta" },
@@ -107,6 +186,7 @@ const WorkOrderModal = ({ isOpen, onClose, workOrder, mode = "edit", onSaveSucce
     "Chaleco Reflectivo",
   ];
 
+  //Handlers
   const handleInputChange = (field, value) => {
     if (isViewMode) return;
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -124,31 +204,38 @@ const WorkOrderModal = ({ isOpen, onClose, workOrder, mode = "edit", onSaveSucce
 
   const handleSave = async () => {
     const payload = {
-  ordenTrabajo: formData.orderNumber,    
-  prioridad: formData.priority,
-  estado: formData.status,
-  fechaLimite: formData.dueDate,
-  descripcion: formData.workDescription, 
-  notasAdicionales: formData.additionalNotes, 
-  cascoSeguridad: formData.requiredPPE.includes("Casco de Seguridad"),
-  gafasProteccion: formData.requiredPPE.includes("Gafas de Protección"),
-  guantesTrabajo: formData.requiredPPE.includes("Guantes de Trabajo"),
-  calzadoSeguridad: formData.requiredPPE.includes("Calzado de Seguridad"),
-  arnesSeguridad: formData.requiredPPE.includes("Arnés de Seguridad"),
-  respiradorN95: formData.requiredPPE.includes("Respirador N95"),
-  chalecoReflectivo: formData.requiredPPE.includes("Chaleco Reflectivo"),
-  requiereEstudiosMedicosActualizados: formData.medicalRequirements,
-  tipo: formData.type,
-};
+      ordenTrabajo: formData.orderNumber,
+      prioridad: formData.priority,
+      estado: formData.status,
+      fechaLimite: formData.dueDate,
+      descripcion: formData.workDescription,
+      notasAdicionales: formData.additionalNotes,
+      cascoSeguridad: formData.requiredPPE.includes("Casco de Seguridad"),
+      gafasProteccion: formData.requiredPPE.includes("Gafas de Protección"),
+      guantesTrabajo: formData.requiredPPE.includes("Guantes de Trabajo"),
+      calzadoSeguridad: formData.requiredPPE.includes("Calzado de Seguridad"),
+      arnesSeguridad: formData.requiredPPE.includes("Arnés de Seguridad"),
+      respiradorN95: formData.requiredPPE.includes("Respirador N95"),
+      chalecoReflectivo: formData.requiredPPE.includes("Chaleco Reflectivo"),
+      requiereEstudiosMedicosActualizados: formData.medicalRequirements,
+      tipo: formData.type,
+    };
 
-    //Aqui manda a traer los datos correspondientes de cliente
     if (assignClient && formData.client.id) {
       payload.cliente = {
         id: formData.client.id,
         nombre: formData.client.nombre,
       };
     }
-    //Aqui manda a traer los datos correspondientes de tecnico
+
+    if (formData.projectName) {
+      payload.proyecto = {
+        nombre: clientProjects.find(
+          (p) => p.id === formData.projectName || p._id === formData.projectName
+        )?.nombre || formData.projectName,
+      };
+    }
+
     if (formData.assignedTechnician.id) {
       payload.tecnicoAsignado = {
         id: formData.assignedTechnician.id,
@@ -165,11 +252,9 @@ const WorkOrderModal = ({ isOpen, onClose, workOrder, mode = "edit", onSaveSucce
       }
 
       onClose();
-      if (onSaveSuccess) {
-        onSaveSuccess(savedOrder || { ...payload, id: workOrder?.id || Date.now() });
-      }
+      onSaveSuccess?.(savedOrder || { ...payload, id: workOrder?.id || Date.now() });
     } catch (error) {
-      console.error("❌ Error al guardar:", error);
+      console.error("Error al guardar:", error);
     }
   };
 
@@ -342,7 +427,7 @@ const WorkOrderModal = ({ isOpen, onClose, workOrder, mode = "edit", onSaveSucce
   {/* Cliente con checkbox a la izquierda */}
   <div>
     <div className="flex items-center gap-2 mb-2">
-      {/* 👇 Checkbox primero */}
+      {/* Checkbox primero */}
       <Checkbox
         checked={assignClient}
         onChange={(e) => setAssignClient(e.target.checked)}
@@ -398,7 +483,8 @@ const WorkOrderModal = ({ isOpen, onClose, workOrder, mode = "edit", onSaveSucce
     )}
 {assignClient && formData.client.id && (
   <div className="mt-4">
-    <div className="relative flex flex-col items-start p-4  border border-blue-200 rounded-lg shadow-sm hover:shadow-md transition-all max-w-full overflow-hidden">
+    {/*Tarjeta del cliente (sin cambios) */}
+    <div className="relative flex flex-col items-start p-4 border border-blue-200 rounded-lg shadow-sm hover:shadow-md transition-all max-w-full overflow-hidden">
       {/* Línea lateral decorativa */}
       <div className="absolute left-0 top-0 h-full w-1 bg-blue-400 rounded-l-lg"></div>
 
@@ -449,8 +535,35 @@ Email: ${formData.client.email || "No especificado"}
         </div>
       </div>
     </div>
+
+    {/*Select de Proyecto — abajo y fuera del recuadro */}
+    <div className="mt-4">
+      <Select
+  label="Nombre del Proyecto"
+  value={formData.projectName || ""}
+  onChange={(value) => handleInputChange("projectName", value)}
+  options={
+    clientProjects.length > 0
+      ? clientProjects.map((p) => ({
+          value: p.id || p._id,
+          label: p.nombre || "Sin nombre",
+        }))
+      : []
+  }
+  placeholder={
+    formData.client.id
+      ? clientProjects.length > 0
+        ? "Selecciona un proyecto"
+        : "Este cliente no tiene proyectos"
+      : "Selecciona un cliente primero"
+  }
+  disabled={isViewMode || !formData.client.id}
+/>
+
+    </div>
   </div>
 )}
+
 
 
 
