@@ -261,17 +261,29 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
           {/* Información básica */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Select
-              label="Número de Orden de Trabajo"
-              options={
-                oportunities?.map((op) => ({
-                  label: op.ordenTrabajo,
-                  value: op.ordenTrabajo,
-                })) || []
-              }
-              value={formData?.orderNumber}
-              onChange={(value) => handleInputChange("orderNumber", value)}
-              required
-            />
+  label="Número de Orden de Trabajo"
+  options={
+    oportunities?.map((op) => ({
+      label: op.ordenTrabajo,
+      value: op.ordenTrabajo,
+    })) || []
+  }
+  value={formData?.orderNumber}
+  onChange={(value) => {
+    handleInputChange("orderNumber", value);
+
+    // Buscar la orden seleccionada
+    const selectedOrder = oportunities.find(
+      (op) => op.ordenTrabajo === value
+    );
+
+    // Si existe, rellenar automáticamente el campo "Nombre del Proyecto" con su tipo
+    if (selectedOrder) {
+      handleInputChange("projectName", selectedOrder.tipo || "");
+    }
+  }}
+  required
+/>
 
             <Input
               label="Nombre del Proyecto"

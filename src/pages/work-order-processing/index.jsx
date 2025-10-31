@@ -275,7 +275,7 @@ const WorkOrderProcessing = () => {
     "Progreso",
   ];
 
-  //Filas de la tabla
+  // Filas de la tabla
   const tableRows = filteredOrders.map((order) => [
     order?.orderNumber || order?.ordenTrabajo || "—",
     order?.projectName || order?.tipo || "—",
@@ -287,7 +287,7 @@ const WorkOrderProcessing = () => {
     `${order?.progress || order?.progreso || 0}%`,
   ]);
 
-  // Crear la tabla
+  // 🔹 Crear la tabla
   doc.autoTable({
     head: [tableColumn],
     body: tableRows,
@@ -305,7 +305,7 @@ const WorkOrderProcessing = () => {
     margin: { top: 80 },
   });
 
-  // Guardar PDF
+  // 🔹 Guardar PDF
   doc.save(`ordenes_trabajo_${new Date().toISOString().split("T")[0]}.pdf`);
 };
 
