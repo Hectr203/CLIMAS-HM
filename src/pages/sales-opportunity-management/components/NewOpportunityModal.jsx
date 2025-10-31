@@ -5,10 +5,12 @@ import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import useClient from '../../../hooks/useClient';
 import usePerson from '../../../hooks/usePerson';
+import useProyecto from '../../../hooks/useProyect';
 
 const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity, error }) => {
   const [formData, setFormData] = useState({
     clientId: '',
+    projectId: '',
     contactChannel: 'whatsapp',
     projectType: 'project',
     priority: 'medium',
@@ -22,6 +24,22 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity, error }) =>
     salesRep: 'María García',
     notes: ''
   });
+  // Proyectos
+  const { proyectos, getProyectos, loading: loadingProyectos, error: errorProyectos } = useProyecto();
+
+  // Filtrar proyectos por cliente seleccionado
+  const proyectosCliente = Array.isArray(proyectos)
+    ? proyectos.filter(p => {
+        const clienteId = p?.cliente?.id || p?.client?.id;
+        return clienteId === formData.clientId;
+      })
+    : [];
+
+  // Opciones para el select de proyectos
+  const proyectoOptions = proyectosCliente.map(p => ({
+    value: p.id || p._id,
+    label: p.nombre || p.name || p.nombreProyecto || 'Proyecto sin nombre'
+  }));
 
   const { clients, getClients, loading: loadingClients, error: errorClients } = useClient();
  
@@ -31,8 +49,45 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity, error }) =>
     if (isOpen) {
       getClients();
       getPersonsByDepartment('Ventas');
+      getProyectos();
     }
   }, [isOpen]);
+  // Limpiar datos de proyecto solo si el cliente realmente cambió (sin ciclo infinito)
+  const prevClientIdRef = React.useRef('');
+  useEffect(() => {
+    if (isOpen && prevClientIdRef.current !== formData.clientId) {
+      setFormData(prev => ({
+        ...prev,
+        projectId: '',
+        projectType: 'project',
+        projectDescription: '',
+        location: '',
+        estimatedBudget: '',
+        timeline: ''
+      }));
+      prevClientIdRef.current = formData.clientId;
+    }
+  }, [isOpen, formData.clientId]);
+
+  // Cuando selecciona un proyecto, autollenar detalles
+  useEffect(() => {
+    if (!formData.projectId) return;
+    const proyecto = proyectosCliente.find(p => (p.id || p._id) === formData.projectId);
+    if (proyecto) {
+      setFormData(prev => ({
+        ...prev,
+        projectType: proyecto.tipoProyecto || proyecto.type || 'project',
+        projectDescription: proyecto.descripcion || proyecto.description || proyecto.descripcionProyecto || '',
+        location: proyecto.ubicacion || proyecto.location || '',
+        estimatedBudget: String(proyecto.presupuesto?.equipos || proyecto.presupuesto?.total || proyecto.presupuesto || ''),
+        timeline: proyecto.cronograma?.fechaFin
+          ? `${proyecto.cronograma?.fechaInicio || ''} - ${proyecto.cronograma?.fechaFin}`
+          : (typeof proyecto.cronograma === 'string' ? proyecto.cronograma : '')
+      }));
+    }
+    // Solo se ejecuta cuando cambia projectId
+    // eslint-disable-next-line
+  }, [formData.projectId]);
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -60,8 +115,12 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity, error }) =>
   const validateForm = () => {
     const newErrors = {};
 
+
     if (!formData?.clientId?.trim()) {
       newErrors.clientId = 'El cliente es requerido';
+    }
+    if (!formData?.projectId?.trim()) {
+      newErrors.projectId = 'El proyecto es requerido';
     }
 
     if (!formData?.contactPerson?.trim()) {
@@ -86,7 +145,7 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity, error }) =>
       newErrors.location = 'La ubicación es requerida';
     }
 
-    if (!formData?.estimatedBudget?.trim()) {
+    if (!String(formData?.estimatedBudget).trim()) {
       newErrors.estimatedBudget = 'El presupuesto estimado es requerido';
     }
 
@@ -119,20 +178,21 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity, error }) =>
 
       const selectedClient = clients?.find(c => c.id === formData?.clientId || c._id === formData?.clientId);
       const newOpportunity = {
-  clienteId: formData?.clientId,
-  nombreCliente: selectedClient?.companyName || selectedClient?.empresa || selectedClient?.nombre || selectedClient?.name || '',
-  canalContacto: formData?.contactChannel,
-  tipoProyecto: formData?.projectType,
-  prioridad: formData?.priority,
-  personaContacto: formData?.contactPerson?.trim(),
-  telefono: formData?.phone?.trim(),
-  email: formData?.email?.trim(),
-  descripcionProyecto: formData?.projectDescription?.trim(),
-  ubicacion: formData?.location?.trim(),
-  presupuestoEstimado: formData?.estimatedBudget?.trim(),
-  cronogramaEsperado: formData?.timeline?.trim(),
-  ejecutivoVentas: departmentPersons?.find(emp => (emp.nombreCompleto || emp.nombre || emp.name || emp.fullName || emp.email) === formData?.salesRep)?.nombreCompleto || formData?.salesRep,
-  notasAdicionales: formData?.notes?.trim() || `Nueva oportunidad registrada por ${formData?.salesRep}`
+        clienteId: formData?.clientId,
+        proyectoId: formData?.projectId,
+        nombreCliente: selectedClient?.companyName || selectedClient?.empresa || selectedClient?.nombre || selectedClient?.name || '',
+        canalContacto: formData?.contactChannel,
+        tipoProyecto: formData?.projectType,
+        prioridad: formData?.priority,
+        personaContacto: formData?.contactPerson?.trim(),
+        telefono: formData?.phone?.trim(),
+        email: formData?.email?.trim(),
+        descripcionProyecto: formData?.projectDescription?.trim(),
+        ubicacion: formData?.location?.trim(),
+        presupuestoEstimado: String(formData?.estimatedBudget).trim(),
+        cronogramaEsperado: formData?.timeline?.trim(),
+        ejecutivoVentas: departmentPersons?.find(emp => (emp.nombreCompleto || emp.nombre || emp.name || emp.fullName || emp.email) === formData?.salesRep)?.nombreCompleto || formData?.salesRep,
+        notasAdicionales: formData?.notes?.trim() || `Nueva oportunidad registrada por ${formData?.salesRep}`
       };
 
       onCreateOpportunity?.(newOpportunity);
@@ -229,7 +289,24 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity, error }) =>
                   />
                   {errorClients && <div className="text-xs text-destructive">Error al cargar clientes</div>}
                 </div>
-                
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Proyecto <span className="text-destructive">*</span>
+                  </label>
+                  <Select
+                    value={formData?.projectId}
+                    onChange={(value) => handleInputChange('projectId', value)}
+                    options={proyectoOptions}
+                    placeholder={formData.clientId ? (loadingProyectos ? 'Cargando proyectos...' : (proyectoOptions.length === 0 ? 'No hay proyectos para este cliente' : 'Selecciona un proyecto')) : 'Selecciona un cliente primero'}
+                    loading={loadingProyectos}
+                    error={errors?.projectId}
+                    searchable
+                    disabled={!formData.clientId}
+                  />
+                  {errorProyectos && <div className="text-xs text-destructive">Error al cargar proyectos</div>}
+                </div>
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">
                     Canal de Contacto <span className="text-destructive">*</span>
@@ -297,9 +374,16 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity, error }) =>
                   label="Teléfono"
                   required
                   value={formData?.phone}
-                  onChange={(e) => handleInputChange('phone', e?.target?.value)}
+                  onChange={(e) => {
+                    // Solo permitir números y máximo 10 dígitos
+                    const val = e?.target?.value.replace(/[^0-9]/g, '').slice(0, 10);
+                    handleInputChange('phone', val);
+                  }}
                   error={errors?.phone}
-                  placeholder="+52 55 1234 5678"
+                  placeholder="Ej. 5512345678"
+                  maxLength={10}
+                  inputMode="numeric"
+                  autoComplete="tel"
                 />
 
                 <div className="md:col-span-2">
