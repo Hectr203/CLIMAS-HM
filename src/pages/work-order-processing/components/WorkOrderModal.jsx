@@ -112,7 +112,7 @@ const WorkOrderModal = ({ isOpen, onClose, workOrder, mode = "edit", onSaveSucce
 
       setAssignClient(!!workOrder.cliente?.id);
 
-      // 🔥 Carga los proyectos del cliente al editar
+      //Carga los proyectos del cliente al editar
       if (workOrder.cliente?.id) {
         try {
           const allProjects = await getProyectos({ force: true });
@@ -123,7 +123,7 @@ const WorkOrderModal = ({ isOpen, onClose, workOrder, mode = "edit", onSaveSucce
           );
           setClientProjects(filtered);
         } catch (error) {
-          console.error("❌ Error al cargar proyectos del cliente:", error);
+          console.error("Error al cargar proyectos del cliente:", error);
           setClientProjects([]);
         }
       }
@@ -134,7 +134,7 @@ const WorkOrderModal = ({ isOpen, onClose, workOrder, mode = "edit", onSaveSucce
 }, [workOrder, isOpen]);
 
 
-// ⬇️ Agrega esto después
+// Agrega esto después
 useEffect(() => {
   if (workOrder?.cliente?.id && clients.length > 0) {
     const selected = clients.find(
@@ -229,12 +229,13 @@ useEffect(() => {
     }
 
     if (formData.projectName) {
-      payload.proyecto = {
-        nombre: clientProjects.find(
-          (p) => p.id === formData.projectName || p._id === formData.projectName
-        )?.nombre || formData.projectName,
-      };
-    }
+  payload.proyectoNombre =
+    clientProjects.find(
+      (p) => p.id === formData.projectName || p._id === formData.projectName
+    )?.nombre || formData.projectName;
+}
+
+
 
     if (formData.assignedTechnician.id) {
       payload.tecnicoAsignado = {
@@ -563,12 +564,7 @@ Email: ${formData.client.email || "No especificado"}
     </div>
   </div>
 )}
-
-
-
-
   </div>
-
               {/* Tipo */}
               <Select
                 label="Tipo"

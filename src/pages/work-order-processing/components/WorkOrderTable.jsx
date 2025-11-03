@@ -282,6 +282,7 @@ const handleDelete = (order) => {
             <tr>
               <SortableHeader label="Orden de Trabajo" sortKey="ordenTrabajo" />
               <SortableHeader label="Técnico Asignado" sortKey="tecnicoAsignado" />
+              <SortableHeader label="Nombre del Proyecto" sortKey="nombreProyecto" />
               <SortableHeader label="Prioridad" sortKey="prioridad" />
               <SortableHeader label="Estado" sortKey="estado" />
               <SortableHeader label="Fecha Límite" sortKey="fechaLimite" />
@@ -326,18 +327,23 @@ const handleDelete = (order) => {
           </td>
 
           <td className="px-6 py-4 whitespace-nowrap text-sm">
-            {order.tecnicoAsignado?.nombre || "Sin técnico"}
-          </td>
+  {order.tecnicoAsignado?.nombre || "Sin técnico"}
+</td>
 
-          <td className="px-6 py-4 whitespace-nowrap">
-            <span
-              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(
-                order.prioridad
-              )}`}
-            >
-              {order.prioridad}
-            </span>
-          </td>
+<td className="px-6 py-4 whitespace-nowrap text-sm">
+  {order.proyectoNombre || order.nombreProyecto || "Sin proyecto"}
+</td>
+
+<td className="px-6 py-4 whitespace-nowrap">
+  <span
+    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(
+      order.prioridad
+    )}`}
+  >
+    {order.prioridad}
+  </span>
+</td>
+
 
           <td className="px-6 py-4 whitespace-nowrap">
             <span
