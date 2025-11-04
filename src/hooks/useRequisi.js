@@ -32,7 +32,7 @@ const useRequisi = () => {
     try {
       const response = await requisiService.createRequisition(payload);
       if (response.success) {
-        showOperationSuccess(response.message || "Requisición creada ✅");
+        showOperationSuccess(response.message || "Requisición creada");
         setRequisitions((prev) => [...prev, response.data]); // ← Agregamos sin recargar todo
         return response.data;
       } else {
@@ -41,7 +41,7 @@ const useRequisi = () => {
       }
     } catch (err) {
       console.error(err);
-      showHttpError("No se pudo crear la requisición ❌");
+      showHttpError("No se pudo crear la requisición");
       setError(err);
       return null;
     } finally {
@@ -55,7 +55,7 @@ const useRequisi = () => {
     try {
       const response = await requisiService.updateRequisition(id, payload);
       if (response.success) {
-        showOperationSuccess(response.message || "Requisición actualizada ✅");
+        showOperationSuccess(response.message || "Requisición actualizada");
         setRequisitions(prev => prev.map(r => r.id === id ? { ...r, ...payload } : r));
         return { ...payload, id };
       } else {
@@ -64,7 +64,7 @@ const useRequisi = () => {
       }
     } catch (err) {
       console.error(err);
-      showHttpError("No se pudo actualizar la requisición ❌");
+      showHttpError("No se pudo actualizar la requisición");
       setError(err);
       return null;
     } finally {
@@ -78,16 +78,16 @@ const deleteRequisition = async (id) => {
   try {
     const response = await requisiService.deleteRequisition(id);
     if (response.success) {
-      showOperationSuccess(response.message || "Requisición eliminada ✅");
+      showOperationSuccess(response.message || "Requisición eliminada");
       setRequisitions(prev => prev.filter(r => r.id !== id));
       return true;
     } else {
-      showHttpError(response.message || "No se pudo eliminar ❌");
+      showHttpError(response.message || "No se pudo eliminar");
       return false;
     }
   } catch (err) {
     console.error(err);
-    showHttpError("Error al eliminar la requisición ❌");
+    showHttpError("Error al eliminar la requisición");
     setError(err);
     return false;
   } finally {

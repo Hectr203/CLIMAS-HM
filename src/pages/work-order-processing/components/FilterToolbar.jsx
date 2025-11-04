@@ -89,7 +89,7 @@ const FilterToolbar = ({ onFiltersChange, totalCount, filteredCount }) => {
 
   const hasActiveFilters = Object.values(filters)?.some((value) => value !== "");
 
-  // 🔹 Generar mensaje dinámico de "sin resultados"
+  // Generar mensaje dinámico de "sin resultados"
   const getNoResultsMessage = () => {
     if (filteredCount > 0) return null;
 
