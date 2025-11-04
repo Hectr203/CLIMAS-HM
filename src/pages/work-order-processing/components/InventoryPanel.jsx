@@ -105,42 +105,50 @@ const InventoryPanel = ({
   const [selectedRequisition, setSelectedRequisition] = useState(null);
 
   const handleEditRequisition = (req) => {
-    const mappedReq = {
-      id: req.id,
-      orderNumber: req.numeroOrdenTrabajo || "",
-      projectName: req.nombreProyecto || "",
-      requestedBy: req.solicitadoPor || "",
-      requestDate: req.fechaSolicitud
-        ? req.fechaSolicitud.split("/").reverse().join("-")
-        : new Date().toISOString().split("T")[0],
-      status: req.estado || "Pendiente",
-      priority: req.prioridad || "Media",
-      description: req.descripcionSolicitud || "",
-      items: req.materiales?.map((m) => ({
-        id: Date.now() + Math.random(),
-        codigoArticulo: m.codigoArticulo || "",
-        name: m.nombreMaterial || "",
-        quantity: m.cantidad,
-        unit: m.unidad?.toLowerCase() || "unidades",
-        urgency: m.urgencia || "Normal",
-        description: m.descripcionEspecificaciones || "",
-        type: "inventario",
-      })) || [],
-      manualItems: req.materialesManuales?.map((m) => ({
-        id: Date.now() + Math.random(),
-        name: m.nombreMaterial || "",
-        quantity: m.cantidad || 1,
-        unit: m.unidad || "pieza",
-        urgency: m.urgencia || "Normal",
-        description: m.descripcionEspecificaciones || "",
-        type: "manual",
-      })) || [],
-      justification: req.justificacionSolicitud || "",
-      notes: req.notasAdicionales || "",
-    };
-    setSelectedRequisition(mappedReq);
-    setIsModalOpen(true);
+  const mappedReq = {
+    id: req.id,
+    orderNumber: req.numeroOrdenTrabajo || "",
+    projectName: req.nombreProyecto || "",
+    requestedBy: req.solicitadoPor || "",
+    requestDate: req.fechaSolicitud
+      ? req.fechaSolicitud.split("/").reverse().join("-")
+      : new Date().toISOString().split("T")[0],
+    status: req.estado || "Pendiente",
+    priority: req.prioridad || "Media",
+    description: req.descripcionSolicitud || "",
+
+    // ✅ materiales de inventario
+    items: req.materiales?.map((m) => ({
+      id: Date.now() + Math.random(),
+      idArticulo: m.id || m.idArticulo || "", // mantiene referencia al inventario
+      codigoArticulo: m.codigoArticulo || "",
+      name: m.nombreMaterial || m.nombre || "", // admite ambos nombres
+      quantity: m.cantidad,
+      unit: m.unidad?.toLowerCase() || "unidades",
+      urgency: m.urgencia || "Normal",
+      description: m.descripcionEspecificaciones || "",
+      type: "inventario",
+    })) || [],
+
+    // ✅ materiales manuales
+    manualItems: req.materialesManuales?.map((m) => ({
+      id: Date.now() + Math.random(),
+      name: m.nombreMaterial || m.nombre || "",
+      quantity: m.cantidad || 1,
+      unit: m.unidad || "pieza",
+      urgency: m.urgencia || "Normal",
+      description: m.descripcionEspecificaciones || "",
+      type: "manual",
+    })) || [],
+
+    justification: req.justificacionSolicitud || "",
+    notes: req.notasAdicionales || "",
   };
+
+  setSelectedRequisition(mappedReq);
+  setIsModalOpen(true);
+};
+
 
   const handleSaveRequisition = (updatedReq) => {
     const updatedList = localRequisitions.map((r) => (r.id === updatedReq.id ? updatedReq : r));
@@ -283,7 +291,7 @@ const InventoryPanel = ({
                                 <li key={index} className="text-xs text-foreground flex items-center space-x-2">
                                   <Icon name="Package" size={12} />
                                   <span>
-                                    {item.nombreMaterial} - {item.cantidad} {item.unidad}
+                                    {item.nombreMaterial || item.nombre || item.name || "Sin nombre"} - {item.cantidad} {item.unidad}
                                     {request.materialesManuales?.includes(item) && (
                                       <span className="text-[10px] text-muted-foreground ml-1">(Manual)</span>
                                     )}

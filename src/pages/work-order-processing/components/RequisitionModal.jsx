@@ -183,11 +183,36 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
   };
 
   const handleSave = async () => {
-    const formattedDate = new Date(formData.requestDate).toLocaleDateString(
-      "es-MX",
-      { day: "2-digit", month: "2-digit", year: "numeric" }
-    );
+  try {
+    // ✅ Formatear fecha a dd/MM/yyyy
+    const fecha = new Date(formData.requestDate);
+    const formattedDate = `${fecha.getDate().toString().padStart(2, "0")}/${(fecha.getMonth() + 1)
+      .toString()
+      .padStart(2, "0")}/${fecha.getFullYear()}`;
 
+    // ✅ Construir materiales de inventario
+    const materiales = formData.items.map((item) => ({
+      id: item.idArticulo || undefined, // para que el backend lo identifique como referencia
+      codigoArticulo: item.codigoArticulo || "",
+      nombreMaterial: item.name || "",
+      cantidad: Number(item.quantity) || 0,
+      unidad:
+        item.unit?.charAt(0).toUpperCase() + item.unit?.slice(1).toLowerCase() || "Unidades",
+      urgencia: item.urgency || "Normal",
+      descripcionEspecificaciones: item.description || "",
+    }));
+
+    // ✅ Construir materiales manuales
+    const materialesManuales = formData.manualItems.map((item) => ({
+      nombreMaterial: item.name || "",
+      cantidad: Number(item.quantity) || 0,
+      unidad:
+        item.unit?.charAt(0).toUpperCase() + item.unit?.slice(1).toLowerCase() || "Unidades",
+      urgencia: item.urgency || "Normal",
+      descripcionEspecificaciones: item.description || "",
+    }));
+
+    // ✅ Payload final
     const payload = {
       numeroOrdenTrabajo: formData.orderNumber,
       nombreProyecto: formData.projectName,
@@ -196,43 +221,31 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
       prioridad: formData.priority,
       estado: formData.status,
       descripcionSolicitud: formData.description,
-      materiales: formData.items.map((item) => ({
-        codigoArticulo: item.codigoArticulo || "",
-        nombreMaterial: item.name || "",
-        cantidad: Number(item.quantity),
-        unidad:
-          item.unit.charAt(0).toUpperCase() + item.unit.slice(1).toLowerCase(),
-        urgencia: item.urgency,
-        descripcionEspecificaciones: item.description,
-      })),
-      materialesManuales: formData.manualItems.map((item) => ({
-        nombreMaterial: item.name,
-        cantidad: Number(item.quantity),
-        unidad:
-          item.unit.charAt(0).toUpperCase() + item.unit.slice(1).toLowerCase(),
-        urgencia: item.urgency,
-        descripcionEspecificaciones: item.description,
-      })),
-      justificacionSolicitud: formData.justification,
-      notasAdicionales: formData.notes,
+      materiales, // <-- inventario
+      materialesManuales, // <-- manuales
+      justificacionSolicitud: formData.justification || "",
+      notasAdicionales: formData.notes || "",
+      proyectoNombre: formData.projectName,
     };
 
-    try {
-      let response;
-      if (requisition?.id) {
-        response = await updateRequisition(requisition.id, payload);
-      } else {
-        response = await createRequisition(payload);
-      }
-
-      if (response) {
-        onSave(response);
-        onClose();
-      }
-    } catch (error) {
-      console.error("Error al guardar la requisición:", error);
+    // ✅ Enviar
+    let response;
+    if (requisition?.id) {
+      response = await updateRequisition(requisition.id, payload);
+    } else {
+      response = await createRequisition(payload);
     }
-  };
+
+    if (response) {
+      onSave(response);
+      onClose();
+    }
+  } catch (error) {
+    console.error("❌ Error al guardar la requisición:", error);
+  }
+};
+
+
 
   if (!isOpen) return null;
 
@@ -272,18 +285,16 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
   onChange={(value) => {
     handleInputChange("orderNumber", value);
 
-    // Buscar la orden seleccionada
-    const selectedOrder = oportunities.find(
-      (op) => op.ordenTrabajo === value
-    );
-
-    // Si existe, rellenar automáticamente el campo "Nombre del Proyecto" con su tipo
-    if (selectedOrder) {
-      handleInputChange("projectName", selectedOrder.tipo || "");
+    // Buscar la oportunidad seleccionada
+    const selected = oportunities.find((op) => op.ordenTrabajo === value);
+    if (selected) {
+      // Llenar automáticamente el nombre del proyecto
+      handleInputChange("projectName", selected.proyectoNombre || "");
     }
   }}
   required
 />
+
 
             <Input
               label="Nombre del Proyecto"
@@ -571,13 +582,14 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
             Cancelar
           </Button>
           <Button
-            type="button"
-            onClick={handleSave}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-            disabled={!formData?.projectName}
-          >
-            Crear Requisición
-          </Button>
+  type="button"
+  onClick={handleSave}
+  className="bg-blue-600 hover:bg-blue-700 text-white"
+  disabled={!formData?.projectName}
+>
+  {requisition?.id ? "Guardar Cambios" : "Crear Requisición"}
+</Button>
+
         </div>
       </div>
     </div>
