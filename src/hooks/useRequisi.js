@@ -9,17 +9,34 @@ const useRequisi = () => {
   const [error, setError] = useState(null);
 
   const getRequisitions = async (filters = {}) => {
+    if (loading) return []; // Evitar múltiples llamadas simultáneas
+    
     setLoading(true);
     setError(null);
+    
     try {
       const response = await requisiService.getRequisitions(filters);
-      const data = response.success && Array.isArray(response.data) ? response.data : [];
-      setRequisitions(data);
-      return data;
+      
+      // Siempre debería ser un objeto con {success, data, message}
+      if (response?.success) {
+        const requisitionData = Array.isArray(response.data) ? response.data : [];
+        setRequisitions(requisitionData);
+        return requisitionData;
+      } else {
+        console.warn('Respuesta inesperada de requisiciones:', response);
+        setRequisitions([]);
+        return [];
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Error en getRequisitions:', err);
       setError(err);
-      showHttpError("Error al cargar requisiciones");
+      
+      // No mostrar error si la petición fue cancelada
+      if (err.message !== 'canceled' && !err.isNetworkError) {
+        showHttpError("Error al cargar requisiciones");
+      }
+      
+      setRequisitions([]);
       return [];
     } finally {
       setLoading(false);

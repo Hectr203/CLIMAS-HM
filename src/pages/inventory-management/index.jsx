@@ -16,11 +16,38 @@ import EditItemModal from './components/EditItemModal';
 import CreatePOModal from './components/CreatePOModal';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
+import RequisitionModal from '../work-order-processing/components/RequisitionModal';
 import useInventory from '../../hooks/useInventory';
-
 import useOrder from '../../hooks/useOrder';
+import useRequisi from '../../hooks/useRequisi';
+import { useNotifications } from '../../context/NotificationContext';
+
+// Función auxiliar para formatear fechas
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  
+  // Si ya está en formato YYYY-MM-DD, lo devolvemos tal cual
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return dateString;
+  
+  // Si está en formato DD/MM/YYYY, lo convertimos
+  const parts = dateString.split('/');
+  if (parts.length === 3) {
+    const [day, month, year] = parts;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  
+  // Si es una fecha válida, la convertimos a YYYY-MM-DD
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    return date.toISOString().split('T')[0];
+  } catch {
+    return '';
+  }
+};
 
 const InventoryManagement = () => {
+  const { showSuccess, showError, showConfirm } = useNotifications();
   const { articulos, getArticulos, loading: inventoryLoading, error: inventoryError } = useInventory();
   const { 
     ordenes, 
@@ -30,6 +57,14 @@ const InventoryManagement = () => {
     getOrdenes,
     updateOrden 
   } = useOrder();
+  const {
+    requisitions,
+    loading: requisitionsLoading,
+    error: requisitionsError,
+    getRequisitions,
+    updateRequisition,
+    deleteRequisition
+  } = useRequisi();
   
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -39,9 +74,11 @@ const InventoryManagement = () => {
   const [showEditItemModal, setShowEditItemModal] = useState(false);
   const [showCreatePOModal, setShowCreatePOModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
-  const loading = inventoryLoading || orderLoading;
+  const [isUpdating, setIsUpdating] = useState(false);
+  const loading = inventoryLoading || orderLoading || requisitionsLoading || isUpdating;
   const error = inventoryError || orderError;
   const [filters, setFilters] = useState({
     search: '',
@@ -296,6 +333,101 @@ const InventoryManagement = () => {
     console.log('Dismiss alert:', alertId);
   };
 
+  // Manejadores para requisiciones
+  const [selectedRequisition, setSelectedRequisition] = useState(null);
+  const [showRequisitionModal, setShowRequisitionModal] = useState(false);
+
+  const handleEditRequisition = (req) => {
+    const reqForEdit = {
+      id: req.id,
+      orderNumber: req.numeroOrdenTrabajo,
+      projectName: req.nombreProyecto,
+      requestedBy: req.solicitadoPor,
+      requestDate: req.fechaSolicitud,
+      status: req.estado || 'Pendiente',
+      priority: req.prioridad || 'Normal',
+      description: req.descripcionSolicitud,
+      items: req.materiales?.map(m => ({
+        id: m.id || Date.now(),
+        name: m.nombreMaterial,
+        quantity: m.cantidad,
+        unit: m.unidad,
+        description: m.descripcionEspecificaciones
+      })) || [],
+      justification: req.justificacionSolicitud,
+      notes: req.notasAdicionales
+    };
+
+    setSelectedRequisition(reqForEdit);
+    setShowRequisitionModal(true);
+  };
+
+  const handleSaveRequisition = async (editedReq) => {
+    try {
+      setIsUpdating(true);
+      // Convertir de nuevo al formato español para el backend
+      const reqToUpdate = {
+        id: editedReq.id,
+        numeroOrdenTrabajo: editedReq.orderNumber,
+        nombreProyecto: editedReq.projectName,
+        solicitadoPor: editedReq.requestedBy,
+        fechaSolicitud: formatDate(editedReq.requestDate),
+        estado: editedReq.status,
+        prioridad: editedReq.priority,
+        descripcionSolicitud: editedReq.description,
+        materiales: editedReq.items?.map(item => ({
+          id: item.id,
+          nombreMaterial: item.name,
+          cantidad: item.quantity,
+          unidad: item.unit,
+          descripcionEspecificaciones: item.description
+        })),
+        justificacionSolicitud: editedReq.justification,
+        notasAdicionales: editedReq.notes
+      };
+
+      const success = await updateRequisition(reqToUpdate.id, reqToUpdate);
+      if (success) {
+        showSuccess('Requisición actualizada correctamente');
+        await getRequisitions();
+        setShowRequisitionModal(false);
+        setSelectedRequisition(null);
+      } else {
+        showError('No se pudo actualizar la requisición');
+      }
+    } catch (error) {
+      console.error('Error al actualizar requisición:', error);
+      showError('Error al actualizar la requisición');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleDelete = async (req) => {
+    showConfirm(
+      `¿Está seguro que desea eliminar la requisición ${req.numeroOrdenTrabajo || 'seleccionada'}?`,
+      {
+        onConfirm: async () => {
+          try {
+            setIsUpdating(true);
+            const success = await deleteRequisition(req.id);
+            if (success) {
+              showSuccess('Requisición eliminada correctamente');
+              await getRequisitions();
+            } else {
+              showError('No se pudo eliminar la requisición');
+            }
+          } catch (error) {
+            console.error('Error al eliminar requisición:', error);
+            showError('Error al eliminar la requisición');
+          } finally {
+            setIsUpdating(false);
+          }
+        }
+      }
+    );
+  };
+
   const handleViewOrder = (order) => {
     setSelectedOrder(order);
     setShowOrderDetailsModal(true);
@@ -480,11 +612,52 @@ ${order.notas || 'Sin notas adicionales'}
     { id: 'requirements', label: 'Requisiciones', icon: 'ClipboardList' }
   ];
 
-  // Cargar artículos al montar el componente
+  // Cargar datos al montar el componente
   useEffect(() => {
-    getArticulos();
-    getOrdenes();
-  }, [getArticulos, getOrdenes]);
+    let isMounted = true;
+
+    const fetchData = async () => {
+      if (!isInitialLoading) return;
+
+      try {
+        // Cargar órdenes primero ya que parece funcionar correctamente
+        await getOrdenes();
+
+        if (isMounted) {
+          // Luego intentar cargar artículos y requisiciones en paralelo
+          await Promise.allSettled([
+            getArticulos().catch(err => {
+              console.warn('Error al cargar artículos:', err);
+              return [];
+            }),
+            getRequisitions().catch(err => {
+              console.warn('Error al cargar requisiciones:', err);
+              return [];
+            })
+          ]);
+        }
+      } catch (error) {
+        console.warn('Error en la carga inicial:', error);
+      } finally {
+        if (isMounted) {
+          setIsInitialLoading(false);
+        }
+      }
+    };
+
+    fetchData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Recargar datos solo cuando se cambia a la pestaña de requisiciones
+  useEffect(() => {
+    if (activeView === 'requirements' && !loading) {
+      getRequisitions();
+    }
+  }, [activeView]);
 
   useEffect(() => {
     document.title = 'Gestión de Inventario - AireFlow Pro';
@@ -610,12 +783,93 @@ ${order.notas || 'Sin notas adicionales'}
           )}
 
           {activeView === 'requirements' && (
-            <MaterialRequirements
-              requirements={materialRequirements}
-              onApproveRequirement={handleApproveRequirement}
-              onRejectRequirement={handleRejectRequirement}
-              onCreatePO={handleCreatePO}
-            />
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-semibold">Requisiciones de Material</h2>
+                <Button
+                  variant="default"
+                  iconName="Plus"
+                  onClick={() => setShowCreatePOModal(true)}
+                >
+                  Nueva Requisición
+                </Button>
+              </div>
+              
+              {requisitionsLoading ? (
+                <p className="text-muted-foreground">Cargando requisiciones...</p>
+              ) : requisitions && requisitions.length > 0 ? (
+                <div className="space-y-4">
+                  {requisitions.map((req) => (
+                    <div
+                      key={req.id}
+                      className="bg-card border border-border rounded-lg p-4 space-y-3"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-medium">{req.numeroOrdenTrabajo || 'Sin número'}</h3>
+                          <p className="text-sm text-muted-foreground">{req.nombreProyecto || 'Sin proyecto'}</p>
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            iconName="Edit"
+                            onClick={() => handleEditRequisition(req)}
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            iconName="Trash"
+                            onClick={() => handleDelete(req)}
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">Solicitado por</p>
+                          <p>{req.solicitadoPor || 'No especificado'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Estado</p>
+                          <p>{req.estado || 'Pendiente'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Fecha</p>
+                          <p>{req.fechaSolicitud ? new Date(req.fechaSolicitud).toLocaleDateString('es-MX') : 'No especificada'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Prioridad</p>
+                          <p>{req.prioridad || 'Normal'}</p>
+                        </div>
+                      </div>
+                      
+                      {req.descripcionSolicitud && (
+                        <div>
+                          <p className="text-muted-foreground">Descripción</p>
+                          <p className="text-sm">{req.descripcionSolicitud}</p>
+                        </div>
+                      )}
+                      
+                      {req.materiales && req.materiales.length > 0 && (
+                        <div>
+                          <p className="font-medium mb-2">Materiales solicitados</p>
+                          <ul className="space-y-1">
+                            {req.materiales.map((item, index) => (
+                              <li key={index} className="text-sm">
+                                {item.cantidad || item.quantity} {item.unidad || item.unit || 'unidades'} - {item.nombreMaterial || item.name}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground">No hay requisiciones disponibles.</p>
+              )}
+            </div>
           )}
 
           {/* New Item Modal */}
@@ -638,6 +892,17 @@ ${order.notas || 'Sin notas adicionales'}
             onClose={handleCloseEditItemModal}
             item={selectedItem}
             onUpdateSuccess={handleUpdateSuccess}
+          />
+
+          {/* Modal de Requisición */}
+          <RequisitionModal
+            isOpen={showRequisitionModal}
+            onClose={() => {
+              setShowRequisitionModal(false);
+              setSelectedRequisition(null);
+            }}
+            requisition={selectedRequisition}
+            onSave={handleSaveRequisition}
           />
 
           {/* Create Purchase Order Modal */}
