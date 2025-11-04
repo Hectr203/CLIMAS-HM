@@ -89,7 +89,7 @@ const FilterToolbar = ({ onFiltersChange, totalCount, filteredCount }) => {
 
   const hasActiveFilters = Object.values(filters)?.some((value) => value !== "");
 
-  // 🔹 Generar mensaje dinámico de "sin resultados"
+  // Generar mensaje dinámico de "sin resultados"
   const getNoResultsMessage = () => {
     if (filteredCount > 0) return null;
 
@@ -218,11 +218,12 @@ const FilterToolbar = ({ onFiltersChange, totalCount, filteredCount }) => {
 
       {/* Mensaje dinámico cuando no hay resultados */}
       {filteredCount === 0 && (
-        <div className="mt-4 flex items-center text-sm text-muted-foreground italic">
-          <Icon name="SearchX" size={16} className="mr-2" />
-          {getNoResultsMessage()}
-        </div>
-      )}
+  <div className="mt-4 flex items-center text-sm italic">
+    <Icon name="SearchX" size={16} className="mr-2 text-black" />
+    <span className="font-bold text-black">{getNoResultsMessage()}</span>
+  </div>
+)}
+
     </div>
   );
 };
