@@ -39,13 +39,14 @@ const QuotationDevelopmentCenter = () => {
       setIsLoading(true);
       try {
         const response = await getCotizaciones();
-        console.log('Respuesta completa del backend:', response);
+  // console.log eliminado
         const cotizaciones = Array.isArray(response.data?.data) ? response.data.data : [];
-        console.log('Cotizaciones obtenidas:', cotizaciones);
+  // console.log eliminado
         // Mapeo adaptado a la estructura real del backend
         const mapped = cotizaciones.map(cotizacion => ({
           id: cotizacion.id || '', // id de Cosmos
           folio: cotizacion.folio || '', // folio
+          clientId: cotizacion.informacion_basica?.cliente?.find?.(c => 'id_cliente' in c)?.id_cliente || '',
           clientName: cotizacion.informacion_basica?.cliente?.find?.(c => c?.nombre_cliente)?.nombre_cliente || '',
           projectName: cotizacion.informacion_basica?.proyecto?.find?.(p => p?.nombre_proyecto)?.nombre_proyecto || '',
           status: 'development',
@@ -85,7 +86,7 @@ const QuotationDevelopmentCenter = () => {
     };
     setQuotations(prev => {
       const updated = [mappedQuotation, ...prev];
-      console.log('Cotizaciones actualizadas:', updated);
+  // console.log eliminado
       return updated;
     });
     setSelectedQuotation(mappedQuotation);
@@ -103,6 +104,7 @@ const QuotationDevelopmentCenter = () => {
       const mapped = cotizaciones.map(cotizacion => ({
         id: cotizacion.id || '',
         folio: cotizacion.folio || '',
+        clientId: cotizacion.informacion_basica?.cliente?.find?.(c => 'id_cliente' in c)?.id_cliente || '',
         clientName: cotizacion.informacion_basica?.cliente?.find?.(c => c?.nombre_cliente)?.nombre_cliente || '',
         projectName: cotizacion.informacion_basica?.proyecto?.find?.(p => p?.nombre_proyecto)?.nombre_proyecto || '',
         status: 'development',

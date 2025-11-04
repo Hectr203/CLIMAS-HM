@@ -20,7 +20,7 @@ class EnvConfig {
   // Debug helper
   static logConfig() {
     console.group("🔧 Configuración de entorno");
-    console.log("API_URL:", this.API_URL);
+  // console.log eliminado
     console.groupEnd();
   }
 }

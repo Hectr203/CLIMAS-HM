@@ -157,11 +157,11 @@ const NotificationPanel = () => {
   ];
 
   const handleMarkAsRead = (id) => {
-    console.log('Marking notification as read:', id);
+  // console.log eliminado
   };
 
   const handleApprove = (id) => {
-    console.log('Approving item:', id);
+  // console.log eliminado
   };
 
   const handleViewDetails = (notification) => {

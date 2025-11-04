@@ -15,7 +15,7 @@ const useClient = () => {
     try {
   const response = await clientService.getClients();
   setClients(Array.isArray(response) ? response : response?.data || []);
-  console.log('Clientes cargados:', Array.isArray(response) ? response : response?.data || []);
+  // console.log eliminado
   return response;
     } catch (err) {
       setError(err);
