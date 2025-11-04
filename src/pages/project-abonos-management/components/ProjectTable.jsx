@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Image from '../../../components/AppImage';
-import proyectoService from 'services/proyectoService';
-
+import useProyecto from '../../../hooks/useProyect'; // ⬅️ usa el hook
+import useClient from '../../../hooks/useClient';
 /* === Config === */
-const DEFAULT_USD_RATE = 18; // Tipo de cambio por defecto cuando no viene en el doc
+const DEFAULT_USD_RATE = 18;
 
 /* === Utils === */
 const parseISODate = (value) => {
@@ -27,58 +27,43 @@ const formatDate = (date) => {
   if (!d) return '—';
   return d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
-const _getStatusColor = (statusValue) => {
-  const v = (statusValue || '').toString().toLowerCase().trim();
-  const map = {
-    // ES
-    'planeacion': 'bg-blue-100 text-blue-800',
-    'planificación': 'bg-blue-100 text-blue-800',
-    'en-progreso': 'bg-green-100 text-green-800',
-    'en progreso': 'bg-green-100 text-green-800',
-    'en pausa': 'bg-yellow-100 text-yellow-800',
-    'revision': 'bg-purple-100 text-purple-800',
-    'revisión': 'bg-purple-100 text-purple-800',
-    'completado': 'bg-emerald-100 text-emerald-800',
-    'cancelado': 'bg-red-100 text-red-800',
-    // EN
-    'planning': 'bg-blue-100 text-blue-800',
-    'in-progress': 'bg-green-100 text-green-800',
-    'on-hold': 'bg-yellow-100 text-yellow-800',
-    'review': 'bg-purple-100 text-purple-800',
-    'completed': 'bg-emerald-100 text-emerald-800',
-    'cancelled': 'bg-red-100 text-red-800',
-  };
-  return map[v] || 'bg-gray-100 text-gray-800';
-};
-const _getPriorityColor = (priorityValue) => {
-  const v = (priorityValue || '').toString().toLowerCase().trim();
-  const map = {
-    // ES
-    'baja': 'text-green-600',
-    'media': 'text-yellow-600',
-    'alta': 'text-orange-600',
-    'urgente': 'text-red-600',
-    // EN
-    'low': 'text-green-600',
-    'medium': 'text-yellow-600',
-    'high': 'text-orange-600',
-    'urgent': 'text-red-600',
-  };
-  return map[v] || 'text-gray-600';
-};
 
 /* === Map NoSQL -> ViewModel (con USD derivado) === */
-const mapProjectDocStrict = (doc) => {
+const mapProjectDocStrict = (doc, clientsMap = {}) => {
   const id = doc.id ?? doc._id ?? (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Math.random()}`);
   const code = doc.codigo ?? doc.code ?? '—';
   const name = doc.nombreProyecto ?? doc.nombre ?? 'Proyecto sin nombre';
   const type = doc.tipoProyecto ?? doc.type ?? '—';
 
-  const clienteNode = doc.cliente ?? doc.client ?? {};
+  // Manejar diferentes formatos de cliente: objeto {id: "..."} o string ID directo
+  const clienteNode = doc.cliente ?? doc.client ?? null;
+  let clienteId = null;
+  let clienteEncontrado = null;
+  
+  if (typeof clienteNode === 'string') {
+    // Si es un string, es directamente el ID
+    clienteId = clienteNode;
+  } else if (clienteNode && typeof clienteNode === 'object') {
+    // Si es un objeto, puede tener id o _id
+    clienteId = clienteNode.id || clienteNode._id || null;
+  }
+  
+  // Buscar el cliente en el mapa por ID
+  if (clienteId) {
+    clienteEncontrado = clientsMap[clienteId] || null;
+  }
+  
   const client = {
-    id: clienteNode.id,
-    name: clienteNode.nombre ?? clienteNode.name,
-    contact: clienteNode.contacto ?? clienteNode.contact,
+    id: clienteId || '—',
+    name: (clienteNode && typeof clienteNode === 'object' && (clienteNode.nombre || clienteNode.name || clienteNode.empresa || clienteNode.companyName)) 
+      ? (clienteNode.nombre || clienteNode.name || clienteNode.empresa || clienteNode.companyName) 
+      : (clienteEncontrado?.nombre ?? clienteEncontrado?.name ?? clienteEncontrado?.empresa ?? clienteEncontrado?.companyName ?? '—'),
+    contact: (clienteNode && typeof clienteNode === 'object' && (clienteNode.contacto || clienteNode.contact))
+      ? (clienteNode.contacto || clienteNode.contact)
+      : (clienteEncontrado?.contacto ?? clienteEncontrado?.contact ?? '—'),
+    email: (clienteNode && typeof clienteNode === 'object' && clienteNode.email)
+      ? clienteNode.email
+      : (clienteEncontrado?.email ?? '—'),
   };
 
   const startDate = doc.cronograma?.fechaInicio ?? doc.startDate ?? null;
@@ -92,18 +77,14 @@ const mapProjectDocStrict = (doc) => {
   const p = doc.presupuesto || {};
   const budget = doc.totalPresupuesto ?? doc.budget ?? p.total ?? null;
 
-  // ---- Equipos en USD (mostrar SIEMPRE que "equipos" > 0) ----
   const equiposUSD = (() => {
-    // 1) valor explícito en USD
     if (p.equipoDolares != null && !isNaN(Number(p.equipoDolares))) {
       return Number(p.equipoDolares) || 0;
     }
-    // 2) meta de captura en USD
     if (p?._metaEquipos?.capturadoEn === 'USD' && p?._metaEquipos?.valorUSD != null) {
       const v = Number(p._metaEquipos.valorUSD);
       if (!isNaN(v)) return v;
     }
-    // 3) derivar desde MXN y tipoCambio (o default)
     const mxn = Number(p?.equipos || 0);
     if (!(mxn > 0)) return 0;
     const rate = Number(p?._metaEquipos?.tipoCambio);
@@ -137,7 +118,7 @@ const mapProjectDocStrict = (doc) => {
     budget, startDate, endDate,
     department, location, description,
     assignedPersonnel, workOrders,
-    equiposUSD, // <-- agregado
+    equiposUSD,
     createdAt: doc.createdAt ?? null,
     updatedAt: doc.updatedAt ?? null,
     raw: doc,
@@ -145,52 +126,78 @@ const mapProjectDocStrict = (doc) => {
 };
 
 const ProjectTable = ({
-  projects,
-  // onProjectSelect,
-  // onStatusUpdate,
+  projects,          // opcional: lista preinyectada desde arriba
   onBulkAction,
-  // onImageUpload,
-  // isUploadingImage,
   onRegisterAbono,
   getPaidAmount,
 }) => {
   const navigate = useNavigate();
-  const [remoteDocs, setRemoteDocs] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+
+  // ⬇️ del hook
+  const {
+    proyectos,            // lista global del hook
+    loading: loadingAny,  // loading combinado (si mantuviste el patch)
+    error,
+    getProyectos,
+    deleteProyecto,
+  } = useProyecto();
+
+  // Hook para obtener clientes
+  const { clients, getClients } = useClient();
+
   const [sortConfig, setSortConfig] = useState({ key: 'startDate', direction: 'desc' });
   const [selectedProjects, setSelectedProjects] = useState([]);
   const [expandedRows, setExpandedRows] = useState([]);
 
+  // Cargar clientes al montar el componente (solo una vez)
   useEffect(() => {
-    let isMounted = true;
-    const fetchProyectos = async () => {
-      try {
-        if (projects && projects.length > 0) return;
-        setLoading(true);
-        setErrorMsg('');
-        const data = await proyectoService.getProyectos().catch(() => []);
-        if (!isMounted) return;
-        setRemoteDocs(Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []));
-      } catch (err) {
-        console.error('Error al obtener los proyectos:', err);
-        if (isMounted) setErrorMsg('No se pudieron cargar los proyectos.');
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-    fetchProyectos();
-    return () => { isMounted = false; };
-  }, [projects]);
+    // Solo cargar si no hay clientes ya cargados
+    if (!clients || clients.length === 0) {
+      getClients().catch((err) => {
+        console.error('Error al cargar clientes:', err);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Array vacío para que solo se ejecute una vez al montar
 
+  // Crear mapa de clientes por ID para búsqueda rápida
+  const clientsMap = useMemo(() => {
+    const map = {};
+    if (Array.isArray(clients)) {
+      clients.forEach((client) => {
+        const clientId = client.id || client._id;
+        if (clientId) {
+          map[clientId] = client;
+        }
+      });
+    }
+    return map;
+  }, [clients]);
+
+  // Carga inicial usando el hook (con AbortController)
+  useEffect(() => {
+    if (projects && projects.length > 0) return; // si viene por props, no pegamos al back
+
+    const controller = new AbortController();
+    getProyectos({ force: false, signal: controller.signal }).catch((err) => {
+      if (err?.name !== 'AbortError') {
+        // ya queda registrado en el hook como error
+        console.error('Fallo getProyectos en ProjectTable:', err);
+      }
+    });
+
+    return () => controller.abort();
+  }, [projects, getProyectos]);
+
+  // Fuente de datos: prop > hook
   const sourceDocs = useMemo(() => {
-    return Array.isArray(projects) && projects.length > 0 ? projects : remoteDocs;
-  }, [projects, remoteDocs]);
+    return Array.isArray(projects) && projects.length > 0 ? projects : proyectos;
+  }, [projects, proyectos]);
 
   const normalizedProjects = useMemo(() => {
     if (!Array.isArray(sourceDocs)) return [];
-    return sourceDocs.map(mapProjectDocStrict);
-  }, [sourceDocs]);
+    return sourceDocs.map((doc) => mapProjectDocStrict(doc, clientsMap));
+  }, [sourceDocs, clientsMap]);
 
   const handleSort = (key) => {
     let direction = 'asc';
@@ -202,14 +209,20 @@ const ProjectTable = ({
     const list = [...normalizedProjects];
     const { key, direction } = sortConfig || {};
     if (!key) return list;
+
     return list.sort((a, b) => {
       let aValue = a?.[key];
       let bValue = b?.[key];
-      if (aValue instanceof Date || bValue instanceof Date) {
-        const aTime = aValue instanceof Date ? aValue.getTime() : -Infinity;
-        const bTime = bValue instanceof Date ? bValue.getTime() : -Infinity;
+
+      // Mejor manejo de fechas (parse explícito)
+      const aDate = parseISODate(aValue);
+      const bDate = parseISODate(bValue);
+      if (aDate || bDate) {
+        const aTime = aDate ? aDate.getTime() : -Infinity;
+        const bTime = bDate ? bDate.getTime() : -Infinity;
         return direction === 'asc' ? aTime - bTime : bTime - aTime;
       }
+
       if (typeof aValue === 'number' || typeof bValue === 'number') {
         aValue = Number(aValue) || 0;
         bValue = Number(bValue) || 0;
@@ -246,15 +259,14 @@ const ProjectTable = ({
     const ok = window.confirm(`¿Eliminar el proyecto "${project?.name || project?.nombreProyecto || project?.code}"? Esta acción no se puede deshacer.`);
     if (!ok) return;
     try {
-      await proyectoService.deleteProyecto(project.id);
-      if (Array.isArray(remoteDocs) && (!projects || projects.length === 0)) {
-        setRemoteDocs(prev => prev.filter(d => (d.id || d._id) !== project.id));
-      }
-      setSelectedProjects(prev => prev.filter(id => id !== project.id));
-      setExpandedRows(prev => prev.filter(id => id !== project.id));
+      await deleteProyecto(project.id); // ⬅️ hook (actualiza estado global)
+      setSelectedProjects((prev) => prev.filter((id) => id !== project.id));
+      setExpandedRows((prev) => prev.filter((id) => id !== project.id));
     } catch (err) {
-      console.error('Error eliminando proyecto:', err);
-      alert('No se pudo eliminar el proyecto.');
+      if (err?.name !== 'AbortError') {
+        console.error('Error eliminando proyecto:', err);
+        alert('No se pudo eliminar el proyecto.');
+      }
     }
   };
 
@@ -263,16 +275,17 @@ const ProjectTable = ({
     const ok = window.confirm(`¿Eliminar ${selectedProjects.length} proyecto(s)?`);
     if (!ok) return;
     try {
+      // puedes paralelizar si tu backend lo tolera:
       for (const id of selectedProjects) {
-        await proyectoService.deleteProyecto(id);
-      }
-      if (Array.isArray(remoteDocs) && (!projects || projects.length === 0)) {
-        setRemoteDocs(prev => prev.filter(d => !selectedProjects.includes(d.id || d._id)));
+        // eslint-disable-next-line no-await-in-loop
+        await deleteProyecto(id);
       }
       setSelectedProjects([]);
     } catch (e) {
-      console.error(e);
-      alert('Ocurrió un error eliminando algunos proyectos.');
+      if (e?.name !== 'AbortError') {
+        console.error(e);
+        alert('Ocurrió un error eliminando algunos proyectos.');
+      }
     }
   };
 
@@ -297,6 +310,9 @@ const ProjectTable = ({
       alert('Error al seleccionar la imagen. Inténtelo de nuevo.');
     }
   };
+
+  const loading = loadingAny; // alias para tu UI
+  const errorMsg = error ? (error.userMessage || error.message || 'Error') : '';
 
   return (
     <div className="bg-card border border-border rounded-lg overflow-hidden">
@@ -332,7 +348,6 @@ const ProjectTable = ({
                 <button onClick={() => handleSort('name')} className="flex items-center space-x-1 hover:text-primary"><span>Proyecto</span><Icon name="ArrowUpDown" size={14} /></button>
               </th>
               <th className="text-left p-4 font-medium text-foreground">Cliente</th>
-              
               <th className="text-left p-4 font-medium text-foreground">
                 <button onClick={() => handleSort('budget')} className="flex items-center space-x-1 hover:text-primary"><span>Presupuesto</span><Icon name="ArrowUpDown" size={14} /></button>
               </th>
@@ -363,10 +378,9 @@ const ProjectTable = ({
                   <td className="p-4">
                     <div>
                       <div className="font-medium text-foreground">{project?.client?.name}</div>
-                      <div className="text-sm text-muted-foreground">{project?.client?.contact}</div>
+                      <div className="text-sm text-muted-foreground">{project?.client?.email}</div>
                     </div>
                   </td>
-                  
                   <td className="p-4">
                     <div className="text-foreground font-medium">{formatCurrency(project?.budget)}</div>
                     {Number(project?.equiposUSD) > 0 && (
@@ -386,9 +400,9 @@ const ProjectTable = ({
                   <td className="p-4"><div className="text-sm text-foreground">{formatDate(project?.startDate)}</div></td>
                   <td className="p-4">
                     <div className="flex items-center space-x-1">
-
                       <Button variant="ghost" size="icon" onClick={() => onRegisterAbono?.(project)} title="Registrar abono"><Icon name="CreditCard" size={16} /></Button>
-
+                      {/* Ejemplo de acción de imagen si luego lo conectas */}
+                      {/* <Button variant="ghost" size="icon" onClick={() => _handleImageUpload(project)} title="Subir imagen"><Icon name="Image" size={16} /></Button> */}
                     </div>
                   </td>
                 </tr>
@@ -461,7 +475,11 @@ const ProjectTable = ({
             </div>
 
             <div className="grid grid-cols-2 gap-4 mb-3">
-              <div><div className="text-xs text-muted-foreground">Cliente</div><div className="text-sm text-foreground">{project?.client?.name}</div></div>
+              <div>
+                <div className="text-xs text-muted-foreground">Cliente</div>
+                <div className="text-sm text-foreground font-medium">{project?.client?.name}</div>
+                <div className="text-xs text-muted-foreground">{project?.client?.email}</div>
+              </div>
               <div>
                 <div className="text-xs text-muted-foreground">Presupuesto</div>
                 <div className="text-sm text-foreground font-medium">{formatCurrency(project?.budget)}</div>
@@ -482,8 +500,6 @@ const ProjectTable = ({
                 })()}
               </div>
             </div>
-
-            
 
             {expandedRows?.includes(project?.id) && (
               <div className="mt-4 pt-4 border-t border-border">

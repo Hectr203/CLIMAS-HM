@@ -5,9 +5,7 @@ import Sidebar from '../../components/ui/Sidebar';
 import Header from '../../components/ui/Header';
 import ProjectFilters from './components/ProjectFilters';
 import ProjectTable from './components/ProjectTable';
-import ProjectStats from './components/ProjectStats';
-import ProjectTimeline from './components/ProjectTimeline';
-import ProjectQuotations from './components/ProjectQuotations';
+import ProjectStats from './components/AbonosStats';
 import CreateProjectModal from './components/CreateProjectModal';
 import EditProjectModal from './components/EditProjectModal';
 import RegisterAbonoModal from './components/RegisterAbonoModal';
@@ -50,7 +48,6 @@ const ProjectManagement = () => {
   } = useProyect();
 
   const [filteredProjects, setFilteredProjects] = useState([]);
-  const [activeView, setActiveView] = useState('table');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
@@ -63,6 +60,7 @@ const ProjectManagement = () => {
     } catch { return {}; }
   });
   const [registerAbonoFor, setRegisterAbonoFor] = useState(null);
+  const [showProjectSelector, setShowProjectSelector] = useState(false);
 
   useEffect(() => { getProyectos(); }, []);
   useEffect(() => {
@@ -110,6 +108,26 @@ const ProjectManagement = () => {
         const code = norm(getCodigo(project));
         const cliente = norm(project?.cliente?.nombre || project?.cliente || '');
         return name.includes(q) || code.includes(q) || cliente.includes(q);
+      });
+    }
+
+    // Filtro por estado de pago (NUEVO)
+    if (filters?.paymentStatus) {
+      filtered = filtered.filter(project => {
+        const budget = getBudget(project);
+        const paid = getTotalPagado(project);
+        
+        if (filters.paymentStatus === 'pagado') {
+          // Proyectos completamente pagados
+          return budget > 0 && paid >= budget;
+        } else if (filters.paymentStatus === 'en-proceso') {
+          // Proyectos con pagos parciales
+          return budget > 0 && paid > 0 && paid < budget;
+        } else if (filters.paymentStatus === 'sin-pago') {
+          // Proyectos sin pagos
+          return paid === 0 || paid == null;
+        }
+        return true;
       });
     }
 
@@ -196,7 +214,21 @@ const ProjectManagement = () => {
   const openRegisterAbono = (project) => {
     setRegisterAbonoFor(project);
   };
-  const closeRegisterAbono = () => setRegisterAbonoFor(null);
+  const closeRegisterAbono = () => {
+    setRegisterAbonoFor(null);
+    setShowProjectSelector(false);
+  };
+  const openNewAbono = () => {
+    if (filteredProjects && filteredProjects.length > 0) {
+      setShowProjectSelector(true);
+    } else {
+      alert('No hay proyectos disponibles para registrar un abono.');
+    }
+  };
+  const handleProjectSelectForAbono = (project) => {
+    setShowProjectSelector(false);
+    setRegisterAbonoFor(project);
+  };
   const handleSaveAbono = (payload) => {
     const { projectId, fecha, monto, saldoRestante } = payload || {};
     if (!projectId) return;
@@ -251,32 +283,6 @@ const ProjectManagement = () => {
     document.body.removeChild(a);
   };
 
-  const onGenerateReportFromTimeline = (periodList /* ya filtrados por ProjectTimeline */, timeframe) => {
-    const headers = ['Código','Nombre','Cliente','Estado','Prioridad','Presupuesto (MXN)','Inicio','Fin'];
-    const esc = (s) => {
-      const v = String(s ?? '');
-      const needs = /[",\n]/.test(v); const e = v.replace(/"/g,'""');
-      return needs ? `"${e}"` : e;
-    };
-    const rows = (periodList || []).map(p => {
-      const code = p?.codigo ?? p?.code ?? '';
-      const name = p?.nombre ?? p?.name ?? '';
-      const client = p?.cliente?.nombre || p?.client?.name || '';
-      const status = p?.statusLabel || p?.estado || p?.status || '';
-      const priority = p?.priority || p?.prioridad || '';
-      const budget = Number(p?.totalPresupuesto ?? p?.presupuesto?.total ?? p?.budget ?? 0).toLocaleString('es-MX');
-      const sd = new Date(p?.startDate ?? p?.cronograma?.fechaInicio ?? '').toLocaleDateString('es-MX');
-      const ed = new Date(p?.endDate ?? p?.cronograma?.fechaFin ?? '').toLocaleDateString('es-MX');
-      return [code,name,client,status,priority,budget,sd,ed].map(esc).join(',');
-    });
-    if (!rows.length) { alert('No hay proyectos en el período.'); return; }
-    const csv = [headers.join(','), ...rows].join('\n');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8;' }));
-    a.download = `cronograma_${timeframe}_${new Date().toISOString().slice(0,10)}.csv`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex">
@@ -311,49 +317,31 @@ const ProjectManagement = () => {
               </div>
 
               <div className="flex items-center space-x-4 mt-4 lg:mt-0">
-                <div className="flex bg-muted rounded-lg p-1">
-                  {[
-                    { value: 'table', label: 'Tabla', icon: 'Table' },
-                    { value: 'timeline', label: 'Cronograma', icon: 'Calendar' },
-                    { value: 'quotations', label: 'Cotizaciones', icon: 'FileText' },
-                    { value: 'stats', label: 'Estadísticas', icon: 'BarChart3' }
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => setActiveView(option.value)}
-                      className={`flex items-center space-x-2 px-3 py-2 rounded-md transition-smooth ${activeView === option.value
-                          ? 'bg-primary text-primary-foreground'
-                          : 'text-muted-foreground hover:text-foreground'
-                        }`}
-                    >
-                      <Icon name={option.icon} size={16} />
-                      <span className="hidden sm:inline text-sm">{option.label}</span>
-                    </button>
-                  ))}
-                </div>
-
-                <Button onClick={() => setIsCreateModalOpen(true)} iconName="Plus" iconPosition="left">
+                <Button onClick={openNewAbono} iconName="CreditCard" iconPosition="left" variant="default">
+                  Nuevo Abono
+                </Button>
+                <Button onClick={() => setIsCreateModalOpen(true)} iconName="Plus" iconPosition="left" variant="outline">
                   Nuevo Proyecto
                 </Button>
               </div>
             </div>
 
             {/* Stats Overview */}
-            {activeView !== 'stats' && filteredProjects?.length > 0 && <ProjectStats projects={filteredProjects} />}
+            {filteredProjects?.length > 0 && (
+              <ProjectStats projects={filteredProjects} getTotalPagado={getTotalPagado} />
+            )}
 
             {/* Filtros (incluye onExport) */}
-            {activeView === 'table' && (
-              <ProjectFilters
-                onFiltersChange={handleFiltersChange}
-                totalProjects={projects?.length}
-                filteredProjects={filteredProjects?.length}
-                onExport={handleExportFromFilters}
-              />
-            )}
+            <ProjectFilters
+              onFiltersChange={handleFiltersChange}
+              totalProjects={projects?.length}
+              filteredProjects={filteredProjects?.length}
+              onExport={handleExportFromFilters}
+            />
 
             {/* Main Content */}
             <div className="space-y-6">
-              {activeView === 'table' && filteredProjects?.length > 0 && (
+              {filteredProjects?.length > 0 && (
                 <ProjectTable
                   projects={filteredProjects}
                   onProjectSelect={handleEditProject}
@@ -361,22 +349,6 @@ const ProjectManagement = () => {
                   getPaidAmount={getTotalPagado}
                   onBulkAction={handleBulkAction}
                 />
-              )}
-
-              {activeView === 'timeline' && (
-                <ProjectTimeline
-                  projects={filteredProjects}
-                  onGenerateReport={onGenerateReportFromTimeline}
-                />
-              )}
-
-              {activeView === 'quotations' && filteredProjects?.length > 0 && <ProjectQuotations projects={filteredProjects} />}
-
-              {activeView === 'stats' && (
-                <div className="space-y-6">
-                  <ProjectStats projects={filteredProjects} />
-                  {filteredProjects?.length > 0 && <ProjectTimeline projects={filteredProjects} onGenerateReport={onGenerateReportFromTimeline} />}
-                </div>
               )}
 
               {/* Vacíos */}
@@ -403,6 +375,62 @@ const ProjectManagement = () => {
                 onSubmit={handleUpdateProject}
                 project={selectedProject}
               />
+            )}
+
+            {/* Selector de Proyecto para Nuevo Abono */}
+            {showProjectSelector && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/40" onClick={() => setShowProjectSelector(false)} />
+                <div className="relative bg-card border border-border rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[80vh] overflow-hidden flex flex-col">
+                  <div className="p-4 border-b border-border flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Icon name="CreditCard" size={18} />
+                      <h3 className="text-lg font-semibold text-foreground">Seleccionar Proyecto para Nuevo Abono</h3>
+                    </div>
+                    <button className="text-muted-foreground hover:text-foreground" onClick={() => setShowProjectSelector(false)} title="Cerrar">
+                      <Icon name="X" size={18} />
+                    </button>
+                  </div>
+                  <div className="p-4 overflow-y-auto flex-1">
+                    <div className="space-y-2">
+                      {filteredProjects && filteredProjects.length > 0 ? (
+                        filteredProjects.map((project) => {
+                          const projectId = project?.id ?? project?._id;
+                          const budget = getBudget(project);
+                          const paid = getTotalPagado(project);
+                          const remaining = Math.max(budget - paid, 0);
+                          return (
+                            <button
+                              key={projectId}
+                              onClick={() => handleProjectSelectForAbono(project)}
+                              className="w-full text-left p-4 border border-border rounded-lg hover:bg-muted/50 transition-smooth"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="font-medium text-foreground">{getNombre(project)}</div>
+                                  <div className="text-sm text-muted-foreground mt-1">
+                                    Código: {getCodigo(project)}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground mt-1">
+                                    Presupuesto: {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(budget)} | 
+                                    Pagado: {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(paid)} | 
+                                    Restante: {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(remaining)}
+                                  </div>
+                                </div>
+                                <Icon name="ChevronRight" size={20} className="text-muted-foreground" />
+                              </div>
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          No hay proyectos disponibles
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* Registrar Abono */}

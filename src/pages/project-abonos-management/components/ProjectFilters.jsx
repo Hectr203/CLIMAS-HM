@@ -100,15 +100,16 @@ const ProjectFilters = ({
 }) => {
   const [filters, setFilters] = useState({
     search: '',
+    paymentStatus: '', // Nuevo: 'pagado', 'en-proceso', '' (todos)
     status: '',
-    department: '',
     dateRange: '',
-    clientType: '',
-    priority: '',
-    minBudget: '',
-    maxBudget: '',
     startDate: '',
     endDate: '',
+    minBudget: '',
+    maxBudget: '',
+    department: '',
+    clientType: '',
+    priority: '',
   });
 
   const [isExpanded, setIsExpanded] = useState(false);
@@ -163,18 +164,26 @@ const ProjectFilters = ({
     onFiltersChange?.(newFilters);
   };
 
+  const paymentStatusOptions = [
+    { value: '', label: 'Todos los Estados de Pago' },
+    { value: 'pagado', label: 'Proyectos Pagados' },
+    { value: 'en-proceso', label: 'En Proceso de Pago' },
+    { value: 'sin-pago', label: 'Sin Pagos' },
+  ];
+
   const clearAllFilters = () => {
     const cleared = {
       search: '',
+      paymentStatus: '',
       status: '',
-      department: '',
       dateRange: '',
-      clientType: '',
-      priority: '',
-      minBudget: '',
-      maxBudget: '',
       startDate: '',
       endDate: '',
+      minBudget: '',
+      maxBudget: '',
+      department: '',
+      clientType: '',
+      priority: '',
     };
     setFilters(cleared);
     onFiltersChange?.(cleared);
@@ -236,10 +245,24 @@ const ProjectFilters = ({
       {/* Quick Filters */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
         <Select
-          label="Estado"
+          label="Estado de Pago"
+          options={paymentStatusOptions}
+          value={filters.paymentStatus}
+          onChange={(value) => handleFilterChange('paymentStatus', value)}
+          className="w-full"
+        />
+        <Select
+          label="Estado del Proyecto"
           options={statusOptions}
           value={filters.status}
           onChange={(value) => handleFilterChange('status', value)}
+          className="w-full"
+        />
+        <Select
+          label="Rango de Fechas"
+          options={dateRangeOptions}
+          value={filters.dateRange}
+          onChange={(value) => handleFilterChange('dateRange', value)}
           className="w-full"
         />
         <Select
@@ -250,24 +273,10 @@ const ProjectFilters = ({
           className="w-full"
         />
         <Select
-          label="Fecha"
-          options={dateRangeOptions}
-          value={filters.dateRange}
-          onChange={(value) => handleFilterChange('dateRange', value)}
-          className="w-full"
-        />
-        <Select
           label="Tipo de Cliente"
           options={clientTypeOptions}
           value={filters.clientType}
           onChange={(value) => handleFilterChange('clientType', value)}
-          className="w-full"
-        />
-        <Select
-          label="Prioridad"
-          options={priorityOptions}
-          value={filters.priority}
-          onChange={(value) => handleFilterChange('priority', value)}
           className="w-full"
         />
         <div className="flex items-end">
@@ -333,6 +342,8 @@ const ProjectFilters = ({
 
             // etiquetas amigables
             let displayValue = value;
+            if (key === 'paymentStatus')
+              displayValue = paymentStatusOptions.find((opt) => opt.value === value)?.label || value;
             if (key === 'status')
               displayValue = statusOptions.find((opt) => opt.value === value)?.label || value;
             if (key === 'department')
