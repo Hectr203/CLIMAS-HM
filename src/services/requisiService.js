@@ -1,14 +1,13 @@
 import httpService from "./httpService";
 
 const requisiService = {
-  // ✅ Obtener requisiciones con filtros dinámicos
   async getRequisitions(filters = {}) {
     try {
       const query = new URLSearchParams(filters).toString();
       const url = query ? `/requisiciones?${query}` : "/requisiciones";
 
       const response = await httpService.get(url);
-      return response; // { success, data, message }
+      return response;
     } catch (error) {
       console.error("Error al obtener requisiciones:", error);
       throw error;
@@ -34,6 +33,16 @@ const requisiService = {
       throw error;
     }
   },
+
+  async deleteRequisition(id) {
+    try {
+      const response = await httpService.delete(`/requisiciones/${id}`);
+      return response;
+    } catch (error) {
+      console.error("Error al eliminar requisición:", error);
+      throw error;
+    }
+  }
 };
 
 export default requisiService;

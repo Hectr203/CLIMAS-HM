@@ -10,7 +10,8 @@ const extractList = (resp) => {
   return [];
 };
 
-const unwrap = (resp) => (resp && typeof resp === 'object' && 'data' in resp ? resp.data : resp);
+const unwrap = (resp) =>
+  (resp && typeof resp === 'object' && 'data' in resp ? resp.data : resp);
 
 const useProyecto = () => {
   const [proyectos, setProyectos] = useState([]);
@@ -103,7 +104,9 @@ const useProyecto = () => {
       const updated = unwrap(resp);
 
       setProyectos((prev) =>
-        prev.map((p) => (String(p.id ?? p._id) === String(id) ? { ...p, ...updated } : p))
+        prev.map((p) =>
+          String(p.id ?? p._id) === String(id) ? { ...p, ...updated } : p
+        )
       );
 
       if (refresh) {
@@ -147,6 +150,28 @@ const useProyecto = () => {
     }
   }, [getProyectos]);
 
+  // ========= STATS CACHED (dashboard rápido) =========
+  // GET /proyectos/stats/get
+  const getCachedStats = useCallback(
+    async ({ signal } = {}) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const resp = await proyectoService.getCachedStats({ signal });
+        // aquí NO tocamos proyectos, esto es data de métricas.
+        // Puede venir como { data: {...} } o directo {...}
+        return unwrap(resp);
+      } catch (err) {
+        console.error('Error en useProyecto.getCachedStats:', err);
+        setError(err);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
   // ========= (currencyapi.com) =========
   const getCurrencyRates = useCallback(
     async ({ base = 'USD', currencies = [] } = {}, { signal } = {}) => {
@@ -168,12 +193,18 @@ const useProyecto = () => {
     []
   );
 
+  /**
+   * Devuelve { MXN: 18.2, EUR: 0.92, ... }
+   */
   const getCurrencyRatesMap = useCallback(
     async ({ base = 'USD', currencies = [] } = {}, { signal } = {}) => {
       setLoadingCurrency(true);
       setError(null);
       try {
-        const map = await proyectoService.getCurrencyRatesMap({ base, currencies }, { signal });
+        const map = await proyectoService.getCurrencyRatesMap(
+          { base, currencies },
+          { signal }
+        );
         return map;
       } catch (err) {
         if (err?.name !== 'AbortError') {
@@ -206,6 +237,9 @@ const useProyecto = () => {
     createProyecto,
     updateProyecto,
     deleteProyecto,
+
+    // dashboard / KPIs cacheados
+    getCachedStats,
 
     // acciones API externa (currencyapi)
     getCurrencyRates,

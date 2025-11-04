@@ -30,15 +30,26 @@ const ALLOWED_ESTADOS = estadoOptionsBackend.map(o => o.value);
 //   return v === 'en proceso' ? 'en proceso' : 'activo';
 // };
 
-/* Cache local del estado UI por proyecto (no toca API) */
+/* Cache local del estado UI por proyecto (para recordar lo que eligió el user en vez de lo que vino del backend) */
 const UI_ESTADO_KEY = 'proyectos_ui_estado_v1';
 const uiEstadoCache = {
-  _read() { try { return JSON.parse(localStorage.getItem(UI_ESTADO_KEY)) || {}; } catch { return {}; } },
-  get(id) { if (!id) return null; const m = this._read(); return m[id] || null; },
+  _read() {
+    try {
+      return JSON.parse(localStorage.getItem(UI_ESTADO_KEY)) || {};
+    } catch {
+      return {};
+    }
+  },
+  get(id) {
+    if (!id) return null;
+    const m = this._read();
+    return m[id] || null;
+  },
   set(id, estado) {
     if (!id) return;
     const m = this._read();
-    if (estado) m[id] = estado; else delete m[id];
+    if (estado) m[id] = estado;
+    else delete m[id];
     localStorage.setItem(UI_ESTADO_KEY, JSON.stringify(m));
   }
 };
@@ -56,12 +67,16 @@ const priorityOptions = [
   { value: 'Urgente', label: 'Urgente' },
 ];
 
-/* ===== Helpers ===== */
+/* ===== Helpers numéricos / formateo ===== */
 const toNumberOrUndef = (v) => {
   if (v === '' || v == null) return undefined;
-  const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/[^\d.-]/g, ''));
+  const n =
+    typeof v === 'number'
+      ? v
+      : parseFloat(String(v).replace(/[^\d.-]/g, ''));
   return Number.isFinite(n) ? n : undefined;
 };
+
 const formatWithCommas = (v, decimals = 2) => {
   const n = toNumberOrUndef(v);
   if (n == null) return '';
@@ -70,9 +85,12 @@ const formatWithCommas = (v, decimals = 2) => {
     : { minimumFractionDigits: decimals, maximumFractionDigits: decimals };
   return n.toLocaleString('es-MX', opts);
 };
+
 const asStr = (v, fallback = '') => (v == null ? fallback : String(v));
-const asArr = (v) => (Array.isArray(v) ? v : v == null ? [] : [String(v)]);
-const rateSafe = (rate) => (Number.isFinite(Number(rate)) ? Number(rate) : 0);
+const asArr = (v) =>
+  Array.isArray(v) ? v : v == null ? [] : [String(v)];
+const rateSafe = (rate) =>
+  Number.isFinite(Number(rate)) ? Number(rate) : 0;
 
 /* ===================== COMPONENTE ===================== */
 const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
@@ -84,21 +102,25 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
   const { persons, getPersons } = usePerson();
   const [clientOptions, setClientOptions] = useState([]);
 
-  // USD controls
+  // Controles de USD para equipos
   const [isEquipmentInUSD, setIsEquipmentInUSD] = useState(false);
-  const [exchangeRate, setExchangeRate] = useState(18);     // MXN por USD
-  const [uiEquipmentUSD, setUiEquipmentUSD] = useState(''); // solo DISPLAY (read-only)
+  const [exchangeRate, setExchangeRate] = useState(18); // MXN por USD
+  const [uiEquipmentUSD, setUiEquipmentUSD] = useState(''); // display
   const [loadingFx, setLoadingFx] = useState(false);
   const [fxError, setFxError] = useState(null);
 
-  /* ============= CARGAS ============= */
+  /* ============= CARGA DE CLIENTES ============= */
   useEffect(() => {
     if (!isOpen) return;
     let mounted = true;
     (async () => {
       try {
         const resp = await clientService.getClients();
-        const list = Array.isArray(resp?.data) ? resp.data : (Array.isArray(resp) ? resp : []);
+        const list = Array.isArray(resp?.data)
+          ? resp.data
+          : Array.isArray(resp)
+          ? resp
+          : [];
         const opts = list.map((c) => ({
           value: c.id,
           label: c.empresa || c.nombre || c.contacto || '—',
@@ -108,22 +130,31 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
         console.error('Error cargando clientes:', e);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [isOpen]);
 
+  /* ============= CARGA DE PERSONAL (solo 1 vez) ============= */
   const fetchedPersonsRef = useRef(false);
   useEffect(() => {
     if (!isOpen) return;
     if (fetchedPersonsRef.current) return;
     fetchedPersonsRef.current = true;
     (async () => {
-      try { await getPersons(); } catch (e) { console.error('Error cargando empleados:', e); }
+      try {
+        await getPersons();
+      } catch (e) {
+        console.error('Error cargando empleados:', e);
+      }
     })();
-    return () => { fetchedPersonsRef.current = false; };
+    return () => {
+      fetchedPersonsRef.current = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  // Traer el proyecto completo al abrir
+  /* ============= CARGA DEL PROYECTO COMPLETO ============= */
   useEffect(() => {
     if (!isOpen || !project?.id) return;
     let mounted = true;
@@ -137,34 +168,43 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
         if (mounted) setServerProject(project || null);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [isOpen, project?.id]);
 
-  // Normalización (estado desde cache → si no, derivado desde API)
+  /* ============= NORMALIZACIÓN DEL PROYECTO PARA EL FORM ============= */
   const normalized = useMemo(() => {
     const doc = serverProject || project || {};
     const p = doc.presupuesto || {};
     const cron = doc.cronograma || {};
     const id = doc.id || project?.id;
-    const estadoUi = uiEstadoCache.get(id) || doc.estado;
+
+    // preferimos estado guardado en cache UI (lo que el usuario eligió la última vez),
+    // si no existe tomamos el backend y lo convertimos a estado UI
+    const cachedEstado = uiEstadoCache.get(id);
+    const estadoUi = cachedEstado || backendToUiDefault(doc.estado);
 
     return {
       id,
       codigo: doc.codigo || '',
       tipoProyecto: doc.tipoProyecto || '',
       clienteId: doc?.cliente?.id ?? '',
-      clienteNombre: doc?.cliente?.nombre || doc?.cliente?.empresa || '',
+      clienteNombre:
+        doc?.cliente?.nombre || doc?.cliente?.empresa || '',
       nombre: doc.nombre || doc.nombreProyecto || '',
       departamento: doc.departamento || '',
       prioridad: doc.prioridad || '',
       ubicacion: doc.ubicacion || '',
       descripcion: doc.descripcion || '',
-      estado: estadoUi,
+      estado: estadoUi, // <-- ESTE ES EL QUE MUESTRAS EN EL SELECT
       cronograma: {
         fechaInicio: cron?.fechaInicio || '',
         fechaFin: cron?.fechaFin || '',
       },
-      personalAsignado: Array.isArray(doc?.personalAsignado) ? doc.personalAsignado : [],
+      personalAsignado: Array.isArray(doc?.personalAsignado)
+        ? doc.personalAsignado
+        : [],
       presupuesto: {
         manoObra: toNumberOrUndef(p.manoObra),
         piezas: toNumberOrUndef(p.piezas),
@@ -173,21 +213,36 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
         materiales: toNumberOrUndef(p.materiales),
         transporte: toNumberOrUndef(p.transporte),
         otros: toNumberOrUndef(p.otros),
-        _metaEquipos: { capturadoEn: p?._metaEquipos?.capturadoEn || 'MXN' },
+        _metaEquipos: {
+          capturadoEn: p?._metaEquipos?.capturadoEn || 'MXN',
+        },
       },
     };
   }, [serverProject, project]);
 
+  /* ============= STATE DEL FORM (CONTROLADO) ============= */
   const [formData, setFormData] = useState(normalized);
-  useEffect(() => { if (isOpen) setFormData(normalized); }, [normalized, isOpen]);
+  useEffect(() => {
+    if (isOpen) setFormData(normalized);
+  }, [normalized, isOpen]);
 
-  // === Traer tasa de cambio: estable y reutilizable ===
+  /* ============= FX / TIPO DE CAMBIO USD↔MXN ============= */
   const fetchUsdMxnRate = useCallback(async () => {
     try {
       setFxError(null);
       setLoadingFx(true);
-      const map = await proyectoService.getCurrencyRatesMap({ base: 'USD', currencies: ['MXN'] });
-      const rate = Number(map?.MXN || 0);
+
+      // usamos getCurrencyRates existente en tu service
+      const apiResp = await proyectoService.getCurrencyRates({
+        base: 'USD',
+        currencies: ['MXN'],
+      });
+
+      // apiResp esperado:
+      // { data: { MXN: { code:'MXN', value:18.2 }, ... }, meta: {...} }
+      const mxnInfo = apiResp?.data?.MXN;
+      const rate = Number(mxnInfo?.value || 0);
+
       if (rate > 0) {
         setExchangeRate(rate);
         return rate;
@@ -204,13 +259,13 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
     }
   }, []);
 
-  // Precargar tipo de cambio al abrir
+  // precarga el tipo de cambio al abrir modal
   useEffect(() => {
     if (!isOpen) return;
     fetchUsdMxnRate();
   }, [isOpen, fetchUsdMxnRate]);
 
-  // Inicializar UI USD según _metaEquipos
+  // inicializar toggle USD/MXN basándonos en _metaEquipos.capturadoEn
   useEffect(() => {
     if (!isOpen) return;
     const cap = formData?.presupuesto?._metaEquipos?.capturadoEn;
@@ -222,7 +277,7 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
     }
   }, [isOpen, formData?.presupuesto?._metaEquipos?.capturadoEn]);
 
-  // Cuando estamos en USD: calcular SIEMPRE USD mostrado = MXN / rate (read-only)
+  // cuando mostramos en USD, calculamos display USD = MXN / rate
   useEffect(() => {
     if (!isEquipmentInUSD) return;
     const mxn = toNumberOrUndef(formData?.presupuesto?.equipos) ?? 0;
@@ -231,78 +286,136 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
     setUiEquipmentUSD(usd ? formatWithCommas(usd, 2) : '0.00');
   }, [isEquipmentInUSD, exchangeRate, formData?.presupuesto?.equipos]);
 
-  // Opciones de Personal
+  /* ============= OPTIONS DE PERSONAL PARA EL MULTISELECT ============= */
   const personnelOptions = useMemo(() => {
-    const fromPersons = Array.isArray(persons) ? persons.map((p) => {
-      const nombre =
-        p?.nombreCompleto ||
-        [p?.nombre, p?.apellidoPaterno, p?.apellidoMaterno].filter(Boolean).join(' ') ||
-        p?.nombre || p?.name || '—';
-      const puesto = p?.puesto || p?.rol || p?.cargo;
-      const etiqueta = puesto ? `${nombre} — ${puesto}` : nombre;
-      return { value: etiqueta, label: etiqueta };
-    }) : [];
+    const fromPersons = Array.isArray(persons)
+      ? persons.map((p) => {
+          const nombre =
+            p?.nombreCompleto ||
+            [p?.nombre, p?.apellidoPaterno, p?.apellidoMaterno]
+              .filter(Boolean)
+              .join(' ') ||
+            p?.nombre ||
+            p?.name ||
+            '—';
+          const puesto = p?.puesto || p?.rol || p?.cargo;
+          const etiqueta = puesto ? `${nombre} — ${puesto}` : nombre;
+          return { value: etiqueta, label: etiqueta };
+        })
+      : [];
+
     const existing = Array.isArray(formData?.personalAsignado)
-      ? formData.personalAsignado.map((s) => ({ value: s, label: s })) : [];
+      ? formData.personalAsignado.map((s) => ({
+          value: s,
+          label: s,
+        }))
+      : [];
+
     const seen = new Set();
-    return [...existing, ...fromPersons].filter(o => (seen.has(o.value) ? false : (seen.add(o.value), true)));
+    return [...existing, ...fromPersons].filter((o) =>
+      seen.has(o.value) ? false : (seen.add(o.value), true)
+    );
   }, [persons, formData?.personalAsignado]);
 
-  // ✅ Total MXN (única declaración)
+  /* ============= TOTAL MXN DEL PRESUPUESTO MOSTRADO ============= */
   const totalMXN = useMemo(() => {
     const b = formData?.presupuesto || {};
-    const sum = (...vals) => vals.reduce((acc, v) => acc + (toNumberOrUndef(v) ?? 0), 0);
-    return sum(b.manoObra, b.piezas, b.equipos, b.materiales, b.transporte, b.otros);
+    const sum = (...vals) =>
+      vals.reduce(
+        (acc, v) => acc + (toNumberOrUndef(v) ?? 0),
+        0
+      );
+    return sum(
+      b.manoObra,
+      b.piezas,
+      b.equipos,
+      b.materiales,
+      b.transporte,
+      b.otros
+    );
   }, [formData]);
 
-  // Handlers
+  /* ============= HANDLERS DEL FORM ============= */
   const handle = (k, v) => {
     setFormData((s) => ({ ...s, [k]: v }));
-    if (errors[k]) setErrors((e) => ({ ...e, [k]: undefined }));
-  };
-  const handleP = (k, raw) => {
-    const n = raw === '' || raw == null ? undefined : toNumberOrUndef(raw);
-    setFormData((s) => ({ ...s, presupuesto: { ...s.presupuesto, [k]: n } }));
+    if (errors[k]) {
+      setErrors((e) => ({ ...e, [k]: undefined }));
+    }
   };
 
-  // Toggle USD: calc display y bloquear edición
+  const handleP = (k, raw) => {
+    const n =
+      raw === '' || raw == null ? undefined : toNumberOrUndef(raw);
+    setFormData((s) => ({
+      ...s,
+      presupuesto: { ...s.presupuesto, [k]: n },
+    }));
+  };
+
+  // toggle USD <-> MXN en el bloque "Equipos"
   const toggleUSD = async (checked) => {
     setIsEquipmentInUSD(checked);
     setFormData((s) => ({
       ...s,
-      presupuesto: { ...s.presupuesto, _metaEquipos: { capturadoEn: checked ? 'USD' : 'MXN' } },
+      presupuesto: {
+        ...s.presupuesto,
+        _metaEquipos: {
+          capturadoEn: checked ? 'USD' : 'MXN',
+        },
+      },
     }));
+
     if (checked) {
       const rate = (await fetchUsdMxnRate()) ?? exchangeRate;
-      const mxn = toNumberOrUndef(formData?.presupuesto?.equipos) ?? 0;
+      const mxn =
+        toNumberOrUndef(formData?.presupuesto?.equipos) ?? 0;
       const usd = rate ? mxn / rate : 0;
-      setUiEquipmentUSD(usd ? formatWithCommas(usd, 2) : '0.00');
+      setUiEquipmentUSD(
+        usd ? formatWithCommas(usd, 2) : '0.00'
+      );
     } else {
       setUiEquipmentUSD('');
     }
   };
 
+  /* ============= VALIDACIÓN ============= */
   const validate = () => {
     const e = {};
     if (!formData.nombre) e.nombre = 'Requerido';
-    if (!formData.departamento) e.departamento = 'Requerido';
+    if (!formData.departamento)
+      e.departamento = 'Requerido';
     if (!formData.ubicacion) e.ubicacion = 'Requerido';
-    if (!ALLOWED_ESTADOS.includes(formData.estado)) e.estado = 'Estado inválido';
-    if (isEquipmentInUSD && !(exchangeRate > 0)) e.exchangeRate = 'Tipo de cambio inválido';
+    if (!ALLOWED_ESTADOS.includes(formData.estado))
+      e.estado = 'Estado inválido';
+    if (isEquipmentInUSD && !(exchangeRate > 0))
+      e.exchangeRate = 'Tipo de cambio inválido';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  // Payload: solo definidos + estado mapeado; equipoDolares calculado si USD activo
+  /* ============= ARMAR PAYLOAD PARA updateProyecto ============= */
   const buildPayloadForUpdate = () => {
     const p = formData.presupuesto || {};
     const pres = {};
-    ['manoObra','piezas','equipos','equipoDolares','materiales','transporte','otros'].forEach(k => {
+
+    [
+      'manoObra',
+      'piezas',
+      'equipos',
+      'equipoDolares',
+      'materiales',
+      'transporte',
+      'otros',
+    ].forEach((k) => {
       const val = toNumberOrUndef(p[k]);
       if (val != null) pres[k] = val;
     });
-    pres._metaEquipos = { capturadoEn: isEquipmentInUSD ? 'USD' : 'MXN' };
 
+    pres._metaEquipos = {
+      capturadoEn: isEquipmentInUSD ? 'USD' : 'MXN',
+    };
+
+    // si el toggle USD está activo, calculamos USD a partir de MXN/rate
     if (isEquipmentInUSD) {
       const mxn = toNumberOrUndef(p.equipos) ?? 0;
       const rate = rateSafe(exchangeRate);
@@ -316,51 +429,94 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
       prioridad: formData.prioridad,
       ubicacion: formData.ubicacion,
       descripcion: formData.descripcion,
-      personalAsignado: Array.isArray(formData.personalAsignado) ? formData.personalAsignado : [],
-      estado: formData.estado,
+      personalAsignado: Array.isArray(
+        formData.personalAsignado
+      )
+        ? formData.personalAsignado
+        : [],
+      // 👇 ahora mandamos el estado que entiende tu backend,
+      // NO siempre "activo"
+      estado: mapUiToBackend(formData.estado),
       presupuesto: pres,
     };
   };
 
+  /* ============= SUBMIT (Guardar Cambios) ============= */
   const handleSubmit = async (e) => {
     e?.preventDefault();
     if (!validate()) return;
     setIsSubmitting(true);
     try {
       const payload = buildPayloadForUpdate();
-      await proyectoService.updateProyecto(formData.id, payload);
+      await proyectoService.updateProyecto(
+        formData.id,
+        payload
+      );
+
+      // guardamos en cache el estado "bonito" que eligió el usuario
       uiEstadoCache.set(formData.id, formData.estado);
-      onSubmit && onSubmit({ id: formData.id, ...payload, _uiEstado: formData.estado });
+
+      // avisamos al padre para que refresque dashboard/stats
+      onSubmit &&
+        onSubmit({
+          id: formData.id,
+          ...payload,
+          _uiEstado: formData.estado,
+        });
+
       onClose && onClose();
     } catch (err) {
       console.error('Error actualizando proyecto:', err);
-      const detalle = err?.data?.error || err?.data?.message || err?.userMessage || err?.message;
-      alert(`No se pudo actualizar el proyecto.\n${detalle || ''}`);
+      const detalle =
+        err?.data?.error ||
+        err?.data?.message ||
+        err?.userMessage ||
+        err?.message;
+      alert(
+        `No se pudo actualizar el proyecto.\n${detalle || ''}`
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  /* Render */
+  /* ============= LABEL DEL CLIENTE ============= */
   const b = formData.presupuesto || {};
   const clientLabel = useMemo(() => {
     if (!formData.clienteId) return '—';
-    const found = clientOptions.find((o) => o.value === formData.clienteId);
-    return found?.label || formData.clienteNombre || formData.clienteId;
+    const found = clientOptions.find(
+      (o) => o.value === formData.clienteId
+    );
+    return (
+      found?.label ||
+      formData.clienteNombre ||
+      formData.clienteId
+    );
   }, [clientOptions, formData.clienteId, formData.clienteNombre]);
 
   if (!isOpen) return null;
 
+  /* ===================== RENDER ===================== */
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-1050 p-4">
       <div className="bg-card border border-border rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border">
           <div>
-            <h2 className="text-xl font-semibold text-foreground">Editar Proyecto</h2>
-            <p className="text-sm text-muted-foreground">Actualice la información permitida</p>
+            <h2 className="text-xl font-semibold text-foreground">
+              Editar Proyecto
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Actualice la información permitida
+            </p>
           </div>
-        <Button variant="ghost" size="icon" onClick={onClose}><Icon name="X" size={20} /></Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+          >
+            <Icon name="X" size={20} />
+          </Button>
         </div>
 
         {/* Form */}
@@ -368,19 +524,40 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Información Básica */}
             <div className="md:col-span-2">
-              <h3 className="text-lg font-medium text-foreground mb-4">Información Básica</h3>
+              <h3 className="text-lg font-medium text-foreground mb-4">
+                Información Básica
+              </h3>
             </div>
 
-            <Input label="Código (solo lectura)" value={asStr(formData?.codigo, '—')} onChange={() => {}} disabled />
-            <Input label="Tipo de Proyecto (solo lectura)" value={asStr(formData?.tipoProyecto, '—')} onChange={() => {}} disabled />
-            <Input label="Cliente (solo lectura)" value={asStr(clientLabel, '—')} onChange={() => {}} disabled />
+            <Input
+              label="Código (solo lectura)"
+              value={asStr(formData?.codigo, '—')}
+              onChange={() => {}}
+              disabled
+            />
+
+            <Input
+              label="Tipo de Proyecto (solo lectura)"
+              value={asStr(formData?.tipoProyecto, '—')}
+              onChange={() => {}}
+              disabled
+            />
+
+            <Input
+              label="Cliente (solo lectura)"
+              value={asStr(clientLabel, '—')}
+              onChange={() => {}}
+              disabled
+            />
 
             <Input
               label="Nombre"
               type="text"
               placeholder="Ej: Instalación HVAC Edificio Central"
               value={asStr(formData?.nombre)}
-              onChange={(e) => handle('nombre', e.target.value)}
+              onChange={(e) =>
+                handle('nombre', e.target.value)
+              }
               error={errors?.nombre}
               required
             />
@@ -389,7 +566,9 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
               label="Departamento Responsable"
               options={departmentOptions}
               value={asStr(formData?.departamento)}
-              onChange={(value) => handle('departamento', value)}
+              onChange={(value) =>
+                handle('departamento', value)
+              }
               error={errors?.departamento}
               required
             />
@@ -398,7 +577,9 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
               label="Prioridad"
               options={priorityOptions}
               value={asStr(formData?.prioridad)}
-              onChange={(value) => handle('prioridad', value)}
+              onChange={(value) =>
+                handle('prioridad', value)
+              }
               error={errors?.prioridad}
               required
             />
@@ -407,7 +588,9 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
               label="Estado"
               options={estadoOptionsBackend}
               value={asStr(formData?.estado)}
-              onChange={(value) => handle('estado', value)}
+              onChange={(value) =>
+                handle('estado', value)
+              }
               error={errors?.estado}
               required
             />
@@ -417,45 +600,73 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
               type="text"
               placeholder="Ej: Ciudad de México, CDMX"
               value={asStr(formData?.ubicacion)}
-              onChange={(e) => handle('ubicacion', e.target.value)}
+              onChange={(e) =>
+                handle('ubicacion', e.target.value)
+              }
               error={errors?.ubicacion}
               required
             />
 
             {/* Descripción */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-foreground mb-2">Descripción del Proyecto</label>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Descripción del Proyecto
+              </label>
               <textarea
                 rows={4}
                 placeholder="Describa los objetivos, alcance y detalles importantes del proyecto..."
                 value={asStr(formData?.descripcion)}
-                onChange={(e) => handle('descripcion', e.target.value)}
+                onChange={(e) =>
+                  handle('descripcion', e.target.value)
+                }
                 className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
               />
             </div>
 
             {/* Desglose de Presupuesto */}
             <div className="md:col-span-2 mt-6">
-              <h3 className="text-lg font-medium text-foreground mb-4">Desglose de Presupuesto</h3>
+              <h3 className="text-lg font-medium text-foreground mb-4">
+                Desglose de Presupuesto
+              </h3>
             </div>
 
-            <Input label="Mano de Obra (MXN)" type="text" inputMode="decimal" placeholder="0.00"
-              value={formatWithCommas(b?.manoObra)} onChange={(e) => handleP('manoObra', e?.target?.value)} />
+            <Input
+              label="Mano de Obra (MXN)"
+              type="text"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={formatWithCommas(b?.manoObra)}
+              onChange={(e) =>
+                handleP('manoObra', e?.target?.value)
+              }
+            />
 
-            <Input label="Piezas (MXN)" type="text" inputMode="decimal" placeholder="0.00"
-              value={formatWithCommas(b?.piezas)} onChange={(e) => handleP('piezas', e?.target?.value)} />
+            <Input
+              label="Piezas (MXN)"
+              type="text"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={formatWithCommas(b?.piezas)}
+              onChange={(e) =>
+                handleP('piezas', e?.target?.value)
+              }
+            />
 
             {/* Equipos con toggle USD */}
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-foreground">
-                  {isEquipmentInUSD ? 'Equipos (USD se convierte a MXN)' : 'Equipos (MXN)'}
+                  {isEquipmentInUSD
+                    ? 'Equipos (USD se convierte a MXN)'
+                    : 'Equipos (MXN)'}
                 </label>
                 <label className="inline-flex items-center gap-2 text-sm text-foreground cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={isEquipmentInUSD}
-                    onChange={(e) => toggleUSD(e.target.checked)}
+                    onChange={(e) =>
+                      toggleUSD(e.target.checked)
+                    }
                     className="h-4 w-4 accent-primary cursor-pointer"
                   />
                   Precio en dólares
@@ -466,11 +677,28 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
               <input
                 type="text"
                 inputMode="decimal"
-                placeholder={isEquipmentInUSD ? '0.00 USD' : '0.00 MXN'}
-                value={isEquipmentInUSD ? uiEquipmentUSD : formatWithCommas(b?.equipos)}
-                onChange={(e) => (isEquipmentInUSD ? undefined : handleP('equipos', e?.target?.value))}
+                placeholder={
+                  isEquipmentInUSD ? '0.00 USD' : '0.00 MXN'
+                }
+                value={
+                  isEquipmentInUSD
+                    ? uiEquipmentUSD
+                    : formatWithCommas(b?.equipos)
+                }
+                onChange={(e) =>
+                  isEquipmentInUSD
+                    ? undefined
+                    : handleP(
+                        'equipos',
+                        e?.target?.value
+                      )
+                }
                 readOnly={isEquipmentInUSD}
-                className={`w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent ${isEquipmentInUSD ? 'bg-muted cursor-not-allowed' : ''}`}
+                className={`w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent ${
+                  isEquipmentInUSD
+                    ? 'bg-muted cursor-not-allowed'
+                    : ''
+                }`}
               />
 
               {isEquipmentInUSD && (
@@ -480,7 +708,10 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
                       label="Tipo de cambio (MXN / USD)"
                       type="text"
                       inputMode="decimal"
-                      value={formatWithCommas(exchangeRate, 4)}
+                      value={formatWithCommas(
+                        exchangeRate,
+                        4
+                      )}
                       onChange={() => {}}
                       readOnly
                       disabled
@@ -495,33 +726,67 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
                     iconName="RefreshCcw"
                     iconPosition="left"
                   >
-                    {loadingFx ? 'Actualizando…' : 'Actualizar tipo de cambio'}
+                    {loadingFx
+                      ? 'Actualizando…'
+                      : 'Actualizar tipo de cambio'}
                   </Button>
 
                   <div className="text-sm text-muted-foreground whitespace-nowrap">
                     Guardado en MXN:{' '}
-                    <span className="font-semibold">${formatWithCommas(b?.equipos, 2)}</span>
+                    <span className="font-semibold">
+                      ${formatWithCommas(b?.equipos, 2)}
+                    </span>
                   </div>
 
-                  {fxError && <div className="text-xs text-destructive">{fxError}</div>}
+                  {fxError && (
+                    <div className="text-xs text-destructive">
+                      {fxError}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
-            <Input label="Materiales (MXN)" type="text" inputMode="decimal" placeholder="0.00"
-              value={formatWithCommas(b?.materiales)} onChange={(e) => handleP('materiales', e?.target?.value)} />
+            <Input
+              label="Materiales (MXN)"
+              type="text"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={formatWithCommas(b?.materiales)}
+              onChange={(e) =>
+                handleP('materiales', e?.target?.value)
+              }
+            />
 
-            <Input label="Transporte (MXN)" type="text" inputMode="decimal" placeholder="0.00"
-              value={formatWithCommas(b?.transporte)} onChange={(e) => handleP('transporte', e?.target?.value)} />
+            <Input
+              label="Transporte (MXN)"
+              type="text"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={formatWithCommas(b?.transporte)}
+              onChange={(e) =>
+                handleP('transporte', e?.target?.value)
+              }
+            />
 
-            <Input label="Otros Gastos (MXN)" type="text" inputMode="decimal" placeholder="0.00"
-              value={formatWithCommas(b?.otros)} onChange={(e) => handleP('otros', e?.target?.value)} />
+            <Input
+              label="Otros Gastos (MXN)"
+              type="text"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={formatWithCommas(b?.otros)}
+              onChange={(e) =>
+                handleP('otros', e?.target?.value)
+              }
+            />
 
             {/* Total */}
             <div className="md:col-span-2">
               <div className="bg-muted p-4 rounded-lg">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-foreground">Total del Presupuesto (MXN):</span>
+                  <span className="text-sm font-medium text-foreground">
+                    Total del Presupuesto (MXN):
+                  </span>
                   <span className="text-lg font-semibold text-primary">
                     ${formatWithCommas(totalMXN, 2)} MXN
                   </span>
@@ -529,25 +794,54 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
               </div>
             </div>
 
-            {/* Cronograma (read-only) */}
+            {/* Cronograma (solo lectura) */}
             <div className="md:col-span-2 mt-6">
-              <h3 className="text-lg font-medium text-foreground mb-4">Cronograma</h3>
+              <h3 className="text-lg font-medium text-foreground mb-4">
+                Cronograma
+              </h3>
             </div>
 
-            <Input label="Fecha de Inicio (solo lectura)" type="date" value={asStr(formData?.cronograma?.fechaInicio, '')} onChange={() => {}} disabled />
-            <Input label="Fecha de Finalización (solo lectura)" type="date" value={asStr(formData?.cronograma?.fechaFin, '')} onChange={() => {}} disabled />
+            <Input
+              label="Fecha de Inicio (solo lectura)"
+              type="date"
+              value={asStr(
+                formData?.cronograma?.fechaInicio,
+                ''
+              )}
+              onChange={() => {}}
+              disabled
+            />
+            <Input
+              label="Fecha de Finalización (solo lectura)"
+              type="date"
+              value={asStr(
+                formData?.cronograma?.fechaFin,
+                ''
+              )}
+              onChange={() => {}}
+              disabled
+            />
 
             {/* Asignación de Personal */}
             <div className="md:col-span-2 mt-6">
-              <h3 className="text-lg font-medium text-foreground mb-4">Asignación de Personal</h3>
+              <h3 className="text-lg font-medium text-foreground mb-4">
+                Asignación de Personal
+              </h3>
             </div>
 
             <div className="md:col-span-2">
               <Select
                 label="Personal Asignado"
                 options={personnelOptions}
-                value={asArr(formData?.personalAsignado).map(String)}
-                onChange={(value) => handle('personalAsignado', asArr(value).map(String))}
+                value={asArr(
+                  formData?.personalAsignado
+                ).map(String)}
+                onChange={(value) =>
+                  handle(
+                    'personalAsignado',
+                    asArr(value).map(String)
+                  )
+                }
                 multiple
                 searchable
                 description="Seleccione el personal que trabajará en este proyecto"
@@ -557,9 +851,22 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
 
           {/* Acciones */}
           <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-border">
-            <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
-            <Button type="submit" loading={isSubmitting} iconName="Save" iconPosition="left">
-              {isSubmitting ? 'Guardando...' : 'Guardar Cambios'}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              loading={isSubmitting}
+              iconName="Save"
+              iconPosition="left"
+            >
+              {isSubmitting
+                ? 'Guardando...'
+                : 'Guardar Cambios'}
             </Button>
           </div>
         </form>

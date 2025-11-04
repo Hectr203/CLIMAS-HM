@@ -59,6 +59,7 @@ const InventoryManagement = () => {
     return articulos.map(articulo => ({
       id: articulo.id,
       itemCode: articulo.codigoArticulo,
+      name: articulo.nombre || '',
       description: articulo.descripcion,
       specifications: articulo.especificaciones || 'Sin especificaciones',
       category: articulo.categoria,

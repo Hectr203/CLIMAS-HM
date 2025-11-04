@@ -4,6 +4,7 @@ import { Search, X, ChevronUp, ChevronDown, Download } from 'lucide-react';
 /* =========================
    UI básicos (con mejoras)
 ========================= */
+
 const Button = ({
   children,
   variant = 'default',
@@ -31,7 +32,8 @@ const Button = ({
     'inline-flex items-center justify-center font-medium rounded-md transition-colors';
   const variantClasses = {
     default: 'bg-primary text-primary-foreground hover:bg-primary/90',
-    outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
+    outline:
+      'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
     ghost: 'hover:bg-accent hover:text-accent-foreground',
   };
   const sizeClasses = {
@@ -55,10 +57,21 @@ const Button = ({
   );
 };
 
-const Input = ({ label, type = 'text', placeholder, value, onChange, className = '' }) => {
+const Input = ({
+  label,
+  type = 'text',
+  placeholder,
+  value,
+  onChange,
+  className = '',
+}) => {
   return (
     <div className="w-full">
-      {label && <label className="block text-sm font-medium text-foreground mb-2">{label}</label>}
+      {label && (
+        <label className="block text-sm font-medium text-foreground mb-2">
+          {label}
+        </label>
+      )}
       <input
         type={type}
         placeholder={placeholder}
@@ -73,7 +86,11 @@ const Input = ({ label, type = 'text', placeholder, value, onChange, className =
 const Select = ({ label, options, value, onChange, className = '' }) => {
   return (
     <div className={className}>
-      {label && <label className="block text-sm font-medium text-foreground mb-2">{label}</label>}
+      {label && (
+        <label className="block text-sm font-medium text-foreground mb-2">
+          {label}
+        </label>
+      )}
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -90,13 +107,14 @@ const Select = ({ label, options, value, onChange, className = '' }) => {
 };
 
 /* =========================
-   ProjectFilters conectado
+   ProjectFilters principal
 ========================= */
+
 const ProjectFilters = ({
   onFiltersChange,
   totalProjects,
   filteredProjects,
-  onExport, // 👈 NUEVO: handler para exportar que viene del padre
+  onExport, // callback que viene del padre para exportar
 }) => {
   const [filters, setFilters] = useState({
     search: '',
@@ -117,7 +135,7 @@ const ProjectFilters = ({
     { value: '', label: 'Todos los Estados' },
     { value: 'planning', label: 'Planificación' },
     { value: 'in-progress', label: 'En Progreso' },
-    { value: 'on-hold', label: 'En Pausa' },
+    { value: 'on-hold', label: 'En Pausa' }, // <- importante
     { value: 'review', label: 'En Revisión' },
     { value: 'completed', label: 'Completado' },
     { value: 'cancelled', label: 'Cancelado' },
@@ -196,17 +214,27 @@ const ProjectFilters = ({
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-4">
-          <h3 className="text-lg font-semibold text-foreground">Filtros de Proyectos</h3>
+          <h3 className="text-lg font-semibold text-foreground">
+            Filtros de Proyectos
+          </h3>
           <div className="text-sm text-muted-foreground">
             Mostrando {filteredProjects} de {totalProjects} proyectos
           </div>
         </div>
+
         <div className="flex items-center space-x-2">
           {hasActiveFilters && (
-            <Button variant="outline" size="sm" onClick={clearAllFilters} iconName="X" iconPosition="left">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearAllFilters}
+              iconName="X"
+              iconPosition="left"
+            >
               Limpiar Filtros
             </Button>
           )}
+
           <Button
             variant="ghost"
             size="sm"
@@ -229,7 +257,10 @@ const ProjectFilters = ({
             onChange={(e) => handleFilterChange('search', e.target.value)}
             className="pl-10"
           />
-          <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
+          <Search
+            size={16}
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
+          />
         </div>
       </div>
 
@@ -242,6 +273,7 @@ const ProjectFilters = ({
           onChange={(value) => handleFilterChange('status', value)}
           className="w-full"
         />
+
         <Select
           label="Departamento"
           options={departmentOptions}
@@ -249,6 +281,7 @@ const ProjectFilters = ({
           onChange={(value) => handleFilterChange('department', value)}
           className="w-full"
         />
+
         <Select
           label="Fecha"
           options={dateRangeOptions}
@@ -256,6 +289,7 @@ const ProjectFilters = ({
           onChange={(value) => handleFilterChange('dateRange', value)}
           className="w-full"
         />
+
         <Select
           label="Tipo de Cliente"
           options={clientTypeOptions}
@@ -263,6 +297,7 @@ const ProjectFilters = ({
           onChange={(value) => handleFilterChange('clientType', value)}
           className="w-full"
         />
+
         <Select
           label="Prioridad"
           options={priorityOptions}
@@ -270,6 +305,7 @@ const ProjectFilters = ({
           onChange={(value) => handleFilterChange('priority', value)}
           className="w-full"
         />
+
         <div className="flex items-end">
           <Button
             variant="outline"
@@ -279,7 +315,11 @@ const ProjectFilters = ({
             className="w-full"
             onClick={handleExportClick}
             disabled={!filteredProjects}
-            title={filteredProjects ? 'Exportar proyectos filtrados' : 'No hay resultados para exportar'}
+            title={
+              filteredProjects
+                ? 'Exportar proyectos filtrados'
+                : 'No hay resultados para exportar'
+            }
           >
             Exportar
           </Button>
@@ -298,6 +338,7 @@ const ProjectFilters = ({
               onChange={(e) => handleFilterChange('minBudget', e.target.value)}
               className="w-full"
             />
+
             <Input
               label="Presupuesto Máximo"
               type="number"
@@ -306,6 +347,7 @@ const ProjectFilters = ({
               onChange={(e) => handleFilterChange('maxBudget', e.target.value)}
               className="w-full"
             />
+
             <Input
               label="Fecha de Inicio"
               type="date"
@@ -313,6 +355,7 @@ const ProjectFilters = ({
               onChange={(e) => handleFilterChange('startDate', e.target.value)}
               className="w-full"
             />
+
             <Input
               label="Fecha de Finalización"
               type="date"
@@ -328,22 +371,34 @@ const ProjectFilters = ({
       {hasActiveFilters && (
         <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border">
           <span className="text-sm text-muted-foreground">Filtros activos:</span>
+
           {Object.entries(filters).map(([key, value]) => {
             if (!value) return null;
 
             // etiquetas amigables
             let displayValue = value;
             if (key === 'status')
-              displayValue = statusOptions.find((opt) => opt.value === value)?.label || value;
+              displayValue =
+                statusOptions.find((opt) => opt.value === value)?.label ||
+                value;
             if (key === 'department')
-              displayValue = departmentOptions.find((opt) => opt.value === value)?.label || value;
+              displayValue =
+                departmentOptions.find((opt) => opt.value === value)?.label ||
+                value;
             if (key === 'dateRange')
-              displayValue = dateRangeOptions.find((opt) => opt.value === value)?.label || value;
+              displayValue =
+                dateRangeOptions.find((opt) => opt.value === value)?.label ||
+                value;
             if (key === 'clientType')
-              displayValue = clientTypeOptions.find((opt) => opt.value === value)?.label || value;
+              displayValue =
+                clientTypeOptions.find((opt) => opt.value === value)?.label ||
+                value;
             if (key === 'priority')
-              displayValue = priorityOptions.find((opt) => opt.value === value)?.label || value;
-            if (key === 'minBudget' || key === 'maxBudget') displayValue = `$${value}`;
+              displayValue =
+                priorityOptions.find((opt) => opt.value === value)?.label ||
+                value;
+            if (key === 'minBudget' || key === 'maxBudget')
+              displayValue = `$${value}`;
 
             return (
               <div
@@ -370,7 +425,9 @@ export default ProjectFilters;
 
 /* ==========================================
    Función de filtrado para el componente padre
+   (YA CON OPCIÓN A IMPLEMENTADA)
 ========================================== */
+
 export const applyProjectFilters = (projects, filters) => {
   let filtered = [...projects];
 
@@ -385,26 +442,55 @@ export const applyProjectFilters = (projects, filters) => {
     );
   }
 
-  // Status
+  // Status (incluye equivalentes cuando eliges "En Pausa")
   if (filters?.status) {
-    filtered = filtered.filter((project) => project?.status === filters.status);
+    filtered = filtered.filter((project) => {
+      const raw = (project?.status || '').toLowerCase().trim();
+      const target = filters.status.toLowerCase().trim();
+
+      // Coincidencia directa
+      if (raw === target) return true;
+
+      // Caso especial "En Pausa"
+      // target === 'on-hold'
+      // Queremos incluir estados equivalentes que el backend mete en "pausa"
+      if (target === 'on-hold') {
+        if (
+          raw.includes('pausa') ||     // "en pausa", "pausado", "pausada"
+          raw.includes('paus')  ||
+          raw.includes('hold')  ||     // "on-hold"
+          raw.includes('suspend') ||   // "suspendido", "suspendida"
+          raw.includes('detenid')      // "detenido", "detenida"
+        ) {
+          return true;
+        }
+      }
+
+      return false;
+    });
   }
 
   // Department
   if (filters?.department) {
     filtered = filtered.filter(
-      (project) => project?.department?.toLowerCase() === filters.department.toLowerCase()
+      (project) =>
+        project?.department?.toLowerCase() ===
+        filters.department.toLowerCase()
     );
   }
 
   // Client type
   if (filters?.clientType) {
-    filtered = filtered.filter((project) => project?.client?.type === filters.clientType);
+    filtered = filtered.filter(
+      (project) => project?.client?.type === filters.clientType
+    );
   }
 
   // Priority
   if (filters?.priority) {
-    filtered = filtered.filter((project) => project?.priority === filters.priority);
+    filtered = filtered.filter(
+      (project) => project?.priority === filters.priority
+    );
   }
 
   // Date range (sobre startDate)
@@ -419,40 +505,53 @@ export const applyProjectFilters = (projects, filters) => {
       switch (filters.dateRange) {
         case 'today':
           return startDate.toDateString() === today.toDateString();
+
         case 'week': {
           const weekAgo = new Date(today);
           weekAgo.setDate(weekAgo.getDate() - 7);
           return startDate >= weekAgo && startDate <= now;
         }
+
         case 'month':
           return (
             startDate.getMonth() === now.getMonth() &&
             startDate.getFullYear() === now.getFullYear()
           );
+
         case 'quarter': {
           const quarter = Math.floor(now.getMonth() / 3);
           const projectQuarter = Math.floor(startDate.getMonth() / 3);
-          return projectQuarter === quarter && startDate.getFullYear() === now.getFullYear();
+          return (
+            projectQuarter === quarter &&
+            startDate.getFullYear() === now.getFullYear()
+          );
         }
+
         case 'year':
           return startDate.getFullYear() === now.getFullYear();
+
         default:
           return true;
       }
     });
   }
 
-  // Budget
+  // Budget range
   if (filters?.minBudget) {
     const minBudget = Number(filters.minBudget);
-    filtered = filtered.filter((project) => Number(project?.budget) >= minBudget);
-  }
-  if (filters?.maxBudget) {
-    const maxBudget = Number(filters.maxBudget);
-    filtered = filtered.filter((project) => Number(project?.budget) <= maxBudget);
+    filtered = filtered.filter(
+      (project) => Number(project?.budget) >= minBudget
+    );
   }
 
-  // Start date exacta
+  if (filters?.maxBudget) {
+    const maxBudget = Number(filters.maxBudget);
+    filtered = filtered.filter(
+      (project) => Number(project?.budget) <= maxBudget
+    );
+  }
+
+  // Exact start date (>=)
   if (filters?.startDate) {
     const filterStartDate = new Date(filters.startDate);
     filtered = filtered.filter((project) => {
@@ -461,7 +560,7 @@ export const applyProjectFilters = (projects, filters) => {
     });
   }
 
-  // End date exacta
+  // Exact end date (<=)
   if (filters?.endDate) {
     const filterEndDate = new Date(filters.endDate);
     filtered = filtered.filter((project) => {
