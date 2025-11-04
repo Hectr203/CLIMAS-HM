@@ -223,20 +223,34 @@ const WorkOrderProcessing = () => {
 
   // Guardar requisición
   const handleSaveRequisition = async (savedRequisition) => {
-  let newReq = { ...savedRequisition };
+    let newReq = { ...savedRequisition };
+    try {
+      if (!newReq?.id) {
+        // Si es una nueva requisición, la creamos en el backend
+        const response = await createRequisition(newReq);
+        if (response) {
+          newReq = response;
+        }
+      } else {
+        // Si es una actualización, actualizamos en el backend
+        const response = await updateRequisition(newReq.id, newReq);
+        if (response) {
+          newReq = response;
+        }
+      }
 
-  if (!newReq?.id) {
-    newReq.id = Date.now();
-    newReq.requestNumber = `REQ-${new Date().getFullYear()}-${String(newReq.id).slice(-3)}`;
-  }
+      setLocalRequisitions(prev => [newReq, ...prev.filter(r => r.id !== newReq.id)]);
+      setLocalOrders(prev => [newReq, ...prev.filter(r => r.id !== newReq.id)]);
 
-  setLocalRequisitions(prev => [newReq, ...prev]);
-  setLocalOrders(prev => [newReq, ...prev]); // sto hará que se muestre también en WorkOrderTable
-
-  getRequisitions(); // sincroniza backend
-  setIsRequisitionModalOpen(false);
-  setSelectedRequisition(null);
-};
+      // Forzar actualización de requisiciones
+      await getRequisitions();
+      
+      setIsRequisitionModalOpen(false);
+      setSelectedRequisition(null);
+    } catch (error) {
+      console.error("Error al guardar la requisición:", error);
+    }
+  };
 
   const handleExportData = () => {
   if (!filteredOrders || filteredOrders.length === 0) {

@@ -2,7 +2,7 @@ import React from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 const OrderDetailsModal = ({ isOpen, onClose, order }) => {
   if (!isOpen || !order) return null;
@@ -45,7 +45,7 @@ const OrderDetailsModal = ({ isOpen, onClose, order }) => {
       subtotal: formatCurrency(item.subtotal)
     }));
 
-    doc.autoTable({
+    autoTable(doc, {
       head: [tableColumns.map(col => col.header)],
       body: tableRows.map(row => tableColumns.map(col => row[col.dataKey])),
       startY: 90,
@@ -54,7 +54,7 @@ const OrderDetailsModal = ({ isOpen, onClose, order }) => {
     });
 
     // Total
-    const finalY = doc.lastAutoTable.finalY || 90;
+    const finalY = doc.previousAutoTable ? doc.previousAutoTable.finalY : 90;
     doc.text(`Total: ${formatCurrency(order.totalOrden)}`, 195, finalY + 10, { align: 'right' });
 
     // Notas si existen
