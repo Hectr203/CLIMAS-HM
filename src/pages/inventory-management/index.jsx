@@ -376,15 +376,37 @@ ${order.notas || 'Sin notas adicionales'}
   const handleExport = async () => {
     try {
       // Create CSV content
-      const csvHeaders = ['Código', 'Descripción', 'Categoría', 'Stock Actual', 'Punto de Reorden', 'Ubicación', 'Proveedor'];
+      const csvHeaders = [
+        'Código',
+        'Nombre',
+        'Descripción',
+        'Categoría',
+        'Stock Actual',
+        'Stock Reservado',
+        'Punto de Reorden',
+        'Unidad',
+        'Ubicación',
+        'Proveedor',
+        'Contacto Proveedor',
+        'Costo Unitario',
+        'Valor Total',
+        'Última Actualización'
+      ];
       const csvRows = inventoryItems?.map(item => [
         item?.itemCode,
+        item?.name,
         item?.description,
         item?.category,
         item?.currentStock,
+        item?.reservedStock || 0,
         item?.reorderPoint,
+        item?.unit,
         item?.location,
-        item?.supplier?.name
+        item?.supplier?.name,
+        item?.supplier?.contact,
+        item?.unitCost,
+        (item?.currentStock * item?.unitCost),
+        new Date(item?.lastUpdated).toLocaleDateString('es-MX')
       ]);
 
       const csvContent = [
@@ -566,7 +588,65 @@ ${order.notas || 'Sin notas adicionales'}
 
           {/* Content based on active view */}
           {activeView === 'overview' && (
-            <InventoryStats stats={inventoryStats} />
+            <InventoryStats 
+              stats={inventoryStats}
+              items={filteredItems}
+              onAddItem={() => setShowNewItemModal(true)}
+              onUpdateStock={() => {
+                const firstItem = filteredItems?.[0];
+                if (firstItem) {
+                  handleUpdateStock(firstItem);
+                }
+              }}
+              onGenerateReport={() => {
+                // Crear el contenido del CSV
+                const headers = [
+                  'Código',
+                  'Nombre',
+                  'Descripción',
+                  'Categoría',
+                  'Stock Actual',
+                  'Stock Reservado',
+                  'Punto de Reorden',
+                  'Unidad',
+                  'Proveedor',
+                  'Ubicación',
+                  'Costo Unitario',
+                  'Valor Total',
+                  'Última Actualización'
+                ];
+
+                const csvRows = [
+                  headers.join(','), // Encabezados
+                  ...filteredItems.map(item => [
+                    `"${item.itemCode || ''}"`,
+                    `"${(item.name || '').replace(/"/g, '""')}"`,
+                    `"${(item.description || '').replace(/"/g, '""')}"`,
+                    `"${item.category || ''}"`,
+                    item.currentStock || 0,
+                    item.reservedStock || 0,
+                    item.reorderPoint || 0,
+                    `"${item.unit || ''}"`,
+                    `"${(item.supplier?.name || '').replace(/"/g, '""')}"`,
+                    `"${(item.location || '').replace(/"/g, '""')}"`,
+                    item.unitCost || 0,
+                    (item.currentStock || 0) * (item.unitCost || 0),
+                    `"${item.lastUpdated ? new Date(item.lastUpdated).toLocaleString() : ''}"`,
+                  ].join(','))
+                ].join('\n');
+
+                // Crear el blob y descargar
+                const blob = new Blob(['\ufeff' + csvRows], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                
+                link.setAttribute('href', url);
+                link.setAttribute('download', `inventario_${new Date().toISOString().split('T')[0]}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
+            />
           )}
 
           {activeView === 'inventory' && (
@@ -585,6 +665,10 @@ ${order.notas || 'Sin notas adicionales'}
                 onViewDetails={handleViewDetails}
                 onUpdateStock={handleUpdateStock}
                 onCreatePO={handleCreatePO}
+                onAddItem={() => {
+                  setShowNewItemModal(true);
+                }}
+                onGenerateReport={handleExport}
               />
             </div>
           )}
