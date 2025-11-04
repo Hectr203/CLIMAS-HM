@@ -117,7 +117,7 @@ const InventoryPanel = ({
     priority: req.prioridad || "Media",
     description: req.descripcionSolicitud || "",
 
-    // ✅ materiales de inventario
+    //  materiales de inventario
     items: req.materiales?.map((m) => ({
       id: Date.now() + Math.random(),
       idArticulo: m.id || m.idArticulo || "", // mantiene referencia al inventario
@@ -130,7 +130,7 @@ const InventoryPanel = ({
       type: "inventario",
     })) || [],
 
-    // ✅ materiales manuales
+    //  materiales manuales
     manualItems: req.materialesManuales?.map((m) => ({
       id: Date.now() + Math.random(),
       name: m.nombreMaterial || m.nombre || "",

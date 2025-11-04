@@ -51,7 +51,7 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
         requestNumber: requisition?.requestNumber || "",
         orderNumber: requisition?.orderNumber || "",
         projectName: requisition?.projectName || "",
-        requestedBy: requisition?.requestedBy || "",
+        requestedBy: requisition?.requestedBy === "Usuario Actual" ? "" : requisition?.requestedBy || "",
         requestDate:
           requisition?.requestDate || new Date().toISOString().split("T")[0],
         status: requisition?.status || "Pendiente",
@@ -68,7 +68,7 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
         requestNumber: `REQ-${Date.now()}`,
         orderNumber: "",
         projectName: "",
-        requestedBy: "Usuario Actual",
+        requestedBy: "",
         requestDate: currentDate,
         status: "Pendiente",
         priority: "Media",
@@ -184,13 +184,13 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
 
   const handleSave = async () => {
   try {
-    // ✅ Formatear fecha a dd/MM/yyyy
+    // Formatear fecha a dd/MM/yyyy
     const fecha = new Date(formData.requestDate);
     const formattedDate = `${fecha.getDate().toString().padStart(2, "0")}/${(fecha.getMonth() + 1)
       .toString()
       .padStart(2, "0")}/${fecha.getFullYear()}`;
 
-    // ✅ Construir materiales de inventario
+    // Construir materiales de inventario
     const materiales = formData.items.map((item) => ({
       id: item.idArticulo || undefined, // para que el backend lo identifique como referencia
       codigoArticulo: item.codigoArticulo || "",
@@ -202,7 +202,7 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
       descripcionEspecificaciones: item.description || "",
     }));
 
-    // ✅ Construir materiales manuales
+    // Construir materiales manuales
     const materialesManuales = formData.manualItems.map((item) => ({
       nombreMaterial: item.name || "",
       cantidad: Number(item.quantity) || 0,
@@ -212,7 +212,7 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
       descripcionEspecificaciones: item.description || "",
     }));
 
-    // ✅ Payload final
+    // Payload final
     const payload = {
       numeroOrdenTrabajo: formData.orderNumber,
       nombreProyecto: formData.projectName,
@@ -228,7 +228,7 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
       proyectoNombre: formData.projectName,
     };
 
-    // ✅ Enviar
+    // Enviar
     let response;
     if (requisition?.id) {
       response = await updateRequisition(requisition.id, payload);
@@ -241,7 +241,7 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
       onClose();
     }
   } catch (error) {
-    console.error("❌ Error al guardar la requisición:", error);
+    console.error(" Error al guardar la requisición:", error);
   }
 };
 
@@ -297,19 +297,21 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
 
 
             <Input
-              label="Nombre del Proyecto"
-              placeholder="Nombre del proyecto"
-              value={formData?.projectName}
-              onChange={(e) => handleInputChange("projectName", e?.target?.value)}
-              required
-            />
+  label="Nombre del Proyecto"
+  placeholder="Nombre del proyecto"
+  value={formData?.projectName}
+  readOnly
+  className="bg-gray-100 cursor-not-allowed"
+  required
+/>
 
             <Input
-              label="Solicitado por"
-              value={formData?.requestedBy}
-              onChange={(e) => handleInputChange("requestedBy", e?.target?.value)}
-              required
-            />
+  label="Solicitado por"
+  placeholder="Usuario Actual"
+  value={formData?.requestedBy}
+  onChange={(e) => handleInputChange("requestedBy", e?.target?.value)}
+  required
+/>
 
             <Input
               label="Fecha de Solicitud"
@@ -376,12 +378,15 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
 
               <div className="grid grid-cols-2 gap-2">
                 <Input
-                  label="Cantidad"
-                  type="number"
-                  placeholder="1"
-                  value={newItem?.quantity}
-                  onChange={(e) => handleNewItemChange("quantity", e?.target?.value)}
-                />
+  label="Cantidad"
+  type="number"
+  placeholder="1"
+  value={newItem?.quantity}
+  onChange={(e) => {
+    const value = Number(e?.target?.value);
+    if (value > 0) handleNewItemChange("quantity", value);
+  }}
+/>
                 <Select
                   label="Unidad"
                   options={unitOptions}
@@ -437,14 +442,15 @@ const RequisitionModal = ({ isOpen, onClose, requisition, onSave }) => {
 
               <div className="grid grid-cols-2 gap-2">
                 <Input
-                  label="Cantidad"
-                  type="number"
-                  placeholder="1"
-                  value={newManualItem?.quantity}
-                  onChange={(e) =>
-                    handleNewManualItemChange("quantity", e?.target?.value)
-                  }
-                />
+  label="Cantidad"
+  type="number"
+  placeholder="1"
+  value={newManualItem?.quantity}
+  onChange={(e) => {
+    const value = Number(e?.target?.value);
+    if (value > 0) handleNewManualItemChange("quantity", value);
+  }}
+/>
                 <Select
                   label="Unidad"
                   options={unitOptions}
