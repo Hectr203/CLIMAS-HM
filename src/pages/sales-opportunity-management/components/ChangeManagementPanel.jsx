@@ -193,7 +193,7 @@ import React, { useState } from 'react';
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => console.log('Request formal approval')}
+                  // console.log eliminado
                   iconName="CheckCircle"
                   iconPosition="left"
                   size="sm"

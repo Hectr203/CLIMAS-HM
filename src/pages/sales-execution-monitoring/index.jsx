@@ -776,7 +776,7 @@ const SalesExecutionMonitoring = () => {
                     {activePanel === 'traceability' && (
                       <TraceabilityPanel
                         project={selectedProject}
-                        onUpdate={(traceabilityData) => console.log('Traceability updated:', traceabilityData)}
+                        // console.log eliminado
                       />
                     )}
 

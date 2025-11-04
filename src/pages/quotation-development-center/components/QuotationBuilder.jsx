@@ -37,8 +37,9 @@ const QuotationBuilder = ({ cotizacion, onUpdate, onAddRevision }) => {
               setError('');
               try {
                 const existing = await getConstructorByCotizacionId(cotizacion.id);
-                console.log('Guardado', cotizacion.id, ':', existing);
+                // Solo mostramos en consola si existe
                 if (existing) {
+                  // console.log eliminado
                   setFormData({
                     scope: existing.alcance || '',
                     assumptions: existing.supuestos || [],
@@ -139,7 +140,7 @@ const QuotationBuilder = ({ cotizacion, onUpdate, onAddRevision }) => {
             };
             try {
               const res = await crearConstructor(payload);
-              console.log('Constructor guardado:', res);
+              // console.log eliminado
               alert('Constructor guardado exitosamente');
             } catch (err) {
               alert('Error al guardar el constructor');
@@ -341,7 +342,7 @@ const QuotationBuilder = ({ cotizacion, onUpdate, onAddRevision }) => {
                     Crear Revisión
                   </Button>
                   <Button
-                    onClick={() => console.log('Submit for internal review')}
+                    // console.log eliminado
                     iconName="Users"
                     iconPosition="left"
                   >

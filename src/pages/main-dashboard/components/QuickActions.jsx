@@ -67,18 +67,18 @@ const QuickActions = () => {
 
   const handleRefreshData = async () => {
     try {
-      console.log('Actualizando datos...');
+  // console.log eliminado
       // Simulate refresh action
       await new Promise(resolve => setTimeout(resolve, 1000));
       // In a real app, you would refetch data here
-      console.log('Datos actualizados exitosamente');
+  // console.log eliminado
     } catch (error) {
       console.error('Error al actualizar datos:', error);
     }
   };
 
   const handleMoreOptions = () => {
-    console.log('Mostrando más opciones...');
+  // console.log eliminado
     // Add dropdown menu or modal with additional options
   };
 

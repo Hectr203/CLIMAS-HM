@@ -164,9 +164,7 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
 
   // Mostrar en consola cómo se obtienen los estados y municipios
   React.useEffect(() => {
-    console.log('Estados:', estados);
-    console.log('Municipios:', municipios);
-    console.log('Estado seleccionado:', formData.estado);
+  // console.log eliminado
   }, [estados, municipios, formData.estado]);
   // Opciones para el select de proyectos (con clientId)
   const projectOptions = proyectos?.map(p => ({
@@ -427,7 +425,7 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
         },
         oportunidadVentaId: formData?.oportunidadVentaId || opportunityId || ''
       };
-      console.log('Objeto enviado al backend:', quotationPayload);
+  // console.log eliminado
       const response = await createQuotation(quotationPayload);
       const wasCreated = response?.success || response?.id || response?.data?.id;
       if (wasCreated) {
