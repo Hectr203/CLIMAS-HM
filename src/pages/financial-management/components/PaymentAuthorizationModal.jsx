@@ -51,10 +51,14 @@ const PaymentAuthorizationModal = ({ isOpen, onClose, expense, onAuthorize, onDe
 
     try {
       await onAuthorize?.({
-        expenseId: expense?.id,
-        ...authData
-      });
-      onClose?.();
+  id: expense?.id,
+  status: "approved", // <--- usamos inglés, como tu API
+  ...authData,
+  amount: parseFloat(expense?.amount?.replace(/[^0-9.-]+/g, "")) || 0
+});
+
+
+onClose?.();
     } catch (error) {
       console.error('Error authorizing payment:', error);
     } finally {
@@ -144,33 +148,6 @@ const PaymentAuthorizationModal = ({ isOpen, onClose, expense, onAuthorize, onDe
               </div>
             </div>
           </div>
-
-          {/* Authorization Level */}
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Icon name="Shield" size={16} className="text-primary" />
-              <h3 className="font-medium text-foreground">Nivel de Autorización</h3>
-            </div>
-            
-            <div className="bg-warning/10 border border-warning/20 rounded-lg p-3">
-              <div className="flex items-center space-x-2">
-                <Icon name="AlertTriangle" size={16} className="text-warning" />
-                <span className="text-sm text-warning">
-                  Nivel mínimo requerido: {authorizationLevels?.find(l => l?.value === getRequiredAuthLevel(expense?.amount || '0'))?.label}
-                </span>
-              </div>
-            </div>
-
-            <Select
-              label="Nivel de Autorización"
-              description="Seleccione el nivel de autorización apropiado"
-              options={authorizationLevels}
-              value={authData?.authorizationLevel}
-              onChange={(value) => handleInputChange('authorizationLevel', value)}
-              required
-            />
-          </div>
-
           {/* Payment Details */}
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
