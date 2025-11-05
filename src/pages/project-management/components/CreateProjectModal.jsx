@@ -7,6 +7,9 @@ import proyectoService from 'services/proyectoService';
 import clientService from 'services/clientService';
 import usePerson from 'hooks/usePerson';
 
+// ⬇️ Ajusta esta ruta según tu proyecto
+import { useErrorHandler, useNotifications } from 'context/NotificationContext';
+
 /* === Catálogos === */
 const projectTypes = [
   { value: 'Instalación', label: 'Instalación' },
@@ -48,13 +51,6 @@ const mapPriorityToEs = (v) => {
   return m[(v || '').toString().toLowerCase()] || v || '';
 };
 
-// /** Tu backend de CREAR solo acepta: "activo" | "en proceso" */
-// const mapStatusForCreate = (uiStatus) => {
-//   const s = (uiStatus || '').toLowerCase();
-//   if (s === 'en progreso') return 'en proceso';
-//   return 'activo';
-// };
-
 /* ===================== Helpers ===================== */
 const formatWithCommas = (v, decimals = 2) => {
   if (v === '' || v == null) return '';
@@ -78,6 +74,10 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
   const { persons, getPersons } = usePerson();
+
+  // Notificaciones
+  const { handleError, handleSuccess } = useErrorHandler();
+  const { showWarning, showError } = useNotifications();
 
   // Estado del formulario
   const [formData, setFormData] = useState({
@@ -106,13 +106,9 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
   // === Moneda / FX ===
   const [isEquipmentInUSD, setIsEquipmentInUSD] = useState(false);
   const [exchangeRate, setExchangeRate] = useState(18); // MXN por USD
-  const [uiEquipmentUSD, setUiEquipmentUSD] = useState(''); // 👈 ahora SOLO display (read-only)
+  const [uiEquipmentUSD, setUiEquipmentUSD] = useState(''); // SOLO display (read-only)
   const [loadingFx, setLoadingFx] = useState(false);
   const [fxError, setFxError] = useState(null);
-
-  // refs anti-bucle
-  const isUSDRef = useRef(isEquipmentInUSD);
-  useEffect(() => { isUSDRef.current = isEquipmentInUSD; }, [isEquipmentInUSD]);
 
   // === Clientes ===
   const [clientOptions, setClientOptions] = useState([]);
@@ -130,30 +126,37 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
         const opts = list.map((c) => ({ value: c.id, label: c.empresa || c.contacto || '—' }));
         if (mounted) setClientOptions(opts);
       } catch (e) {
-        console.error('Error cargando clientes:', e);
+        handleError(e, 'Error cargando clientes');
       } finally {
         if (mounted) setLoadingClients(false);
       }
     })();
     return () => { mounted = false; };
-  }, [isOpen]);
+  }, [isOpen, handleError]);
 
-  // Personas (una vez por apertura, sin depender de getPersons)
+  // Personas (una vez por apertura). ⚠️ No reseteamos la bandera en cleanup para evitar bucle.
   const fetchedPersonsRef = useRef(false);
   useEffect(() => {
     if (!isOpen) return;
     if (fetchedPersonsRef.current) return;
     fetchedPersonsRef.current = true;
-    const abort = new AbortController();
+
+    const controller = new AbortController();
     (async () => {
       try {
-        await getPersons({ signal: abort.signal });
+        await getPersons({ signal: controller.signal });
       } catch (e) {
-        if (e?.name !== 'AbortError') console.error('Error cargando empleados:', e);
+        if (e?.name !== 'AbortError') handleError(e, 'Error cargando empleados');
       }
     })();
-    return () => { abort.abort(); fetchedPersonsRef.current = false; };
-  }, [isOpen]); // intencionalmente sin getPersons
+
+    return () => {
+      controller.abort();
+      // ❌ NO: fetchedPersonsRef.current = false;
+    };
+    // Intencionalmente no metemos getPersons a deps para no dispararlo por cambios de referencia
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, handleError]);
 
   // Opciones de personal
   const personnelOptionsFinal = useMemo(() => {
@@ -178,13 +181,6 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
     if (errors[key]) setErrors((e) => ({ ...e, [key]: undefined }));
   };
 
-  const setEquipmentMXN = (mxnValue) => {
-    setFormData((s) => ({
-      ...s,
-      budgetBreakdown: { ...s.budgetBreakdown, equipment: Number(mxnValue) || 0 },
-    }));
-  };
-
   /** 🔁 Cuando está en USD, el USD mostrado se calcula SIEMPRE desde MXN/rate */
   useEffect(() => {
     if (!isEquipmentInUSD) return;
@@ -196,7 +192,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
 
   const handleBudgetChange = (key, rawValue) => {
     const cleanedNumber = unformatNumber(rawValue);
-    // ✅ si está en USD, NO permitimos editar; solo mostramos USD calculado.
+    // Si está en USD, NO permitimos editar equipment (solo display)
     if (key === 'equipment' && isEquipmentInUSD) return;
     setFormData((s) => ({
       ...s,
@@ -204,29 +200,35 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
     }));
   };
 
-  // === FX: traer USD→MXN estable
+  // === FX: usar el método existente getCurrencyRates
   const fetchUsdMxnRate = useCallback(async () => {
     try {
       setFxError(null);
       setLoadingFx(true);
-      const map = await proyectoService.getCurrencyRatesMap({ base: 'USD', currencies: ['MXN'] });
-      const rate = Number(map?.MXN || 0);
+
+      // Esperado: { data: { MXN: { code:'MXN', value: 18.2 } } }
+      const resp = await proyectoService.getCurrencyRates({ base: 'USD', currencies: ['MXN'] });
+      const mxnInfo = resp?.data?.MXN || resp?.MXN; // tolerante si devuelven directo
+      const rate = Number(mxnInfo?.value ?? mxnInfo ?? 0);
+
       if (rate > 0) {
         setExchangeRate(rate);
-        // USD de display se recalcula en el useEffect de arriba
         return rate;
       } else {
-        setFxError('No llegó una tasa válida.');
+        const msg = 'No llegó una tasa válida.';
+        setFxError(msg);
+        showError(msg);
         return null;
       }
     } catch (e) {
-      setFxError(e?.message || 'Error llamando currencyapi');
-      console.error('currencyapi error:', e);
+      const msg = e?.message || 'Error llamando currencyapi';
+      setFxError(msg);
+      handleError(e, 'Tipo de cambio');
       return null;
     } finally {
       setLoadingFx(false);
     }
-  }, []);
+  }, [handleError, showError]);
 
   // Pre-cargar tasa al abrir
   useEffect(() => {
@@ -237,14 +239,11 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
   const toggleEquipmentUSD = async (checked) => {
     setIsEquipmentInUSD(checked);
     if (checked) {
-      await fetchUsdMxnRate(); // tras traer tasa, el useEffect calculará el USD mostrado
+      await fetchUsdMxnRate(); // el useEffect recalcula el USD mostrado
     } else {
       setUiEquipmentUSD('');
     }
   };
-
-  // En modo USD, el rate también es solo lectura (no editable)
-  const handleExchangeRateChange = () => {};
 
   const validate = () => {
     const e = {};
@@ -264,7 +263,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
     setErrors(e);
     return Object.keys(e).length === 0;
   };
- 
+
   const buildPayloadForBackend = () => {
     const b = formData.budgetBreakdown || {};
     const equipoDolares = isEquipmentInUSD
@@ -298,22 +297,30 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
 
   const handleSubmit = async (e) => {
     e?.preventDefault();
-    if (!validate()) return;
+    if (!validate()) {
+      showWarning('Revisa los campos requeridos del formulario.');
+      return;
+    }
     setIsSubmitting(true);
     try {
       const payload = buildPayloadForBackend();
       await proyectoService.createProyecto(payload);
+
+      // ✅ Notificación de éxito
+      handleSuccess('create', 'Proyecto');
+
       onSubmit && onSubmit(payload);
       onClose && onClose();
     } catch (err) {
       console.error('Error creando proyecto:', err);
-      alert(err?.data?.message || err?.userMessage || err?.message || 'Error al crear el proyecto.');
+      handleError(err, 'Error creando proyecto');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   if (!isOpen) return null;
+
   const b = formData.budgetBreakdown || {};
   const totalMXN =
     (Number(b?.labor) || 0) +
@@ -345,44 +352,105 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
               <h3 className="text-lg font-medium text-foreground mb-4">Información Básica</h3>
             </div>
 
-            <Input label="Nombre del Proyecto" type="text" placeholder="Ej: Instalación HVAC Edificio Central"
-              value={formData?.name} onChange={(e) => handleInputChange('name', e?.target?.value)}
-              error={errors?.name} required />
+            <Input
+              label="Nombre del Proyecto"
+              type="text"
+              placeholder="Ej: Instalación HVAC Edificio Central"
+              value={formData?.name}
+              onChange={(e) => handleInputChange('name', e?.target?.value)}
+              error={errors?.name}
+              required
+            />
 
-            <Input label="Código del Proyecto" type="text" placeholder="Ej: PROJ-2025-001"
-              value={formData?.code} onChange={(e) => handleInputChange('code', e?.target?.value)}
-              error={errors?.code} description="Se generará automáticamente si se deja vacío" />
+            <Input
+              label="Código del Proyecto"
+              type="text"
+              placeholder="Ej: PROJ-2025-001"
+              value={formData?.code}
+              onChange={(e) => handleInputChange('code', e?.target?.value)}
+              error={errors?.code}
+              description="Se generará automáticamente si se deja vacío"
+            />
 
-            <Select label="Tipo de Proyecto" options={projectTypes} value={formData?.type}
-              onChange={(value) => handleInputChange('type', value)} error={errors?.type} required />
+            <Select
+              label="Tipo de Proyecto"
+              options={projectTypes}
+              value={formData?.type}
+              onChange={(value) => handleInputChange('type', value)}
+              error={errors?.type}
+              required
+            />
 
-            <Select label="Cliente" options={clientOptions} value={formData?.client}
-              onChange={(value) => handleInputChange('client', value)} error={errors?.client}
-              searchable required loading={loadingClients} />
+            <Select
+              label="Cliente"
+              options={clientOptions}
+              value={formData?.client}
+              onChange={(value) => handleInputChange('client', value)}
+              error={errors?.client}
+              searchable
+              required
+              loading={loadingClients}
+            />
 
-            <Select label="Departamento Responsable" options={departmentOptions} value={formData?.department}
-              onChange={(value) => handleInputChange('department', value)} error={errors?.department} required />
+            <Select
+              label="Departamento Responsable"
+              options={departmentOptions}
+              value={formData?.department}
+              onChange={(value) => handleInputChange('department', value)}
+              error={errors?.department}
+              required
+            />
 
-            <Select label="Prioridad" options={priorityOptions} value={formData?.priority}
-              onChange={(value) => handleInputChange('priority', value)} error={errors?.priority} required />
+            <Select
+              label="Prioridad"
+              options={priorityOptions}
+              value={formData?.priority}
+              onChange={(value) => handleInputChange('priority', value)}
+              error={errors?.priority}
+              required
+            />
 
-            <Select label="Estado del Proyecto" options={projectStatusOptions} value={formData?.status}
-              onChange={(value) => handleInputChange('status', value)} error={errors?.status} required />
+            <Select
+              label="Estado del Proyecto"
+              options={projectStatusOptions}
+              value={formData?.status}
+              onChange={(value) => handleInputChange('status', value)}
+              error={errors?.status}
+              required
+            />
 
-            <Input label="Ubicación" type="text" placeholder="Ej: Ciudad de México, CDMX"
-              value={formData?.location} onChange={(e) => handleInputChange('location', e?.target?.value)}
-              error={errors?.location} required />
+            <Input
+              label="Ubicación"
+              type="text"
+              placeholder="Ej: Ciudad de México, CDMX"
+              value={formData?.location}
+              onChange={(e) => handleInputChange('location', e?.target?.value)}
+              error={errors?.location}
+              required
+            />
 
             {/* Presupuesto */}
             <div className="md:col-span-2 mt-6">
               <h3 className="text-lg font-medium text-foreground mb-4">Desglose de Presupuesto</h3>
             </div>
 
-            <Input label="Mano de Obra (MXN)" type="text" inputMode="decimal" placeholder="0.00"
-              value={formatWithCommas(b?.labor)} onChange={(e) => handleBudgetChange('labor', e?.target?.value)} />
+            <Input
+              label="Mano de Obra (MXN)"
+              type="text"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={formatWithCommas(b?.labor)}
+              onChange={(e) => handleBudgetChange('labor', e?.target?.value)}
+            />
 
-            <Input label="Piezas (MXN)" type="text" inputMode="decimal" placeholder="0.00"
-              value={formatWithCommas(b?.parts)} onChange={(e) => handleBudgetChange('parts', e?.target?.value)} />
+            <Input
+              label="Piezas (MXN)"
+              type="text"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={formatWithCommas(b?.parts)}
+              onChange={(e) => handleBudgetChange('parts', e?.target?.value)}
+            />
 
             {/* Equipos con USD */}
             <div className="flex flex-col gap-2">
@@ -391,9 +459,12 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
                   {isEquipmentInUSD ? 'Equipos (USD se convierte a MXN)' : 'Equipos (MXN)'}
                 </label>
                 <label className="inline-flex items-center gap-2 text-sm text-foreground cursor-pointer select-none">
-                  <input type="checkbox" checked={isEquipmentInUSD}
+                  <input
+                    type="checkbox"
+                    checked={isEquipmentInUSD}
                     onChange={(e) => toggleEquipmentUSD(e.target.checked)}
-                    className="h-4 w-4 accent-primary cursor-pointer" />
+                    className="h-4 w-4 accent-primary cursor-pointer"
+                  />
                   Precio en dólares
                 </label>
               </div>
@@ -405,8 +476,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
                 placeholder={isEquipmentInUSD ? '0.00 USD' : '0.00 MXN'}
                 value={isEquipmentInUSD ? uiEquipmentUSD : formatWithCommas(b?.equipment)}
                 onChange={(e) => handleBudgetChange('equipment', e?.target?.value)}
-                readOnly={isEquipmentInUSD} // 👈 read-only en USD
-                disabled={false}
+                readOnly={isEquipmentInUSD}
                 className={`w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent ${isEquipmentInUSD ? 'bg-muted cursor-not-allowed' : ''}`}
               />
 
@@ -418,7 +488,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
                       type="text"
                       inputMode="decimal"
                       value={formatWithCommas(exchangeRate, 4)}
-                      onChange={handleExchangeRateChange}
+                      onChange={() => {}}
                       readOnly
                       disabled
                     />
@@ -447,14 +517,32 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
               )}
             </div>
 
-            <Input label="Materiales (MXN)" type="text" inputMode="decimal" placeholder="0.00"
-              value={formatWithCommas(b?.materials)} onChange={(e) => handleBudgetChange('materials', e?.target?.value)} />
+            <Input
+              label="Materiales (MXN)"
+              type="text"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={formatWithCommas(b?.materials)}
+              onChange={(e) => handleBudgetChange('materials', e?.target?.value)}
+            />
 
-            <Input label="Transporte (MXN)" type="text" inputMode="decimal" placeholder="0.00"
-              value={formatWithCommas(b?.transportation)} onChange={(e) => handleBudgetChange('transportation', e?.target?.value)} />
+            <Input
+              label="Transporte (MXN)"
+              type="text"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={formatWithCommas(b?.transportation)}
+              onChange={(e) => handleBudgetChange('transportation', e?.target?.value)}
+            />
 
-            <Input label="Otros Gastos (MXN)" type="text" inputMode="decimal" placeholder="0.00"
-              value={formatWithCommas(b?.other)} onChange={(e) => handleBudgetChange('other', e?.target?.value)} />
+            <Input
+              label="Otros Gastos (MXN)"
+              type="text"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={formatWithCommas(b?.other)}
+              onChange={(e) => handleBudgetChange('other', e?.target?.value)}
+            />
 
             {/* Total */}
             <div className="md:col-span-2">
@@ -473,11 +561,23 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
               <h3 className="text-lg font-medium text-foreground mb-4">Cronograma</h3>
             </div>
 
-            <Input label="Fecha de Inicio" type="date" value={formData?.startDate}
-              onChange={(e) => handleInputChange('startDate', e?.target?.value)} error={errors?.startDate} required />
+            <Input
+              label="Fecha de Inicio"
+              type="date"
+              value={formData?.startDate}
+              onChange={(e) => handleInputChange('startDate', e?.target?.value)}
+              error={errors?.startDate}
+              required
+            />
 
-            <Input label="Fecha de Finalización" type="date" value={formData?.endDate}
-              onChange={(e) => handleInputChange('endDate', e?.target?.value)} error={errors?.endDate} required />
+            <Input
+              label="Fecha de Finalización"
+              type="date"
+              value={formData?.endDate}
+              onChange={(e) => handleInputChange('endDate', e?.target?.value)}
+              error={errors?.endDate}
+              required
+            />
 
             {/* Personal */}
             <div className="md:col-span-2 mt-6">
