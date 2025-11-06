@@ -11,24 +11,15 @@ import DepartmentWorkload from './components/DepartmentWorkload';
 
 const MainDashboard = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
-    }, 60000); // Update every minute
-
+    }, 60000); // Actualiza cada minuto
     return () => clearInterval(timer);
   }, []);
-
-  const handleSidebarToggle = () => {
-    setSidebarCollapsed(!sidebarCollapsed);
-  };
-
-  const handleMobileMenuToggle = () => {
-    setMobileMenuOpen(!mobileMenuOpen);
-  };
 
   const kpiData = [
     {
@@ -37,7 +28,7 @@ const MainDashboard = () => {
       change: '+3',
       changeType: 'positive',
       icon: 'FolderOpen',
-      color: 'primary'
+      color: 'primary',
     },
     {
       title: 'Aprobaciones Pendientes',
@@ -45,7 +36,7 @@ const MainDashboard = () => {
       change: '+2',
       changeType: 'negative',
       icon: 'AlertCircle',
-      color: 'warning'
+      color: 'warning',
     },
     {
       title: 'Margen Mensual',
@@ -53,7 +44,7 @@ const MainDashboard = () => {
       change: '+2.3%',
       changeType: 'positive',
       icon: 'TrendingUp',
-      color: 'success'
+      color: 'success',
     },
     {
       title: 'Eficiencia Operativa',
@@ -61,61 +52,65 @@ const MainDashboard = () => {
       change: '+5%',
       changeType: 'positive',
       icon: 'Target',
-      color: 'primary'
-    }
+      color: 'primary',
+    },
   ];
 
-  const formatTime = (date) => {
-    return date?.toLocaleTimeString('es-MX', {
+  const formatTime = (date) =>
+    date?.toLocaleTimeString('es-MX', {
       hour: '2-digit',
       minute: '2-digit',
-      hour12: false
+      hour12: false,
     });
-  };
 
-  const formatDate = (date) => {
-    return date?.toLocaleDateString('es-MX', {
+  const formatDate = (date) =>
+    date?.toLocaleDateString('es-MX', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
     });
-  };
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Desktop Sidebar */}
-      <div className="hidden lg:block">
-        <Sidebar 
-          isCollapsed={sidebarCollapsed} 
-          onToggle={handleSidebarToggle}
-        />
-      </div>
-      {/* Mobile Header */}
-      <div className="lg:hidden">
-        <Header 
-          onMenuToggle={handleMobileMenuToggle}
-          isMenuOpen={mobileMenuOpen}
-        />
-      </div>
-      {/* Main Content */}
-      <div className={`transition-all duration-300 ${
-        sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'
-      } lg:pt-0 pt-16`}>
+      {/* HEADER */}
+      <Header
+        onMenuToggle={() => setHeaderMenuOpen(!headerMenuOpen)}
+        isMenuOpen={headerMenuOpen}
+      />
+
+      {/* SIDEBAR */}
+      <Sidebar
+        isCollapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+      />
+
+      {/* MAIN CONTENT */}
+      <main
+        className={`transition-all duration-300 ${
+          sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'
+        } pt-16`}
+      >
         <div className="p-6">
           {/* Header Section */}
           <div className="mb-8">
             <Breadcrumb />
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mt-4">
               <div>
-                <h1 className="text-3xl font-bold text-foreground">Panel Principal</h1>
+                <h1 className="text-3xl font-bold text-foreground">
+                  Panel Principal
+                </h1>
                 <p className="text-muted-foreground mt-2">
                   Resumen operativo y seguimiento de proyectos HVAC
                 </p>
               </div>
               <div className="mt-4 lg:mt-0 text-right">
-                <div className="text-2xl font-bold text-foreground">{formatTime(currentTime)}</div>
-                <div className="text-sm text-muted-foreground capitalize">{formatDate(currentTime)}</div>
+                <div className="text-2xl font-bold text-foreground">
+                  {formatTime(currentTime)}
+                </div>
+                <div className="text-sm text-muted-foreground capitalize">
+                  {formatDate(currentTime)}
+                </div>
               </div>
             </div>
           </div>
@@ -137,12 +132,12 @@ const MainDashboard = () => {
 
           {/* Main Content Grid */}
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-8">
-            {/* Project Status Table - Takes 2 columns */}
+            {/* Project Status Table */}
             <div className="xl:col-span-2">
               <ProjectStatusTable />
             </div>
 
-            {/* Notification Panel - Takes 1 column */}
+            {/* Notification Panel */}
             <div className="xl:col-span-1">
               <NotificationPanel />
             </div>
@@ -167,7 +162,10 @@ const MainDashboard = () => {
           <div className="border-t border-border pt-6 mt-8">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between text-sm text-muted-foreground">
               <div>
-                <p>&copy; {new Date()?.getFullYear()} AireFlow Pro. Todos los derechos reservados.</p>
+                <p>
+                  &copy; {new Date()?.getFullYear()} AireFlow Pro. Todos los
+                  derechos reservados.
+                </p>
               </div>
               <div className="mt-2 md:mt-0 flex items-center space-x-4">
                 <span>Versión 2.1.0</span>
@@ -179,7 +177,7 @@ const MainDashboard = () => {
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 };
