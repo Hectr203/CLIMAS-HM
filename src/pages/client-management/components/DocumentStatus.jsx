@@ -75,7 +75,7 @@ const DocumentStatus = ({ documents, onUploadDocument, onViewDocument, onDownloa
           Subir Documento
         </Button>
       </div>
-      <div className="space-y-4">
+  <div className="space-y-4 max-h-[400px] overflow-y-auto overflow-x-hidden">
         {documents?.length === 0 ? (
           <div className="text-center py-8">
             <Icon name="FileX" size={48} className="text-muted-foreground mx-auto mb-4" />
