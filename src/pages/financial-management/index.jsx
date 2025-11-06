@@ -35,12 +35,13 @@ const FinanzasManagement = () => {
       try {
         const data = await getGastos();
         if (Array.isArray(data)) setExpenses(data);
-        else console.warn('getGastos no devolvió un array:', data);
+        else console.warn('⚠️ getGastos no devolvió un array:', data);
       } catch (err) {
         console.error('Error al obtener gastos:', err);
       }
     };
     fetchData();
+    // 👇 no pongas getGastos como dependencia o se cicla
   }, []);
 
   // ========================================================
