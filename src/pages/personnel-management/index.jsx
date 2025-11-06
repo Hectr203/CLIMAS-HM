@@ -158,15 +158,15 @@ const PersonnelManagement = () => {
   };
 
   const handleExportData = () => {
-    console.log('Exporting personnel data...');
+  // console.log eliminado
   };
 
   const handleViewComplianceDetails = (type) => {
-    console.log('Viewing compliance details for:', type);
+  // console.log eliminado
   };
 
   const handleScheduleTraining = () => {
-    console.log('Scheduling training...');
+  // console.log eliminado
   };
 
   const handleSidebarToggle = () => {

@@ -458,12 +458,12 @@ const WorkshopOperationsCenter = () => {
   };
 
   const handleReportToProjects = (workOrderId, reportType, reportData) => {
-    console.log(`Reporting to Projects - Order: ${workOrderId}, Type: ${reportType}`, reportData);
+  // console.log eliminado
     // Integration with Projects department
   };
 
   const handleRequestToPurchases = (workOrderId, requestType, requestData) => {
-    console.log(`Request to Purchases - Order: ${workOrderId}, Type: ${requestType}`, requestData);
+  // console.log eliminado
     // Integration with Purchases department
   };
 

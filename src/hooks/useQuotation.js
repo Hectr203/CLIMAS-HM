@@ -10,12 +10,7 @@ const useQuotation = () => {
     setError(null);
     try {
       const response = await quotationService.createQuotation(data);
-      console.log("Respuesta del backend (cotización creada):", response);
-      // Mostrar los datos principales del formulario para verificar
-      console.log("Cliente:", data.clientName);
-      console.log("Proyecto:", data.projectName);
-      console.log("Responsable:", data.assignedTo);
-      console.log("Datos completos enviados:", data);
+      // console.log eliminado
       return response;
     } catch (err) {
       setError(err);
@@ -93,6 +88,36 @@ const useQuotation = () => {
     }
   };
 
+  // Nueva función para crear/actualizar revisión
+  const upsertRevision = async (revisionData) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await quotationService.upsertRevision(revisionData);
+      return response;
+    } catch (err) {
+      setError(err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Nueva función para obtener revisión
+  const getRevision = async ({ id, idCotizacion }) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await quotationService.getRevision({ id, idCotizacion });
+      return response;
+    } catch (err) {
+      setError(err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     createQuotation,
     getCotizaciones,
@@ -100,6 +125,8 @@ const useQuotation = () => {
     editCotizacion,
     crearConstructor,
     getConstructorByCotizacionId,
+    upsertRevision,
+    getRevision,
     loading,
     error,
   };

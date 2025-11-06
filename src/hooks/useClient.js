@@ -27,13 +27,10 @@ const useClient = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await clientService.getClients();
-      const clientsData = Array.isArray(response) ? response : response?.data || [];
-      setClients(clientsData);
-      clientsRef.current = clientsData; // Actualizar el ref
-      hasLoadedRef.current = true; // Marcar como cargado
-      console.log('Clientes cargados:', clientsData);
-      return response;
+  const response = await clientService.getClients();
+  setClients(Array.isArray(response) ? response : response?.data || []);
+  // console.log eliminado
+  return response;
     } catch (err) {
       setError(err);
       setClients([]);
