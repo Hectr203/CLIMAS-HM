@@ -177,7 +177,7 @@ const PersonnelManagement = () => {
     setMobileMenuOpen(!mobileMenuOpen);
   };
 
-  // ✅ Mock dashboard data
+  // Mock dashboard data
   const mockComplianceData = {
     totalEmployees: persons?.length || 0,
     overallCompliance: 78,
