@@ -49,7 +49,7 @@ const CommunicationTimeline = ({ communications, onAddCommunication, onViewDetai
   };
 
   return (
-    <div className="bg-card border border-border rounded-lg p-6 card-shadow">
+  <div className="bg-card border border-border rounded-lg p-6 card-shadow" style={{minWidth: '370px', maxWidth: '440px'}}>
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-foreground">Historial de Comunicación</h3>
         <Button
@@ -62,7 +62,7 @@ const CommunicationTimeline = ({ communications, onAddCommunication, onViewDetai
           Nueva Comunicación
         </Button>
       </div>
-      <div className="space-y-4 max-h-96 overflow-y-auto">
+      <div className="space-y-4 max-h-[350px] overflow-y-auto overflow-x-hidden">
         {communications?.length === 0 ? (
           <div className="text-center py-8">
             <Icon name="MessageCircle" size={48} className="text-muted-foreground mx-auto mb-4" />

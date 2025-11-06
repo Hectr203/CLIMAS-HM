@@ -102,7 +102,7 @@ const ContractAlerts = ({ contracts, onViewContract, onRenewContract, onSchedule
           Ver Todos
         </Button>
       </div>
-      <div className="space-y-4 max-h-80 overflow-y-auto">
+  <div className="space-y-4 max-h-[350px] overflow-y-auto overflow-x-auto px-2" style={{minWidth: '100%', maxWidth: '100%'}}>
         {alertContracts?.length === 0 ? (
           <div className="text-center py-8">
             <Icon name="CheckCircle" size={48} className="text-success mx-auto mb-4" />
@@ -117,9 +117,9 @@ const ContractAlerts = ({ contracts, onViewContract, onRenewContract, onSchedule
             return (
               <div
                 key={contract?.id}
-                className={`p-4 rounded-lg border-2 ${getAlertColor(alertType)} transition-smooth`}
+                className={`p-4 rounded-lg border-2 ${getAlertColor(alertType)} transition-smooth min-w-[400px] max-w-[600px] mx-auto`}
               >
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between flex-wrap">
                   <div className="flex items-start space-x-3">
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                       alertType === 'expired' ? 'bg-error text-error-foreground' :
@@ -129,47 +129,35 @@ const ContractAlerts = ({ contracts, onViewContract, onRenewContract, onSchedule
                     }`}>
                       <Icon name={getAlertIcon(alertType)} size={20} />
                     </div>
-                    
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <h4 className="text-sm font-medium text-foreground">
-                          {contract?.contractNumber}
-                        </h4>
-                        <span className={`px-2 py-1 text-xs rounded-full ${
-                          alertType === 'expired' ? 'bg-error text-error-foreground' :
-                          alertType === 'expiring' ? 'bg-warning text-warning-foreground' :
-                          'bg-accent text-accent-foreground'
-                        }`}>
-                          {getAlertMessage(contract)}
-                        </span>
-                      </div>
-                      
-                      <p className="text-sm text-foreground mb-2">{contract?.clientName}</p>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs text-muted-foreground">
-                        <div className="flex items-center space-x-1">
-                          <Icon name="Calendar" size={12} />
-                          <span>Inicio: {formatDate(contract?.startDate)}</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <Icon name="CalendarX" size={12} />
-                          <span>Vence: {formatDate(contract?.expirationDate)}</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <Icon name="DollarSign" size={12} />
-                          <span>Valor: {formatCurrency(contract?.value)}</span>
-                        </div>
-                      </div>
-                      
-                      {contract?.description && (
-                        <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
-                          {contract?.description}
-                        </p>
-                      )}
+                    <div className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
+                      alertType === 'expired' ? 'bg-error text-error-foreground' :
+                      alertType === 'expiring' ? 'bg-warning text-warning-foreground' :
+                      'bg-accent text-accent-foreground'
+                    }`}>
+                      {getAlertMessage(contract)}
                     </div>
                   </div>
-                  
-                  <div className="flex items-center space-x-2">
+                  <div className="flex-1 min-w-0 ml-4">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <h4 className="text-sm font-bold text-foreground">
+                        {contract?.contractNumber}
+                      </h4>
+                      <span className="text-xs text-muted-foreground font-medium">
+                        {contract?.clientName}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-1">
+                      <span className="flex items-center gap-1"><Icon name="Calendar" size={12} />Inicio: {formatDate(contract?.startDate)}</span>
+                      <span className="flex items-center gap-1"><Icon name="CalendarX" size={12} />Vence: {formatDate(contract?.expirationDate)}</span>
+                      <span className="flex items-center gap-1"><Icon name="DollarSign" size={12} />Valor: {formatCurrency(contract?.value)}</span>
+                    </div>
+                    {contract?.description && (
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                        {contract?.description}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2 ml-4">
                     <Button
                       variant="ghost"
                       size="sm"

@@ -568,13 +568,15 @@ const ClientManagement = () => {
 
               {/* Client List */}
               {viewMode === 'table' ? (
-                <ClientTable
-                  clients={filteredClients}
-                  onViewDetails={handleViewDetails}
-                  onEditClient={handleEditClient}
-                  onViewProjects={handleViewProjects}
-                  onViewContracts={handleViewContracts}
-                />
+                <div style={{overflowX: 'auto', width: '100%'}}>
+                  <ClientTable
+                    clients={filteredClients}
+                    onViewDetails={handleViewDetails}
+                    onEditClient={handleEditClient}
+                    onViewProjects={handleViewProjects}
+                    onViewContracts={handleViewContracts}
+                  />
+                </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                   {filteredClients?.map((client) => (
@@ -612,7 +614,7 @@ const ClientManagement = () => {
 
           {/* Sidebar */}
           {showSidebar && (
-            <div className="fixed right-0 top-0 h-full w-96 bg-card border-l border-border shadow-lg z-1000 overflow-y-auto">
+            <div className="fixed right-0 top-0 h-full bg-card border-l border-border shadow-lg z-1000 overflow-y-auto" style={{width: '500px', minWidth: '440px'}}>
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-lg font-semibold text-foreground">
