@@ -8,6 +8,7 @@ import clientService from 'services/clientService';
 
 /* === Config === */
 const DEFAULT_USD_RATE = 18;
+const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
 
 /* === Helpers === */
 const safeUUID = () => {
@@ -72,29 +73,24 @@ const statusKeyFromAny = (raw) => {
     planificacion: 'planning',
     planificación: 'planning',
     planning: 'planning',
-
     'en progreso': 'in_progress',
     'en-progreso': 'in_progress',
     in_progress: 'in_progress',
     'in-progress': 'in_progress',
     progress: 'in_progress',
-
     'en pausa': 'on_hold',
     'en-pausa': 'on_hold',
     on_hold: 'on_hold',
     paused: 'on_hold',
     pausa: 'on_hold',
-
     revision: 'review',
     revisión: 'review',
     review: 'review',
-
     completado: 'completed',
     complete: 'completed',
     completed: 'completed',
     done: 'completed',
     finalizado: 'completed',
-
     cancelado: 'cancelled',
     canceled: 'cancelled',
     cancelled: 'cancelled',
@@ -277,6 +273,10 @@ const ProjectTable = ({
   const [clientCache, setClientCache] = useState({});
   const [clientsLoaded, setClientsLoaded] = useState(false);
 
+  // paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]); // 5 por defecto
+
   /* Cargar proyectos si no vienen por props */
   useEffect(() => {
     let mounted = true;
@@ -353,6 +353,7 @@ const ProjectTable = ({
     let direction = 'asc';
     if (sortConfig?.key === key && sortConfig?.direction === 'asc') direction = 'desc';
     setSortConfig({ key, direction });
+    setCurrentPage(1); // reiniciar a primera página en cada cambio de orden
   };
 
   const sortedProjects = useMemo(() => {
@@ -383,6 +384,30 @@ const ProjectTable = ({
       return 0;
     });
   }, [normalizedProjects, sortConfig]);
+
+  /* Paginated slice */
+  const totalItems = sortedProjects.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+  const pageItems = sortedProjects.slice(startIndex, endIndex);
+
+  // clamp de página cuando cambian totales/tamaño
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+    if (currentPage < 1) setCurrentPage(1);
+  }, [currentPage, totalPages]);
+
+  // al cambiar pageSize, volver a página 1
+  const handleChangePageSize = (e) => {
+    const v = Number(e?.target?.value) || PAGE_SIZE_OPTIONS[0];
+    setPageSize(v);
+    setCurrentPage(1);
+  };
+
+  const goToPage = (n) => setCurrentPage(Math.min(Math.max(1, n), totalPages));
+  const prevPage = () => goToPage(currentPage - 1);
+  const nextPage = () => goToPage(currentPage + 1);
 
   /* Helpers cliente */
   const getPossibleClientId = (p) => {
@@ -433,10 +458,18 @@ const ProjectTable = ({
   /* Select/expand */
   const handleSelectProject = (id) =>
     setSelectedProjects((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  // seleccionar/deseleccionar todos SOLO de la página actual
   const handleSelectAll = () => {
-    if (selectedProjects?.length === sortedProjects?.length) setSelectedProjects([]);
-    else setSelectedProjects(sortedProjects?.map((p) => p?.id));
+    const pageIds = pageItems.map((p) => p?.id);
+    const allSelected = pageIds.every((id) => selectedProjects.includes(id));
+    if (allSelected) {
+      setSelectedProjects((prev) => prev.filter((id) => !pageIds.includes(id)));
+    } else {
+      setSelectedProjects((prev) => Array.from(new Set([...prev, ...pageIds])));
+    }
   };
+
   const toggleRowExpansion = (id) =>
     setExpandedRows((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
@@ -546,7 +579,6 @@ const ProjectTable = ({
           <div className="flex items-center justify-between">
             <span className="text-sm text-foreground">{selectedProjects?.length} proyecto(s) seleccionado(s)</span>
             <div className="flex items-center space-x-2">
-
               <Button variant="outline" size="sm" iconName="Trash2" iconPosition="left" onClick={handleBulkDelete}>Eliminar</Button>
             </div>
           </div>
@@ -561,7 +593,10 @@ const ProjectTable = ({
               <th className="w-12 p-4">
                 <input
                   type="checkbox"
-                  checked={selectedProjects?.length === sortedProjects?.length && sortedProjects?.length > 0}
+                  checked={
+                    pageItems.length > 0 &&
+                    pageItems.every((p) => selectedProjects.includes(p.id))
+                  }
                   onChange={handleSelectAll}
                   className="rounded border-border"
                 />
@@ -604,7 +639,7 @@ const ProjectTable = ({
           </thead>
 
           <tbody>
-            {sortedProjects?.map((project) => {
+            {pageItems?.map((project) => {
               const { presupuestoTotal, abonosList, totalAbonado, restante, percent } = getTotalsForProject(project);
               const draft = newAbonoDraft[project.id] || { fecha: '', monto: '', nota: '' };
               const isPagado = restante <= 0;
@@ -826,7 +861,7 @@ const ProjectTable = ({
                               </button>
                             </div>
 
-                            <div className="flex flex-wrap gap-2 text-[11px]">
+                            <div className="flex flex-wrap gap-2 text:[11px] text-[11px]">
                               <input
                                 type="date"
                                 value={draft.fecha || ''}
@@ -881,8 +916,7 @@ const ProjectTable = ({
 
                             <div className="relative w-full h-3 bg-muted rounded overflow-hidden border border-border">
                               <div
-                                className={`h-full transition-all duration-500 ${percent >= 100 ? 'bg-green-600' : 'bg-green-500'
-                                  }`}
+                                className={`h-full transition-all duration-500 ${percent >= 100 ? 'bg-green-600' : 'bg-green-500'}`}
                                 style={{ width: `${percent}%` }}
                               />
                               <span className="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-white">
@@ -898,7 +932,7 @@ const ProjectTable = ({
               );
             })}
 
-            {sortedProjects?.length === 0 && !loading && (
+            {pageItems?.length === 0 && !loading && (
               <tr>
                 <td colSpan={9} className="p-8 text-center text-muted-foreground">
                   No hay proyectos para mostrar.
@@ -907,11 +941,38 @@ const ProjectTable = ({
             )}
           </tbody>
         </table>
+
+        {/* Paginación Desktop */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-t border-border px-4 py-3 gap-3">
+          <div className="flex items-center gap-3">
+            <label className="text-xs text-muted-foreground">Mostrar</label>
+            <select
+              value={pageSize}
+              onChange={handleChangePageSize}
+              className="text-sm px-2 py-1 border border-border rounded bg-background text-foreground"
+            >
+              {PAGE_SIZE_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+            <span className="text-xs text-muted-foreground">por página</span>
+            <span className="text-xs text-muted-foreground ml-3">
+              Mostrando <span className="font-medium">{totalItems === 0 ? 0 : startIndex + 1}</span>–<span className="font-medium">{endIndex}</span> de <span className="font-medium">{totalItems}</span>
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" onClick={() => goToPage(1)} disabled={currentPage === 1} iconName="ChevronsLeft" />
+            <Button variant="outline" size="sm" onClick={prevPage} disabled={currentPage === 1} iconName="ChevronLeft" />
+            <span className="px-2 text-sm text-foreground">{currentPage} / {totalPages}</span>
+            <Button variant="outline" size="sm" onClick={nextPage} disabled={currentPage === totalPages} iconName="ChevronRight" />
+            <Button variant="outline" size="sm" onClick={() => goToPage(totalPages)} disabled={currentPage === totalPages} iconName="ChevronsRight" />
+          </div>
+        </div>
       </div>
 
       {/* Mobile (resumen) */}
       <div className="lg:hidden">
-        {sortedProjects?.map((p) => {
+        {pageItems?.map((p) => {
           const nameToShow = resolveClientName(p);
           const emailToShow = resolveClientEmailOrContact(p);
           const statusUI = resolveProjectStatus(p);
@@ -948,6 +1009,35 @@ const ProjectTable = ({
             </div>
           );
         })}
+
+        {/* Paginación Mobile */}
+        <div className="flex flex-col gap-3 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <label className="text-xs text-muted-foreground">Mostrar</label>
+            <select
+              value={pageSize}
+              onChange={handleChangePageSize}
+              className="text-sm px-2 py-1 border border-border rounded bg-background text-foreground"
+            >
+              {PAGE_SIZE_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+            <span className="text-xs text-muted-foreground">por página</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-muted-foreground">
+              {totalItems === 0 ? '0 de 0' : `${startIndex + 1}–${endIndex} de ${totalItems}`}
+            </div>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" onClick={() => goToPage(1)} disabled={currentPage === 1} iconName="ChevronsLeft" />
+              <Button variant="outline" size="sm" onClick={prevPage} disabled={currentPage === 1} iconName="ChevronLeft" />
+              <span className="px-2 text-sm text-foreground">{currentPage}/{totalPages}</span>
+              <Button variant="outline" size="sm" onClick={nextPage} disabled={currentPage === totalPages} iconName="ChevronRight" />
+              <Button variant="outline" size="sm" onClick={() => goToPage(totalPages)} disabled={currentPage === totalPages} iconName="ChevronsRight" />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
