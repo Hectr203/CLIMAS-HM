@@ -48,10 +48,11 @@ const PaymentAuthorizationModal = ({ isOpen, onClose, expense, onAuthorize, onDe
   const handleSubmit = async (e) => {
     e?.preventDefault();
     setIsSubmitting(true);
+
     try {
       await onAuthorize?.({
   id: expense?.id,
-  status: "approved",
+  status: "approved", // <--- usamos inglés, como tu API
   ...authData,
   amount: parseFloat(expense?.amount?.replace(/[^0-9.-]+/g, "")) || 0
 });
@@ -194,7 +195,19 @@ onClose?.();
             />
           </div>
 
-          
+          {/* Additional Approval */}
+          <div className="flex items-center space-x-3">
+            <input
+              type="checkbox"
+              id="additionalApproval"
+              checked={authData?.requiresAdditionalApproval}
+              onChange={(e) => handleInputChange('requiresAdditionalApproval', e?.target?.checked)}
+              className="w-4 h-4 text-primary bg-input border-border rounded focus:ring-ring"
+            />
+            <label htmlFor="additionalApproval" className="text-sm text-foreground">
+              Requiere aprobación adicional de nivel superior
+            </label>
+          </div>
 
           {/* Action Buttons */}
           <div className="flex items-center justify-between pt-6 border-t border-border">
