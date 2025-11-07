@@ -84,20 +84,15 @@ const MainDashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Desktop Sidebar */}
-      <div className="hidden lg:block">
-        <Sidebar 
-          isCollapsed={sidebarCollapsed} 
-          onToggle={handleSidebarToggle}
-        />
-      </div>
-      {/* Mobile Header */}
-      <div className="lg:hidden">
-        <Header 
-          onMenuToggle={handleMobileMenuToggle}
-          isMenuOpen={mobileMenuOpen}
-        />
-      </div>
+      <Header
+  onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
+  isMenuOpen={mobileMenuOpen}
+/>
+<Sidebar
+  isCollapsed={sidebarCollapsed}
+  onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+/>
+
       {/* Main Content */}
       <div className={`transition-all duration-300 ${
         sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'

@@ -5,6 +5,8 @@ import Button from "../../../components/ui/Button";
 import PaymentAuthorizationModal from "./PaymentAuthorizationModal";
 import useProyect from "../../../hooks/useProyect";
 import useGastos from "../../../hooks/useGastos";
+import { jsPDF } from "jspdf";
+import "jspdf-autotable";
 
 const formatDate = (date) => {
   if (!date) return "—";
@@ -144,6 +146,125 @@ const getStatusLabel = (estado) => {
 };
 
 
+
+
+
+const handleDownloadPDF = (order) => {
+  const doc = new jsPDF();
+  const blue = "#0A4A8A";
+  const gray = "#333333";
+
+  // === ENCABEZADO AZUL ===
+  doc.setFillColor(10, 74, 138);
+  doc.rect(0, 0, 210, 25, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text("ORDEN DE COMPRA", 105, 15, { align: "center" });
+
+  // === DATOS GENERALES ===
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(gray);
+  doc.setFontSize(12);
+  doc.text("Datos Generales", 105, 35, { align: "center" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  const leftX = 20;
+  const rightX = 120;
+  const baseY = 44;
+
+  doc.text(`Folio: ${order.numeroOrden || "—"}`, leftX, baseY);
+  doc.text(`Fecha de Orden: ${formatDate(order.fechaOrden)}`, leftX, baseY + 7);
+  doc.text(`Estado: ${getStatusLabel(order.estado)}`, leftX, baseY + 14);
+
+  doc.text(`Proveedor: ${order.proveedor?.nombre || "—"}`, rightX, baseY);
+  doc.text(`Creado por: ${order.creadoPor || "—"}`, rightX, baseY + 7);
+  doc.text(`Términos de Pago: ${order.terminosPago || "—"}`, rightX, baseY + 14);
+
+  // === TÍTULO DETALLE DE PRODUCTOS ===
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("Detalle de Productos", 105, 70, { align: "center" });
+
+  // === TABLA DE PRODUCTOS ===
+  const articulos = Array.isArray(order.articulos)
+    ? order.articulos.map((a) => ({
+        codigo: a.codigoArticulo || "—",
+        descripcion: a.descripcion || a.nombre || "—",
+        unidad: a.unidad || "—",
+        cantidad: a.cantidadOrdenada || 0,
+        costoUnitario: a.costoUnitario || 0,
+        subtotal:
+          a.subtotal ||
+          (a.cantidadOrdenada || 0) * (a.costoUnitario || 0),
+      }))
+    : [];
+
+  const tableY = 75;
+  doc.autoTable({
+    startY: tableY,
+    head: [["Código", "Descripción", "Unidad", "Cantidad", "Costo Unitario", "Subtotal"]],
+    body: articulos.map((a) => [
+      a.codigo,
+      a.descripcion,
+      a.unidad,
+      a.cantidad,
+      formatCurrency(a.costoUnitario),
+      formatCurrency(a.subtotal),
+    ]),
+    theme: "grid",
+    styles: { fontSize: 9 },
+    headStyles: {
+      fillColor: [10, 74, 138],
+      textColor: 255,
+      halign: "center",
+      fontStyle: "bold",
+    },
+    bodyStyles: { halign: "center" },
+    margin: { left: 15, right: 15 },
+  });
+
+  // === TOTAL EN LA PARTE INFERIOR DERECHA ===
+  const finalY = doc.lastAutoTable.finalY + 10; // posición justo debajo de la tabla
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(gray);
+  doc.text(`Total: ${formatCurrency(order.totalOrden)}`, 195, finalY, { align: "right" });
+
+  // === APROBACIONES FIJAS AL PIE ===
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const approvalSectionY = pageHeight - 35;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.setTextColor(gray);
+  doc.text("Aprobaciones", 105, approvalSectionY - 5, { align: "center" });
+
+  // Líneas de firma perfectamente simétricas
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+
+  const lineY = approvalSectionY + 10;
+  const leftXLine = 20;
+  const rightXLine = 135;
+
+  doc.text("_____________________________", leftXLine, lineY);
+  doc.text("_____________________________", rightXLine, lineY);
+
+  // Textos bajo las líneas
+  doc.text("Responsable de Aprobación", leftXLine + 10, lineY + 6);
+  doc.text("Departamento de Compras", rightXLine + 7, lineY + 6);
+
+  // === GUARDAR ===
+  doc.save(`Orden_${order.numeroOrden || "Compra"}.pdf`);
+};
+
+
+
+
+
+
   return (
     <div className="bg-card rounded-lg border border-border">
       {/* Header */}
@@ -251,15 +372,17 @@ const getStatusLabel = (estado) => {
                   >
                     Ver Detalles
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    iconName="Download"
-                    iconSize={16}
-                    onClick={() => alert("Descargar PDF")}
-                  >
-                    Descargar
-                  </Button>
+                  {["aprobado", "approved"].includes(order.estado?.toLowerCase()) && (
+  <Button
+    variant="ghost"
+    size="sm"
+    iconName="Download"
+    iconSize={16}
+    onClick={() => handleDownloadPDF(order)}
+  >
+    Descargar
+  </Button>
+)}
                   <Button
                     variant="ghost"
                     size="sm"
