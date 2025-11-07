@@ -123,23 +123,24 @@ onClose?.();
             <h3 className="font-medium text-foreground">Detalles del Gasto</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="text-muted-foreground">Descripción:</span>
+                <span className="text-muted-foreground">Código Proyecto:</span>
+                <p className="text-foreground">{expense?.project}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Proveedor:</span>
+                <p className="text-foreground">{expense?.category}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Notas:</span>
                 <p className="text-foreground font-medium">{expense?.description}</p>
               </div>
               <div>
                 <span className="text-muted-foreground">Monto:</span>
                 <p className="text-foreground font-bold text-lg">{expense?.amount}</p>
               </div>
+              
               <div>
-                <span className="text-muted-foreground">Categoría:</span>
-                <p className="text-foreground">{expense?.category}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Proyecto:</span>
-                <p className="text-foreground">{expense?.project}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Fecha:</span>
+                <span className="text-muted-foreground">Fecha de Creación:</span>
                 <p className="text-foreground">{expense?.date}</p>
               </div>
               <div>

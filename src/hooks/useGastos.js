@@ -1,5 +1,6 @@
 // hooks/useGastos.js
 import { useCallback } from "react";
+import { useNotifications } from "../context/NotificationContext";
 import gastosService from "../services/gastosService";
 
 const useGastos = () => {
