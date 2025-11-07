@@ -2,7 +2,7 @@ import React from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 const OrderDetailsModal = ({ isOpen, onClose, order }) => {
   if (!isOpen || !order) return null;
@@ -29,6 +29,7 @@ const OrderDetailsModal = ({ isOpen, onClose, order }) => {
     // Tabla de artículos
     const tableColumns = [
       { header: 'Código', dataKey: 'codigo' },
+      { header: 'Nombre', dataKey: 'nombre' },
       { header: 'Descripción', dataKey: 'descripcion' },
       { header: 'Cantidad', dataKey: 'cantidad' },
       { header: 'Costo Unit.', dataKey: 'costoUnitario' },
@@ -37,13 +38,14 @@ const OrderDetailsModal = ({ isOpen, onClose, order }) => {
 
     const tableRows = order.articulos?.map(item => ({
       codigo: item.codigoArticulo,
+      nombre: item.nombre || item.descripcion || item.codigoArticulo,
       descripcion: item.descripcion,
       cantidad: `${item.cantidadOrdenada} ${item.unidad}`,
       costoUnitario: formatCurrency(item.costoUnitario),
       subtotal: formatCurrency(item.subtotal)
     }));
 
-    doc.autoTable({
+    autoTable(doc, {
       head: [tableColumns.map(col => col.header)],
       body: tableRows.map(row => tableColumns.map(col => row[col.dataKey])),
       startY: 90,
@@ -52,7 +54,7 @@ const OrderDetailsModal = ({ isOpen, onClose, order }) => {
     });
 
     // Total
-    const finalY = doc.lastAutoTable.finalY || 90;
+    const finalY = doc.previousAutoTable ? doc.previousAutoTable.finalY : 90;
     doc.text(`Total: ${formatCurrency(order.totalOrden)}`, 195, finalY + 10, { align: 'right' });
 
     // Notas si existen
@@ -104,13 +106,25 @@ const OrderDetailsModal = ({ isOpen, onClose, order }) => {
   };
 
   const getPaymentTermLabel = (term) => {
-    switch (term) {
-      case 'immediate': return 'Pago Inmediato';
-      case 'net15': return '15 días';
-      case 'net30': return '30 días';
-      case 'net60': return '60 días';
-      default: return term;
-    }
+    if (!term) return 'No especificado';
+    
+    // Convertir a minúsculas para hacer la comparación insensible a mayúsculas
+    const termLower = term.toLowerCase();
+    const terms = {
+      'immediate': 'Pago Inmediato',
+      'net15': '15 días',
+      'net30': '30 días',
+      'net60': '60 días',
+      'contado': 'Pago de Contado',
+      'credito': 'Crédito',
+      'custom': 'Personalizado',
+      'prepaid': 'Pago por Adelantado',
+      'cod': 'Pago Contra Entrega',
+      'credit_card': 'Tarjeta de Crédito',
+      'wire_transfer': 'Transferencia Bancaria',
+      'cash': 'Efectivo'
+    };
+    return terms[termLower] || 'Otros Términos';
   };
 
   return (
@@ -187,6 +201,7 @@ const OrderDetailsModal = ({ isOpen, onClose, order }) => {
                 <thead className="bg-muted">
                   <tr>
                     <th className="px-4 py-3 text-left text-sm font-medium">Código</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Nombre</th>
                     <th className="px-4 py-3 text-left text-sm font-medium">Descripción</th>
                     <th className="px-4 py-3 text-right text-sm font-medium">Cantidad</th>
                     <th className="px-4 py-3 text-right text-sm font-medium">Costo Unit.</th>
@@ -197,6 +212,7 @@ const OrderDetailsModal = ({ isOpen, onClose, order }) => {
                   {order.articulos?.map((item) => (
                     <tr key={item.articuloId} className="hover:bg-muted/50">
                       <td className="px-4 py-3 text-sm font-mono">{item.codigoArticulo}</td>
+                      <td className="px-4 py-3 text-sm">{item.nombre}</td>
                       <td className="px-4 py-3 text-sm">{item.descripcion}</td>
                       <td className="px-4 py-3 text-sm text-right">
                         {item.cantidadOrdenada} {item.unidad}
@@ -208,7 +224,7 @@ const OrderDetailsModal = ({ isOpen, onClose, order }) => {
                 </tbody>
                 <tfoot className="bg-muted">
                   <tr>
-                    <td colSpan="4" className="px-4 py-3 text-right font-medium">Total:</td>
+                    <td colSpan="5" className="px-4 py-3 text-right font-medium">Total:</td>
                     <td className="px-4 py-3 text-right text-lg font-bold">{formatCurrency(order.totalOrden)}</td>
                   </tr>
                 </tfoot>

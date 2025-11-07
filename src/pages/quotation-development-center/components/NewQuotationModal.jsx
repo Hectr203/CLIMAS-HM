@@ -2,6 +2,7 @@ import { useNotifications } from '../../../context/NotificationContext';
 import useQuotation from '../../../hooks/useQuotation';
 import useClient from '../../../hooks/useClient';
 import React, { useState } from 'react';
+import { useOpportunity } from '../../../hooks/useOpportunity';
 import { useEstados, useMunicipios } from '../../../hooks/useEstado';
 import useProyecto from '../../../hooks/useProyect';
 import usePerson from '../../../hooks/usePerson';
@@ -14,8 +15,10 @@ import Select from '../../../components/ui/Select';
 
 // Formatea el presupuesto solo con separadores de miles y decimales
 function formatearNumero(valor) {
-  if (!valor || isNaN(Number(valor))) return '';
-  const partes = valor.split('.');
+  if (valor === null || valor === undefined || isNaN(Number(valor))) return '';
+  // Si es número, convertir a string
+  let valorStr = typeof valor === 'string' ? valor : String(valor);
+  const partes = valorStr.split('.');
   let entero = partes[0];
   let decimal = partes[1] || '';
   entero = Number(entero).toLocaleString('es-MX');
@@ -32,51 +35,57 @@ function formatearDinero(valor) {
 }
 
 const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
+  React.useEffect(() => {
+    const handler = () => {
+      setIsFromOpportunity(true);
+    };
+    window.addEventListener('setNewQuotationModalFromOpportunity', handler);
+    return () => window.removeEventListener('setNewQuotationModalFromOpportunity', handler);
+  }, []);
+  React.useEffect(() => {
+    const handler = () => {
+      resetModalState();
+    };
+    window.addEventListener('resetNewQuotationModal', handler);
+    return () => window.removeEventListener('resetNewQuotationModal', handler);
+  }, []);
   // Obtener el ID de oportunidad de los parámetros de URL
   const [opportunityId] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('opportunityId');
   });
 
-  // Cargar información de la oportunidad si existe
-  React.useEffect(() => {
-    if (!opportunityId) return;
+  // Hooks para obtener oportunidades, clientes y proyectos
+  const { oportunidades } = useOpportunity();
+  // Solo una declaración de los hooks para evitar errores
+  const proyectoHook = useProyecto();
+  const clientHook = useClient();
+  const proyectos = proyectoHook.proyectos;
+  const getProyectos = proyectoHook.getProyectos;
+  const loadingProyectos = proyectoHook.loading;
+  const clients = clientHook.clients;
+  const getClients = clientHook.getClients;
+  const loadingClients = clientHook.loading;
 
-    // TODO: Reemplazar con la llamada real a la API
-    // Por ahora simulamos una carga de datos
-    const mockOpportunityData = {
-      clientName: "Cliente de la Oportunidad",
-      contactInfo: {
-        contactPerson: "Contacto",
-        phone: "555-1234",
-        email: "contacto@cliente.com"
-      },
-      projectDetails: {
-        description: "Descripción del proyecto",
-        location: "Ubicación del proyecto",
-        estimatedBudget: 100000,
-        timeline: "3 meses"
-      },
-      priority: "high"
-    };
+  // Buscar la oportunidad actual
+  const currentOpportunity = React.useMemo(() => {
+    return oportunidades?.find(o => String(o.id) === String(opportunityId));
+  }, [oportunidades, opportunityId]);
 
-    // Actualizar el formulario con los datos de la oportunidad
-    setFormData(prev => ({
-      ...prev,
-      nombreCliente: mockOpportunityData.clientName,
-      personaContacto: mockOpportunityData.contactInfo.contactPerson,
-      telefono: mockOpportunityData.contactInfo.phone,
-      email: mockOpportunityData.contactInfo.email,
-      descripcionProyecto: mockOpportunityData.projectDetails.description,
-      ubicacion: mockOpportunityData.projectDetails.location,
-      montoTotal: mockOpportunityData.projectDetails.estimatedBudget.toString(),
-      cronograma: mockOpportunityData.projectDetails.timeline,
-      prioridad: mockOpportunityData.priority === 'high' ? 'alta' : 
-                mockOpportunityData.priority === 'medium' ? 'media' : 'baja'
-    }));
-  }, [opportunityId]);
+  // Buscar cliente y proyecto por id
+  const currentClient = React.useMemo(() => {
+    if (!currentOpportunity?.clienteId) return null;
+    return clients?.find(c => String(c.id) === String(currentOpportunity.clienteId) || String(c._id) === String(currentOpportunity.clienteId));
+  }, [clients, currentOpportunity]);
 
-  const [formData, setFormData] = useState({
+  const currentProject = React.useMemo(() => {
+    if (!currentOpportunity?.proyectoId) return null;
+    return proyectos?.find(p => String(p.id) === String(currentOpportunity.proyectoId) || String(p._id) === String(currentOpportunity.proyectoId));
+  }, [proyectos, currentOpportunity]);
+
+  // Precargar datos en el formulario solo como información
+  // Estado inicial del formulario
+  const initialFormData = {
     clienteId: '',
     nombreCliente: '',
     proyectoId: '',
@@ -95,12 +104,55 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
     prioridad: 'media',
     tipoProyecto: 'hvac',
     notas: '',
-    oportunidadVentaId: opportunityId || '' // Agregar el ID de oportunidad
-  });
+    oportunidadVentaId: ''
+  };
 
-  // Proyectos y clientes
-  const { proyectos, getProyectos, loading: loadingProyectos } = useProyecto();
-  const { clients, getClients, loading: loadingClients } = useClient();
+  const [formData, setFormData] = useState({ ...initialFormData, oportunidadVentaId: opportunityId || '' });
+  const [isFromOpportunity, setIsFromOpportunity] = useState(false);
+
+  // Función para resetear el estado del modal y formulario
+  const resetModalState = () => {
+    setFormData({ ...initialFormData, oportunidadVentaId: '' });
+    setIsFromOpportunity(false);
+  };
+
+  // Al cerrar el modal, limpiar estado
+  const handleClose = () => {
+    resetModalState();
+    if (onClose) onClose();
+  };
+
+  React.useEffect(() => {
+    // Si el modal se abre y no viene de oportunidad, resetea el estado
+    if (isOpen && !isFromOpportunity) {
+      resetModalState();
+    }
+    // Si hay oportunidad y los IDs existen, simula la selección manual
+    if (currentOpportunity && currentOpportunity.clienteId && currentOpportunity.proyectoId) {
+      setIsFromOpportunity(true);
+      const selectedClient = clients?.find(c => String(c.id) === String(currentOpportunity.clienteId) || String(c._id) === String(currentOpportunity.clienteId));
+      const selectedProject = proyectos?.find(p => String(p.id) === String(currentOpportunity.proyectoId) || String(p._id) === String(currentOpportunity.proyectoId));
+      setFormData(prev => ({
+        ...prev,
+        clienteId: selectedClient?.id || '',
+        nombreCliente: selectedClient?.empresa || selectedClient?.nombre || selectedClient?.razonSocial || selectedClient?.name || '',
+        proyectoId: selectedProject?.id || '',
+        nombreProyecto: selectedProject?.nombreProyecto || selectedProject?.nombre || selectedProject?.proyectoNombre || selectedProject?.codigo || '',
+        personaContacto: currentOpportunity?.contactInfo?.contactPerson || '',
+        telefono: currentOpportunity?.contactInfo?.phone || '',
+        email: currentOpportunity?.contactInfo?.email || '',
+        descripcionProyecto: currentOpportunity?.projectDetails?.description || '',
+        montoTotal: currentOpportunity?.projectDetails?.estimatedBudget?.toString() || '',
+        cronograma: currentOpportunity?.projectDetails?.timeline || '',
+        prioridad: currentOpportunity?.priority || 'media',
+        oportunidadVentaId: currentOpportunity?.id || ''
+      }));
+    }
+  }, [isOpen, currentOpportunity, clients, proyectos, isFromOpportunity]);
+
+  // ...eliminado, ahora el estado se inicializa arriba...
+
+  // Proyectos y clientes: ya declarados arriba, solo ejecuta la carga
   React.useEffect(() => {
     getProyectos();
     getClients();
@@ -112,9 +164,7 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
 
   // Mostrar en consola cómo se obtienen los estados y municipios
   React.useEffect(() => {
-    console.log('Estados:', estados);
-    console.log('Municipios:', municipios);
-    console.log('Estado seleccionado:', formData.estado);
+  // console.log eliminado
   }, [estados, municipios, formData.estado]);
   // Opciones para el select de proyectos (con clientId)
   const projectOptions = proyectos?.map(p => ({
@@ -155,16 +205,13 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
   // Hook para cargar empleados
   const { persons, getPersons, loading: loadingEmployees } = usePerson();
   React.useEffect(() => { getPersons(); /* solo una vez */ }, []);
-  // Opciones para el select de responsables (corregido)
-  // Opciones para el select de responsables (corregido)
-  // Clave única para cada responsable (evita duplicados)
   const assignedToOptions = persons?.map((emp, idx) => {
     const idValue = emp.empleadoId || emp.id || `${idx}`;
-    // Si hay duplicados, agrega el índice para asegurar unicidad
+    const uniqueValue = `${idValue}_${idx}`;
     return {
-      value: idValue,
+      value: uniqueValue,
       label: emp.nombreCompleto || emp.nombre || emp.empleadoId || emp.id,
-      key: `${idValue}-${idx}`
+      key: uniqueValue
     };
   }) || [];
 
@@ -187,7 +234,7 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
         [field]: cleanValue
       }));
     } else if (field === 'asignadoA') {
-      // Guardar id y nombre
+      // Guardar id y nombre como antes
       const selected = assignedToOptions.find(opt => opt.value === value);
       setFormData(prev => ({
         ...prev,
@@ -251,7 +298,8 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
       newErrors.direccion = 'La dirección es requerida';
     }
 
-    if (!formData?.montoTotal?.trim()) {
+    let montoTotalStr = typeof formData?.montoTotal === 'string' ? formData?.montoTotal : String(formData?.montoTotal ?? '');
+    if (!montoTotalStr.trim()) {
       newErrors.montoTotal = 'El presupuesto estimado es requerido';
     }
 
@@ -277,30 +325,107 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
     if (!validateForm()) return;
     setIsSubmitting(true);
     try {
-      // Construir el objeto con los campos que espera el backend
+      // Buscar el proyecto seleccionado para obtener los objetos completos
+      const proyectoSeleccionado = proyectos?.find(p => String(p.id) === String(formData?.proyectoId) || String(p._id) === String(formData?.proyectoId));
+  
+      let montoTotal = 0;
+      if (proyectoSeleccionado?.presupuesto && typeof proyectoSeleccionado?.presupuesto === 'object') {
+        montoTotal = Object.values(proyectoSeleccionado.presupuesto).reduce((acc, val) => acc + (typeof val === 'number' ? val : 0), 0);
+      } else if (typeof proyectoSeleccionado?.presupuesto === 'number') {
+        montoTotal = proyectoSeleccionado.presupuesto;
+      } else if (formData?.montoTotal && !isNaN(Number(formData.montoTotal))) {
+        montoTotal = Number(formData.montoTotal);
+      }
+      // Formatear tiempoEjecucion como string
+      let tiempoEjecucion = '';
+      const cronograma = proyectoSeleccionado?.cronograma || formData?.cronograma || null;
+      if (cronograma && typeof cronograma === 'object' && cronograma.fechaInicio && cronograma.fechaFin) {
+        tiempoEjecucion = `${cronograma.fechaInicio} a ${cronograma.fechaFin}`;
+      } else if (typeof cronograma === 'string') {
+        tiempoEjecucion = cronograma;
+      } else {
+        tiempoEjecucion = '';
+      }
+      // Payload adaptado a la estructura esperada por el backend
+      const ubicacionStr = [formData?.direccion, formData?.municipio, formData?.estado].filter(Boolean).join(', ');
+      // Normalizar prioridad
+      const PRIORIDADES_VALIDAS = ['urgente', 'alta', 'media', 'baja'];
+      let prioridadValue = (formData?.prioridad || '').toLowerCase();
+      if (!PRIORIDADES_VALIDAS.includes(prioridadValue)) {
+        prioridadValue = 'media';
+      }
+
       const quotationPayload = {
-        clienteId: formData?.clienteId,
+        // Campos requeridos en el nivel raíz
         nombreCliente: formData?.nombreCliente?.trim(),
+        clienteId: formData?.clienteId,
         proyectoId: formData?.proyectoId,
         nombreProyecto: formData?.nombreProyecto?.trim(),
+        ubicacion: {
+          estado: formData?.estado?.trim() ? formData?.estado?.trim() : null,
+          municipio: formData?.municipio?.trim() ? formData?.municipio?.trim() : null,
+          direccion: formData?.direccion?.trim() ? formData?.direccion?.trim() : null
+        },
+        presupuestoEstimado: montoTotal,
+        tiempoEjecucion: tiempoEjecucion,
         personaContacto: formData?.personaContacto?.trim(),
         telefono: formData?.telefono?.trim(),
         email: formData?.email?.trim(),
         descripcionProyecto: formData?.descripcionProyecto?.trim(),
-        ubicacion: {
-          estado: formData?.estado,
-          municipio: formData?.municipio,
-          direccion: formData?.direccion,
-        },
-        presupuestoEstimado: Number(formData?.montoTotal),
-        tiempoEjecucion: formData?.cronograma,
-        prioridad: formData?.prioridad,
         Responsable: formData?.asignadoA,
         idResponsable: formData?.personalAsignadoId,
-        tipoProyecto: formData?.tipoProyecto,
-        notas: formData?.notas
+        notas: formData?.notas?.trim() ? formData?.notas?.trim() : null,
+        prioridad: prioridadValue,
+        // Estructura anidada para compatibilidad
+        informacion_basica: {
+          cliente: [
+            { id_cliente: formData?.clienteId },
+            { nombre_cliente: formData?.nombreCliente?.trim() }
+          ],
+          proyecto: [
+            { id_proyecto: formData?.proyectoId },
+            { nombre_proyecto: formData?.nombreProyecto?.trim() }
+          ],
+          prioridad: prioridadValue,
+          tipo_proyecto: formData?.tipoProyecto
+        },
+        informacion_contacto: [
+          {
+            persona_contacto1: [
+              {
+                Persona_de_contacto_nombre: formData?.personaContacto?.trim(),
+                telefono: formData?.telefono?.trim(),
+                email: formData?.email?.trim()
+              }
+            ]
+          }
+        ],
+        detalles_proyecto: {
+          descripcion_proyecto: formData?.descripcionProyecto?.trim() || null,
+          ubicacion_proyecto: [
+            {
+              estado: formData?.estado?.trim() ? formData?.estado?.trim() : null,
+              municipio: formData?.municipio?.trim() ? formData?.municipio?.trim() : null,
+              direccion: formData?.direccion?.trim() ? formData?.direccion?.trim() : null
+            }
+          ],
+          presupuesto_estimado_mxn: montoTotal,
+          tiempo_ejecucion: tiempoEjecucion
+        },
+        asignacion: {
+          responsables: formData?.personalAsignadoId && formData?.asignadoA
+            ? [
+                {
+                  id: formData?.personalAsignadoId,
+                  nombre: formData?.asignadoA
+                }
+              ]
+            : [],
+          notas_adicionales: formData?.notas?.trim() ? formData?.notas?.trim() : null
+        },
+        oportunidadVentaId: formData?.oportunidadVentaId || opportunityId || ''
       };
-      console.log('Objeto enviado al backend:', quotationPayload);
+  // console.log eliminado
       const response = await createQuotation(quotationPayload);
       const wasCreated = response?.success || response?.id || response?.data?.id;
       if (wasCreated) {
@@ -312,35 +437,16 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
       }
     } catch (error) {
       alert('Error al crear la cotización');
-      console.error('Error creating quotation:', error);
+      if (error?.response?.data) {
+        console.error('Error detalle backend:', error.response.data);
+      } else {
+        console.error('Error creating quotation:', error);
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleClose = () => {
-    setFormData({
-      clienteId: '',
-      nombreCliente: '',
-      proyectoId: '',
-      nombreProyecto: '',
-      personalAsignadoId: '',
-      asignadoA: '',
-      personaContacto: '',
-      telefono: '',
-      email: '',
-      descripcionProyecto: '',
-      ubicacion: '',
-      montoTotal: '',
-      cronograma: '',
-      prioridad: 'media',
-      tipoProyecto: 'hvac',
-      notas: ''
-    });
-    setErrors({});
-    setIsSubmitting(false);
-    onClose?.();
-  };
 
   if (!isOpen) return null;
 
@@ -380,30 +486,89 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
                 Información Básica
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Nombre del Cliente"
-                  required
-                  value={formData?.nombreCliente}
-                  disabled
-                  error={errors?.nombreCliente}
-                  placeholder="Cliente del proyecto seleccionado"
-                />
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">
-                    Nombre del Proyecto <span className="text-destructive">*</span>
-                  </label>
-                  <Select
-                    value={projectOptions.find(opt => opt.label === formData?.nombreProyecto)?.value || ''}
-                    onChange={handleProjectChange}
-                    options={projectOptions}
-                    isLoading={loadingProyectos}
-                    placeholder={loadingProyectos ? 'Cargando proyectos...' : 'Selecciona un proyecto'}
+                {/* Cliente: select si no hay oportunidad, input deshabilitado si hay oportunidad */}
+                {opportunityId ? (
+                  <Input
+                    label="Nombre del Cliente"
+                    required
+                    value={formData?.nombreCliente}
+                    disabled
+                    error={errors?.nombreCliente}
+                    placeholder="Cliente del proyecto seleccionado"
                   />
-                  {errors?.nombreProyecto && (
-                    <p className="text-sm text-destructive mt-1">{errors?.nombreProyecto}</p>
-                  )}
-                </div>
+                ) : (
+                  <Select
+                    label="Cliente"
+                    required
+                    value={formData?.clienteId}
+                    onChange={value => {
+                      const selectedClient = clients?.find(c => String(c.id) === String(value) || String(c._id) === String(value));
+                      setFormData(prev => ({
+                        ...prev,
+                        clienteId: value,
+                        nombreCliente: getClientNameById(value),
+                        proyectoId: '',
+                        nombreProyecto: '',
+                        personaContacto: selectedClient?.contacto || '',
+                        telefono: selectedClient?.telefono || '',
+                        email: selectedClient?.email || ''
+                      }));
+                    }}
+                    options={clients?.map(c => ({ value: c.id || c._id, label: c.empresa || c.nombre || c.razonSocial || c.name }))}
+                    isLoading={loadingClients}
+                    error={errors?.nombreCliente}
+                    placeholder={loadingClients ? 'Cargando clientes...' : 'Selecciona un cliente'}
+                  />
+                )}
+
+                {/* Proyecto: select si no hay oportunidad, input deshabilitado si hay oportunidad */}
+                {opportunityId ? (
+                  <Input
+                    label="Nombre del Proyecto"
+                    required
+                    value={formData?.nombreProyecto}
+                    disabled
+                    error={errors?.nombreProyecto}
+                    placeholder="Proyecto relacionado a la oportunidad"
+                  />
+                ) : (
+                    <Select
+                      label="Proyecto"
+                      required
+                      value={formData?.proyectoId}
+                      onChange={value => {
+                        const selected = proyectos?.find(p => String(p.id) === String(value) || String(p._id) === String(value));
+                        // Precargar presupuesto total usando el nombre exacto
+                        let montoTotal = '';
+                        if (selected?.presupuesto && typeof selected.presupuesto === 'object') {
+                          montoTotal = selected.presupuesto.total || '';
+                        }
+                        // Precargar cronograma como rango de fechas usando el nombre exacto
+                        let cronograma = '';
+                        if (selected?.cronograma && typeof selected.cronograma === 'object') {
+                          if (selected.cronograma.fechaInicio && selected.cronograma.fechaFin) {
+                            cronograma = `${selected.cronograma.fechaInicio} a ${selected.cronograma.fechaFin}`;
+                          } else {
+                            cronograma = selected.cronograma.fechaInicio || selected.cronograma.fechaFin || '';
+                          }
+                        }
+                        setFormData(prev => ({
+                          ...prev,
+                          proyectoId: value,
+                          nombreProyecto: selected?.nombre || selected?.nombreProyecto || selected?.proyectoNombre || '',
+                          descripcionProyecto: selected?.descripcion || selected?.descripcionProyecto || '',
+                          ubicacion: selected?.ubicacion || '',
+                          montoTotal: montoTotal,
+                          cronograma: cronograma
+                        }));
+                      }}
+                      options={proyectos?.filter(p => String(p.cliente?.id) === String(formData.clienteId)).map(p => ({ value: p.id || p._id, label: p.nombre || p.nombreProyecto || p.proyectoNombre }))}
+                      isLoading={loadingProyectos}
+                      error={errors?.nombreProyecto}
+                      placeholder={formData.clienteId ? (loadingProyectos ? 'Cargando proyectos...' : 'Selecciona un proyecto') : 'Selecciona primero un cliente'}
+                      disabled={!formData.clienteId}
+                    />
+                )}
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">

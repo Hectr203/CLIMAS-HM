@@ -137,14 +137,9 @@ const MainDashboard = () => {
 
           {/* Main Content Grid */}
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-8">
-            {/* Project Status Table - Takes 2 columns */}
-            <div className="xl:col-span-2">
+            {/* Project Status Table - Ahora ocupa las 3 columnas */}
+            <div className="xl:col-span-3">
               <ProjectStatusTable />
-            </div>
-
-            {/* Notification Panel - Takes 1 column */}
-            <div className="xl:col-span-1">
-              <NotificationPanel />
             </div>
           </div>
 

@@ -9,17 +9,34 @@ const useRequisi = () => {
   const [error, setError] = useState(null);
 
   const getRequisitions = async (filters = {}) => {
+    if (loading) return []; // Evitar múltiples llamadas simultáneas
+    
     setLoading(true);
     setError(null);
+    
     try {
       const response = await requisiService.getRequisitions(filters);
-      const data = response.success && Array.isArray(response.data) ? response.data : [];
-      setRequisitions(data);
-      return data;
+      
+      // Siempre debería ser un objeto con {success, data, message}
+      if (response?.success) {
+        const requisitionData = Array.isArray(response.data) ? response.data : [];
+        setRequisitions(requisitionData);
+        return requisitionData;
+      } else {
+        console.warn('Respuesta inesperada de requisiciones:', response);
+        setRequisitions([]);
+        return [];
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Error en getRequisitions:', err);
       setError(err);
-      showHttpError("Error al cargar requisiciones");
+      
+      // No mostrar error si la petición fue cancelada
+      if (err.message !== 'canceled' && !err.isNetworkError) {
+        showHttpError("Error al cargar requisiciones");
+      }
+      
+      setRequisitions([]);
       return [];
     } finally {
       setLoading(false);
@@ -32,7 +49,7 @@ const useRequisi = () => {
     try {
       const response = await requisiService.createRequisition(payload);
       if (response.success) {
-        showOperationSuccess(response.message || "Requisición creada ✅");
+        showOperationSuccess(response.message || "Requisición creada");
         setRequisitions((prev) => [...prev, response.data]); // ← Agregamos sin recargar todo
         return response.data;
       } else {
@@ -41,7 +58,7 @@ const useRequisi = () => {
       }
     } catch (err) {
       console.error(err);
-      showHttpError("No se pudo crear la requisición ❌");
+      showHttpError("No se pudo crear la requisición");
       setError(err);
       return null;
     } finally {
@@ -55,7 +72,7 @@ const useRequisi = () => {
     try {
       const response = await requisiService.updateRequisition(id, payload);
       if (response.success) {
-        showOperationSuccess(response.message || "Requisición actualizada ✅");
+        showOperationSuccess(response.message || "Requisición actualizada");
         setRequisitions(prev => prev.map(r => r.id === id ? { ...r, ...payload } : r));
         return { ...payload, id };
       } else {
@@ -64,7 +81,7 @@ const useRequisi = () => {
       }
     } catch (err) {
       console.error(err);
-      showHttpError("No se pudo actualizar la requisición ❌");
+      showHttpError("No se pudo actualizar la requisición");
       setError(err);
       return null;
     } finally {
@@ -72,7 +89,32 @@ const useRequisi = () => {
     }
   };
 
-  return { requisitions, loading, error, getRequisitions, createRequisition, updateRequisition };
+const deleteRequisition = async (id) => {
+  setLoading(true);
+  setError(null);
+  try {
+    const response = await requisiService.deleteRequisition(id);
+    if (response.success) {
+      showOperationSuccess(response.message || "Requisición eliminada");
+      setRequisitions(prev => prev.filter(r => r.id !== id));
+      return true;
+    } else {
+      showHttpError(response.message || "No se pudo eliminar");
+      return false;
+    }
+  } catch (err) {
+    console.error(err);
+    showHttpError("Error al eliminar la requisición");
+    setError(err);
+    return false;
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
+  return { requisitions, loading, error, getRequisitions, createRequisition, updateRequisition, deleteRequisition };
 };
 
 export default useRequisi;

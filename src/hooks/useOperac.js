@@ -32,7 +32,7 @@ const useOperac = () => {
     try {
       const response = await operacService.createWorkOrder(payload);
       if (response.success) {
-        showOperationSuccess(response.message || "Orden creada ✅");
+        showOperationSuccess(response.message || "Orden creada");
         const newOrders = await getOportunities(); // Actualiza estado global
         const savedOrder = newOrders.find(o => o.id === response.data.id) || response.data;
         return savedOrder;
@@ -42,7 +42,7 @@ const useOperac = () => {
       }
     } catch (err) {
       console.error(err);
-      showHttpError("No se pudo crear la orden ❌");
+      showHttpError("No se pudo crear la orden");
       setError(err);
       return null;
     } finally {
@@ -56,7 +56,7 @@ const useOperac = () => {
     try {
       const response = await operacService.updateWorkOrder(id, payload);
       if (response.success) {
-        showOperationSuccess(response.message || "Orden actualizada ✅");
+        showOperationSuccess(response.message || "Orden actualizada");
         // Actualiza localmente sin recargar
         setOportunities(prev => prev.map(o => o.id === id ? { ...o, ...payload } : o));
         return { ...payload, id };
@@ -66,15 +66,38 @@ const useOperac = () => {
       }
     } catch (err) {
       console.error(err);
-      showHttpError("No se pudo actualizar la orden ❌");
+      showHttpError("No se pudo actualizar la orden");
       setError(err);
       return null;
     } finally {
       setLoading(false);
     }
   };
+  const deleteWorkOrder = async (id) => {
+  setLoading(true);
+  setError(null);
+  try {
+    const response = await operacService.deleteWorkOrder(id);
+    if (response.success) {
+      showOperationSuccess(response.message || "Orden eliminada");
+      setOportunities(prev => prev.filter(o => o.id !== id));
+      return true;
+    } else {
+      showHttpError(response.message || "Error al eliminar la orden");
+      return false;
+    }
+  } catch (err) {
+    console.error(err);
+    showHttpError("No se pudo eliminar la orden");
+    setError(err);
+    return false;
+  } finally {
+    setLoading(false);
+  }
+};
 
-  return { oportunities, loading, error, getOportunities, createWorkOrder, updateWorkOrder };
+
+  return { oportunities, loading, error, getOportunities, createWorkOrder, updateWorkOrder, deleteWorkOrder, };
 };
 
 export default useOperac;

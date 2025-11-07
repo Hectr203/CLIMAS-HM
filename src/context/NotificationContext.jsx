@@ -116,6 +116,54 @@ export const NotificationProvider = ({ children }) => {
     const message = messages[operation] || messages.default;
     return showSuccess(message);
   }, [showSuccess]);
+    //  Mostrar notificación tipo confirmación con botones
+
+const showConfirm = useCallback((message, { onConfirm, onCancel } = {}) => {
+  const id = Date.now() + Math.random();
+
+  const action = (
+    <div className="flex justify-end gap-3 mt-3">
+      <button
+        onClick={() => {
+          if (onCancel) onCancel();
+          removeNotification(id);
+        }}
+        className="px-4 py-1.5 text-sm font-medium border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition"
+      >
+        Cancelar
+      </button>
+
+      <button
+        onClick={() => {
+          if (onConfirm) onConfirm();
+          removeNotification(id);
+        }}
+        className="px-4 py-1.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition"
+      >
+        Eliminar
+      </button>
+    </div>
+  );
+
+  setNotifications(prev => [
+    ...prev,
+    {
+      id,
+      message: (
+        <div className="flex flex-col">
+          <span className="text-sm text-gray-800">{message}</span>
+          {action}
+        </div>
+      ),
+      type: NotificationTypes.WARNING,
+      duration: 0, // No se cierra automáticamente
+      persistent: true,
+    }
+  ]);
+}, [removeNotification]);
+
+ 
+
 
   const value = {
     notifications,
@@ -128,7 +176,8 @@ export const NotificationProvider = ({ children }) => {
     showWarning,
     showInfo,
     showHttpError,
-    showOperationSuccess
+    showOperationSuccess,
+    showConfirm,
   };
 
   return (

@@ -23,6 +23,7 @@ import WorkshopOperationsCenter from './pages/workshop-operations-center';
 import SalesOpportunityManagement from './pages/sales-opportunity-management';
 import QuotationDevelopmentCenter from './pages/quotation-development-center';
 import SalesExecutionMonitoring from './pages/sales-execution-monitoring';
+import ProjectAbonosManagement from './pages/project-abonos-management';
 
 const Routes = () => {
   return (
@@ -160,6 +161,14 @@ const Routes = () => {
               element={
                 <ProtectedRoute requiredPath="/quotation-development-center">
                   <QuotationDevelopmentCenter />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/project-abonos-management" 
+              element={
+                <ProtectedRoute requiredPath="/project-abonos-management">
+                  <ProjectAbonosManagement />
                 </ProtectedRoute>
               } 
             />

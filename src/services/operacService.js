@@ -1,7 +1,7 @@
 import httpService from "./httpService";
 
 const operacService = {
-  //  Ahora acepta filtros dinámicos
+  // Ahora acepta filtros dinámicos
   async getWorkOrders(filters = {}) {
     try {
       const query = new URLSearchParams(filters).toString();
@@ -31,6 +31,16 @@ const operacService = {
       return response;
     } catch (error) {
       console.error("Error al actualizar trabajo:", error);
+      throw error;
+    }
+  },
+
+  async deleteWorkOrder(id) {
+    try {
+      const response = await httpService.delete(`/trabajos/${id}`);
+      return response; // { success, data, message }
+    } catch (error) {
+      console.error("Error al eliminar trabajo:", error);
       throw error;
     }
   },

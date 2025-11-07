@@ -23,6 +23,45 @@ const ClientManagement = () => {
   const [showNewClientModal, setShowNewClientModal] = useState(false);
   const { clients, getClients, createClient, editClient, loading, error } = useClient();
 
+  // Cálculo de clientes activos (case-insensitive para 'estado')
+  // Cálculo de total clientes del mes anterior
+  const getPreviousMonthClients = (clientsArr) => {
+    if (!Array.isArray(clientsArr)) return 0;
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    return clientsArr.filter(c => {
+      const createdAt = c?.createdAt ? new Date(c.createdAt) : null;
+      return createdAt && createdAt < firstDayOfMonth;
+    }).length;
+  };
+  const getActiveClients = (clientsArr) => {
+    if (!Array.isArray(clientsArr)) return 0;
+    return clientsArr.filter(c => {
+      const estado = (c?.estado || c?.status || '').toString().toLowerCase();
+      return estado === 'activo';
+    }).length;
+  };
+
+  // Cálculo de clientes activos del mes anterior
+  const getPreviousMonthActiveClients = (clientsArr) => {
+    if (!Array.isArray(clientsArr)) return 0;
+    const now = new Date();
+    // Primer día del mes actual
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    return clientsArr.filter(c => {
+      const estado = (c?.estado || c?.status || '').toString().toLowerCase();
+      const createdAt = c?.createdAt ? new Date(c.createdAt) : null;
+      return estado === 'activo' && createdAt && createdAt < firstDayOfMonth;
+    }).length;
+  };
+
+  // Cálculo de variación porcentual
+  const getMonthlyVariation = (current, previous) => {
+    if (typeof previous !== 'number' || previous === 0) return '+0%';
+    const percent = ((current - previous) / previous) * 100;
+    return `${percent > 0 ? '+' : ''}${percent.toFixed(0)}%`;
+  };
+
   useEffect(() => {
     getClients();
     // eslint-disable-next-line
@@ -165,49 +204,57 @@ const ClientManagement = () => {
 
     // Filtro de búsqueda (empresa, contacto, email)
     if (filters?.search) {
-      const search = filters.search.toLowerCase();
-      filtered = filtered?.filter(client =>
-        client?.empresa?.toLowerCase()?.includes(search) ||
-        client?.contacto?.toLowerCase()?.includes(search) ||
-        client?.email?.toLowerCase()?.includes(search)
-      );
+      const search = filters.search.trim().toLowerCase();
+      filtered = filtered?.filter(client => {
+        const empresa = (client?.empresa || client?.companyName || '').toString().toLowerCase();
+        const contacto = (client?.contacto || client?.contactPerson || '').toString().toLowerCase();
+        const email = (client?.email || '').toString().toLowerCase();
+        return empresa.includes(search) || contacto.includes(search) || email.includes(search);
+      });
     }
 
     // Industria
     if (filters?.industry) {
-      filtered = filtered?.filter(client => client?.industria === filters?.industry);
+      const industry = filters.industry.trim().toLowerCase();
+      filtered = filtered?.filter(client => (client?.industria || client?.industry || '').toString().toLowerCase() === industry);
     }
 
     // Estado
     if (filters?.status) {
-      filtered = filtered?.filter(client => client?.estado === filters?.status);
+      const estado = filters.status.trim().toLowerCase();
+      filtered = filtered?.filter(client => (client?.estado || client?.status || '').toString().toLowerCase() === estado);
     }
 
     // Relación
     if (filters?.relationshipHealth) {
-      filtered = filtered?.filter(client => client?.relacion === filters?.relationshipHealth);
+      const relacion = filters.relationshipHealth.trim().toLowerCase();
+      filtered = filtered?.filter(client => (client?.relacion || client?.relationshipHealth || '').toString().toLowerCase() === relacion);
     }
 
     // Ubicación
     if (filters?.location) {
-      filtered = filtered?.filter(client => client?.ubicacionEmpre === filters?.location || client?.ubicacion?.ciudad === filters?.location);
+      const location = filters.location.trim().toLowerCase();
+      filtered = filtered?.filter(client => {
+        const ubicacionEmpre = (client?.ubicacionEmpre || '').toString().toLowerCase();
+        const ciudad = (client?.ubicacion?.ciudad || '').toString().toLowerCase();
+        return ubicacionEmpre === location || ciudad === location;
+      });
     }
 
     // RFC
     if (filters?.rfc) {
-      filtered = filtered?.filter(client =>
-        client?.rfc?.toLowerCase()?.includes(filters?.rfc?.toLowerCase())
-      );
+      const rfc = filters.rfc.trim().toLowerCase();
+      filtered = filtered?.filter(client => (client?.rfc || '').toString().toLowerCase().includes(rfc));
     }
 
     // Proyectos mínimos
     if (filters?.minProjects) {
-      filtered = filtered?.filter(client => (parseInt(client?.totalProjects) || 0) >= parseInt(filters?.minProjects));
+      filtered = filtered?.filter(client => (parseInt(client?.totalProjects || client?.proyectos || 0) || 0) >= parseInt(filters?.minProjects));
     }
 
     // Valor mínimo
     if (filters?.minValue) {
-      filtered = filtered?.filter(client => (parseInt(client?.totalValue) || 0) >= parseInt(filters?.minValue));
+      filtered = filtered?.filter(client => (parseInt(client?.totalValue || client?.valor || 0) || 0) >= parseInt(filters?.minValue));
     }
 
     setFilteredClients(filtered);
@@ -438,6 +485,7 @@ const ClientManagement = () => {
 
               {/* Stats Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                {/* Total Clientes */}
                 <div className="bg-card border border-border rounded-lg p-6 card-shadow">
                   <div className="flex items-center justify-between">
                     <div>
@@ -450,16 +498,17 @@ const ClientManagement = () => {
                   </div>
                   <div className="mt-4 flex items-center space-x-2">
                     <Icon name="TrendingUp" size={16} className="text-success" />
-                    <span className="text-sm text-success">+12% este mes</span>
+                    <span className="text-sm text-success">{getMonthlyVariation(Array.isArray(clients) ? clients.length : 0, getPreviousMonthClients(clients))} este mes</span>
                   </div>
                 </div>
 
+                {/* Clientes Activos */}
                 <div className="bg-card border border-border rounded-lg p-6 card-shadow">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Clientes Activos</p>
                       <p className="text-2xl font-bold text-foreground">
-                        {Array.isArray(clients) ? clients.filter(c => c?.status === 'Activo').length : 0}
+                        {getActiveClients(clients)}
                       </p>
                     </div>
                     <div className="w-12 h-12 bg-success rounded-lg flex items-center justify-center">
@@ -468,7 +517,7 @@ const ClientManagement = () => {
                   </div>
                   <div className="mt-4 flex items-center space-x-2">
                     <Icon name="TrendingUp" size={16} className="text-success" />
-                    <span className="text-sm text-success">+8% este mes</span>
+                    <span className="text-sm text-success">{getMonthlyVariation(getActiveClients(clients), getPreviousMonthActiveClients(clients))} este mes</span>
                   </div>
                 </div>
 
@@ -519,13 +568,15 @@ const ClientManagement = () => {
 
               {/* Client List */}
               {viewMode === 'table' ? (
-                <ClientTable
-                  clients={filteredClients}
-                  onViewDetails={handleViewDetails}
-                  onEditClient={handleEditClient}
-                  onViewProjects={handleViewProjects}
-                  onViewContracts={handleViewContracts}
-                />
+                <div style={{overflowX: 'auto', width: '100%'}}>
+                  <ClientTable
+                    clients={filteredClients}
+                    onViewDetails={handleViewDetails}
+                    onEditClient={handleEditClient}
+                    onViewProjects={handleViewProjects}
+                    onViewContracts={handleViewContracts}
+                  />
+                </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                   {filteredClients?.map((client) => (
@@ -563,7 +614,7 @@ const ClientManagement = () => {
 
           {/* Sidebar */}
           {showSidebar && (
-            <div className="fixed right-0 top-0 h-full w-96 bg-card border-l border-border shadow-lg z-1000 overflow-y-auto">
+            <div className="fixed right-0 top-0 h-full bg-card border-l border-border shadow-lg z-1000 overflow-y-auto" style={{width: '500px', minWidth: '440px'}}>
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-lg font-semibold text-foreground">

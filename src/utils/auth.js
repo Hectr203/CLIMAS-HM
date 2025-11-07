@@ -24,6 +24,7 @@ export const ROLE_PERMISSIONS = {
       '/sales-opportunity-management',
       '/quotation-development-center',
       '/project-management',
+      '/project-abonos-management',
       '/work-order-processing',
       '/personnel-management',
       '/inventory-management',
@@ -91,11 +92,11 @@ export const getCurrentUser = () => {
   const authToken = localStorage.getItem('authToken');
   const userRole = localStorage.getItem('userRole');
   const userEmail = localStorage.getItem('userEmail');
-  
+
   if (!authToken || !userRole) {
     return null;
   }
-  
+
   return {
     token: authToken,
     role: userRole,
@@ -148,9 +149,9 @@ export const getAllowedNavigationItems = (userRole) => {
   if (!userRole || !ROLE_PERMISSIONS?.[userRole]) {
     return [];
   }
-  
+
   const allowedPaths = ROLE_PERMISSIONS?.[userRole]?.allowedPaths;
-  
+
   const allNavigationItems = [
     {
       label: 'Dashboard',
@@ -158,7 +159,7 @@ export const getAllowedNavigationItems = (userRole) => {
       icon: 'LayoutDashboard',
       tooltip: 'Resumen operacional y KPIs',
       badge: null,
-  roles: [AUTH_ROLES?.ADMIN]
+      roles: [AUTH_ROLES?.ADMIN]
     },
     {
       label: 'Oportunidades',
@@ -166,7 +167,7 @@ export const getAllowedNavigationItems = (userRole) => {
       icon: 'Target',
       tooltip: 'Gestión de oportunidades de venta',
       badge: 8,
-  roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.SALES_REPRESENTATIVE]
+      roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.SALES_REPRESENTATIVE]
     },
     {
       label: 'Cotizaciones',
@@ -174,7 +175,7 @@ export const getAllowedNavigationItems = (userRole) => {
       icon: 'FileText',
       tooltip: 'Desarrollo y gestión de cotizaciones',
       badge: null,
-  roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.SALES_REPRESENTATIVE, AUTH_ROLES?.FINANCIAL_CONTROLLER]
+      roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.SALES_REPRESENTATIVE, AUTH_ROLES?.FINANCIAL_CONTROLLER]
     },
     {
       label: 'Proyectos',
@@ -182,7 +183,14 @@ export const getAllowedNavigationItems = (userRole) => {
       icon: 'FolderOpen',
       tooltip: 'Gestión del ciclo de vida de proyectos',
       badge: 5,
-  roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.PROJECT_MANAGER]
+      roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.PROJECT_MANAGER]
+    },
+    {
+      label: 'Abonos',
+      path: '/project-abonos-management',
+      icon: 'CreditCard',
+      tooltip: 'Gestión de abonos de proyectos',
+      roles: [AUTH_ROLES?.ADMIN]
     },
     {
       label: 'Operaciones',
@@ -190,7 +198,7 @@ export const getAllowedNavigationItems = (userRole) => {
       icon: 'ClipboardList',
       tooltip: 'Procesamiento y seguimiento de órdenes de trabajo',
       badge: 12,
-  roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.WORKSHOP_SUPERVISOR]
+      roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.WORKSHOP_SUPERVISOR]
     },
     {
       label: 'Operaciones de Taller',
@@ -251,12 +259,12 @@ export const getAllowedNavigationItems = (userRole) => {
       ]
     }
   ];
-  
+
   // Filter navigation items based on user role and allowed paths
   const filterItems = (items) => {
     return items?.filter(item => {
       if (item?.children) {
-        const allowedChildren = item?.children?.filter(child => 
+        const allowedChildren = item?.children?.filter(child =>
           child?.roles?.includes(userRole) && allowedPaths?.includes(child?.path)
         );
         if (allowedChildren?.length > 0) {
@@ -269,7 +277,7 @@ export const getAllowedNavigationItems = (userRole) => {
       }
     });
   };
-  
+
   return filterItems(allNavigationItems);
 };
 
@@ -278,7 +286,7 @@ export const getDefaultPath = (userRole) => {
   if (!userRole || !ROLE_PERMISSIONS?.[userRole]) {
     return '/login';
   }
-  
+
   return ROLE_PERMISSIONS?.[userRole]?.defaultPath;
 };
 

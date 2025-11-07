@@ -10,6 +10,7 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
   
   const [formData, setFormData] = useState({
     itemCode: '',
+    name: '',
     description: '',
     specifications: '',
     category: '',
@@ -80,6 +81,9 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
     if (!formData?.itemCode?.trim()) {
       newErrors.itemCode = 'El código de artículo es requerido';
     }
+    if (!formData?.name?.trim()) {
+      newErrors.name = 'El nombre del artículo es requerido';
+    }
     if (!formData?.description?.trim()) {
       newErrors.description = 'La descripción es requerida';
     }
@@ -116,6 +120,7 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
       // Crear el payload según la estructura del backend
       const payload = {
         codigoArticulo: formData?.itemCode?.trim(),
+        nombre: formData?.name?.trim(),
         descripcion: formData?.description?.trim(),
         especificaciones: formData?.specifications?.trim() || '',
         categoria: formData?.category,
@@ -136,6 +141,7 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
       const itemForTable = {
         id: nuevoArticulo.id,
         itemCode: nuevoArticulo.codigoArticulo,
+        name: nuevoArticulo.nombre || '',
         description: nuevoArticulo.descripcion,
         specifications: nuevoArticulo.especificaciones,
         category: nuevoArticulo.categoria,
@@ -172,6 +178,7 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
   const handleReset = () => {
     setFormData({
       itemCode: '',
+      name: '',
       description: '',
       specifications: '',
       category: '',
@@ -246,6 +253,23 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
                   />
                   {errors?.itemCode && (
                     <p className="text-sm text-destructive mt-1">{errors?.itemCode}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Nombre *
+                  </label>
+                  <Input
+                    type="text"
+                    value={formData?.name}
+                    onChange={(e) => handleInputChange('name', e?.target?.value)}
+                    placeholder="Nombre del artículo"
+                    error={errors?.name}
+                    disabled={isSubmitting}
+                  />
+                  {errors?.name && (
+                    <p className="text-sm text-destructive mt-1">{errors?.name}</p>
                   )}
                 </div>
 

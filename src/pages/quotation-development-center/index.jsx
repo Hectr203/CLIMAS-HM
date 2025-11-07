@@ -26,8 +26,8 @@ const QuotationDevelopmentCenter = () => {
     const params = new URLSearchParams(window.location.search);
     const opportunityId = params.get('opportunityId');
     const newQuotation = params.get('newQuotation');
-    
     if (opportunityId && newQuotation === 'true') {
+      window.dispatchEvent(new CustomEvent('setNewQuotationModalFromOpportunity'));
       setIsNewQuotationModalOpen(true);
     }
   }, []);
@@ -39,13 +39,14 @@ const QuotationDevelopmentCenter = () => {
       setIsLoading(true);
       try {
         const response = await getCotizaciones();
-        console.log('Respuesta completa del backend:', response);
+  // console.log eliminado
         const cotizaciones = Array.isArray(response.data?.data) ? response.data.data : [];
-        console.log('Cotizaciones obtenidas:', cotizaciones);
+  // console.log eliminado
         // Mapeo adaptado a la estructura real del backend
         const mapped = cotizaciones.map(cotizacion => ({
           id: cotizacion.id || '', // id de Cosmos
           folio: cotizacion.folio || '', // folio
+          clientId: cotizacion.informacion_basica?.cliente?.find?.(c => 'id_cliente' in c)?.id_cliente || '',
           clientName: cotizacion.informacion_basica?.cliente?.find?.(c => c?.nombre_cliente)?.nombre_cliente || '',
           projectName: cotizacion.informacion_basica?.proyecto?.find?.(p => p?.nombre_proyecto)?.nombre_proyecto || '',
           status: 'development',
@@ -85,11 +86,38 @@ const QuotationDevelopmentCenter = () => {
     };
     setQuotations(prev => {
       const updated = [mappedQuotation, ...prev];
-      console.log('Cotizaciones actualizadas:', updated);
+  // console.log eliminado
       return updated;
     });
     setSelectedQuotation(mappedQuotation);
     setActiveTab('builder');
+    setIsNewQuotationModalOpen(false);
+    // Limpiar el parámetro newQuotation de la URL para evitar que se abra el modal tras recargar
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('newQuotation')) {
+      params.delete('newQuotation');
+      window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+    }
+    // Recargar cotizaciones desde el backend para tener la lista actualizada
+    getCotizaciones().then(response => {
+      const cotizaciones = Array.isArray(response.data?.data) ? response.data.data : [];
+      const mapped = cotizaciones.map(cotizacion => ({
+        id: cotizacion.id || '',
+        folio: cotizacion.folio || '',
+        clientId: cotizacion.informacion_basica?.cliente?.find?.(c => 'id_cliente' in c)?.id_cliente || '',
+        clientName: cotizacion.informacion_basica?.cliente?.find?.(c => c?.nombre_cliente)?.nombre_cliente || '',
+        projectName: cotizacion.informacion_basica?.proyecto?.find?.(p => p?.nombre_proyecto)?.nombre_proyecto || '',
+        status: 'development',
+        createdDate: cotizacion.fechaCreacion ? new Date(cotizacion.fechaCreacion).toLocaleDateString('es-MX') : '',
+        lastModified: cotizacion.fechaActualizacion ? new Date(cotizacion.fechaActualizacion).toLocaleDateString('es-MX') : '',
+        assignedTo: cotizacion.asignacion?.responsables?.[0]?.nombre_responsable || '',
+        priority: cotizacion.informacion_basica?.prioridad || 'media',
+        quotationData: {
+          totalAmount: cotizacion.detalles_proyecto?.presupuesto_estimado_mxn || 0
+        }
+      }));
+      setQuotations(mapped);
+    });
   };
 
   const handleQuotationSelect = async (quotation) => {
@@ -249,7 +277,10 @@ const QuotationDevelopmentCenter = () => {
                 <Button
                   iconName="Plus"
                   iconPosition="left"
-                  onClick={() => setIsNewQuotationModalOpen(true)}
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('resetNewQuotationModal'));
+                    setIsNewQuotationModalOpen(true);
+                  }}
                 >
                   Nueva Cotización
                 </Button>

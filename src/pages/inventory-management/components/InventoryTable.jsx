@@ -2,7 +2,14 @@ import React, { useState } from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 
-const InventoryTable = ({ items, onViewDetails, onUpdateStock, onCreatePO }) => {
+const InventoryTable = ({ 
+  items, 
+  onViewDetails, 
+  onUpdateStock, 
+  onCreatePO,
+  onAddItem,
+  onGenerateReport
+}) => {
   const [sortField, setSortField] = useState('itemCode');
   const [sortDirection, setSortDirection] = useState('asc');
 
@@ -40,11 +47,15 @@ const InventoryTable = ({ items, onViewDetails, onUpdateStock, onCreatePO }) => 
   };
 
   return (
-    <div className="bg-card rounded-lg border border-border overflow-hidden">
-      {/* Desktop Table */}
-      <div className="hidden lg:block overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-muted border-b border-border">
+    <div className="space-y-4">
+      {/* Quick Functions */}
+
+
+      <div className="bg-card rounded-lg border border-border overflow-hidden">
+        {/* Desktop Table */}
+        <div className="hidden lg:block overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-muted border-b border-border">
             <tr>
               <th className="text-left p-3 lg:p-4">
                 <button
@@ -53,6 +64,15 @@ const InventoryTable = ({ items, onViewDetails, onUpdateStock, onCreatePO }) => 
                 >
                   <span>Código</span>
                   <SortIcon field="itemCode" />
+                </button>
+              </th>
+              <th className="text-left p-3 lg:p-4">
+                <button
+                  onClick={() => handleSort('name')}
+                  className="flex items-center space-x-2 font-medium text-sm text-foreground hover:text-primary transition-smooth"
+                >
+                  <span>Nombre</span>
+                  <SortIcon field="name" />
                 </button>
               </th>
               <th className="text-left p-3 lg:p-4">
@@ -111,6 +131,9 @@ const InventoryTable = ({ items, onViewDetails, onUpdateStock, onCreatePO }) => 
                 <tr key={item?.id} className="border-b border-border hover:bg-muted/50 transition-smooth">
                   <td className="p-3 lg:p-4">
                     <span className="font-mono text-sm text-foreground">{item?.itemCode}</span>
+                  </td>
+                  <td className="p-3 lg:p-4">
+                    <div className="font-medium text-sm text-foreground">{item?.name}</div>
                   </td>
                   <td className="p-3 lg:p-4">
                     <div className="font-medium text-sm text-foreground">{item?.description}</div>
@@ -267,6 +290,7 @@ const InventoryTable = ({ items, onViewDetails, onUpdateStock, onCreatePO }) => 
         })
         )}
       </div>
+    </div>
     </div>
   );
 };

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const PurchaseOrderPanel = ({ orders, onViewOrder, onApproveOrder, onCreateOrder, onDeleteOrder }) => {
   const [orderToDelete, setOrderToDelete] = useState(null);
@@ -59,7 +59,7 @@ const PurchaseOrderPanel = ({ orders, onViewOrder, onApproveOrder, onCreateOrder
       formatCurrency(item.subtotal)
     ]);
 
-    autoTable(doc, {
+    doc.autoTable({
       head: tableHead,
       body: tableBody,
       startY: 90,
