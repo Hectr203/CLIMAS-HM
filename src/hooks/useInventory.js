@@ -17,6 +17,7 @@ const useInventory = () => {
       if (response.success) {
         // Verificar si data es un array directamente
         if (Array.isArray(response.data)) {
+
           setArticulos(response.data);
         } 
         // Verificar si data tiene una propiedad que contenga el array
@@ -28,6 +29,7 @@ const useInventory = () => {
           for (const key of possibleArrayKeys) {
             if (response.data[key] && Array.isArray(response.data[key])) {
               foundArray = response.data[key];
+
               break;
             }
           }
@@ -35,14 +37,15 @@ const useInventory = () => {
           if (foundArray) {
             setArticulos(foundArray);
           } else {
+            console.log('No se encontró array de artículos. Estructura de response.data:', Object.keys(response.data));
             setArticulos([]);
           }
         } else {
-          console.log('response.data no es válido');
+          console.log('response.data no es válido:', response.data);
           setArticulos([]);
         }
       } else {
-        console.log('Backend response.success es false');
+        console.log('Backend response.success es false:', response);
         setArticulos([]);
       }
     } catch (err) {
