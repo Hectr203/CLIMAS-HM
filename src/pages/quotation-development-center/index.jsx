@@ -152,6 +152,13 @@ const QuotationDevelopmentCenter = () => {
   };
 
   const handleQuotationUpdate = (quotationId, updates) => {
+    console.log('🔄 Actualizando cotización:', {
+      quotationId,
+      updates,
+      materialsCount: updates?.materials?.length || 0,
+      riskFactorsCount: updates?.riskAssessment?.factors?.length || 0
+    });
+
     setQuotations(prev => prev?.map(quote => 
       quote?.id === quotationId 
         ? { ...quote, ...updates, lastModified: new Date()?.toISOString()?.split('T')?.[0] }

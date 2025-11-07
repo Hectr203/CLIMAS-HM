@@ -14,11 +14,11 @@ const CreatePOModal = ({
   const [selectedItems, setSelectedItems] = useState([]);
   const [orderDetails, setOrderDetails] = useState({
     supplier: '',
-    expectedDelivery: '',
     notes: '',
     urgent: false,
     reference: '',
-    paymentTerms: 'net30'
+    paymentTerms: 'net30',
+    priority: 'normal'
   });
 
   const paymentTermsOptions = [
@@ -26,6 +26,13 @@ const CreatePOModal = ({
     { value: 'net15', label: '15 días' },
     { value: 'net30', label: '30 días' },
     { value: 'net60', label: '60 días' },
+  ];
+
+  const priorityOptions = [
+    { value: 'baja', label: 'Baja' },
+    { value: 'normal', label: 'Normal' },
+    { value: 'alta', label: 'Alta' },
+    { value: 'urgente', label: 'Urgente' },
   ];
 
   useEffect(() => {
@@ -114,6 +121,20 @@ const CreatePOModal = ({
     }));
   };
 
+  const handlePriceChange = (id, newPrice) => {
+    setSelectedItems(selectedItems.map(item => {
+      if (item.id === id) {
+        const price = Math.max(0, parseFloat(newPrice) || 0);
+        return {
+          ...item,
+          unitCost: price,
+          subtotal: price * item.orderQty
+        };
+      }
+      return item;
+    }));
+  };
+
   const handleDetailChange = (field, value) => {
     setOrderDetails({
       ...orderDetails,
@@ -136,11 +157,11 @@ const CreatePOModal = ({
     // Crear la estructura de la orden
     const orderData = {
       supplier: orderDetails.supplier,
-      expectedDelivery: orderDetails.expectedDelivery,
       notes: orderDetails.notes,
       urgent: orderDetails.urgent,
       reference: orderDetails.reference,
       paymentTerms: orderDetails.paymentTerms,
+      priority: orderDetails.priority,
       items: selectedItems,
       total: calculateTotal(),
       status: 'pending',
@@ -161,11 +182,11 @@ const CreatePOModal = ({
           setSelectedItems([]);
           setOrderDetails({
             supplier: '',
-            expectedDelivery: '',
             notes: '',
             urgent: false,
             reference: '',
-            paymentTerms: 'net30'
+            paymentTerms: 'net30',
+            priority: 'normal'
           });
         }
       }, 300);
@@ -342,8 +363,17 @@ const CreatePOModal = ({
                           <td className="p-2">{item.name}</td>
                           <td className="p-2">{item.description}</td>
                           <td className="p-2">
-                            <div className="font-medium">
-                              {formatCurrency(item.unitCost)}
+                            <div className="flex items-center">
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={item.unitCost}
+                                onChange={(e) => handlePriceChange(item.id, e.target.value)}
+                                className="w-24 text-right"
+                                placeholder="0.00"
+                              />
+                              <span className="ml-1 text-xs text-muted-foreground">MXN</span>
                             </div>
                           </td>
                           <td className="p-2">
@@ -387,7 +417,7 @@ const CreatePOModal = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Proveedor
+                      Proveedor *
                     </label>
                     <input
                       type="text"
@@ -400,14 +430,19 @@ const CreatePOModal = ({
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Fecha de entrega esperada
+                      Prioridad
                     </label>
-                    <input
-                      type="date"
+                    <select
                       className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                      value={orderDetails.expectedDelivery}
-                      onChange={(e) => handleDetailChange('expectedDelivery', e.target.value)}
-                    />
+                      value={orderDetails.priority}
+                      onChange={(e) => handleDetailChange('priority', e.target.value)}
+                    >
+                      {priorityOptions.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   
                   <div>
@@ -474,6 +509,9 @@ const CreatePOModal = ({
                     </div>
                     <div className="text-sm">
                       <span className="text-muted-foreground">Proveedor:</span> {orderDetails.supplier || 'No especificado'}
+                    </div>
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Prioridad:</span> {priorityOptions.find(p => p.value === orderDetails.priority)?.label || 'Normal'}
                     </div>
                     <div className="text-sm">
                       <span className="text-muted-foreground">Total:</span> {formatCurrency(calculateTotal())}
