@@ -163,22 +163,16 @@ onClose?.();
                 onChange={(value) => handleInputChange('paymentMethod', value)}
                 required
               />
-
-              <Input
-                type="date"
-                label="Fecha Programada"
-                value={authData?.scheduledDate}
-                onChange={(e) => handleInputChange('scheduledDate', e?.target?.value)}
-                required
-              />
-            </div>
-
-            <Select
+              <Select
               label="Prioridad"
               options={priorityOptions}
               value={authData?.priority}
               onChange={(value) => handleInputChange('priority', value)}
             />
+              
+            </div>
+
+            
           </div>
 
           {/* Comments */}
