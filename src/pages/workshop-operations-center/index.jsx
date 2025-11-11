@@ -488,7 +488,7 @@ const WorkshopOperationsCenter = () => {
       {/* Main Content */}
       <div className={`transition-all duration-300 ${
         sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'
-      } lg:pt-0 pt-16`}>
+      }`}>
         <div className="p-6">
           {/* Breadcrumb */}
           <div className="mb-6">

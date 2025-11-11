@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
+import Breadcrumb from '../../components/ui/Breadcrumb';
 import DocumentTree from './components/DocumentTree';
 import WorkflowStatus from './components/WorkflowStatus';
 import QuotationWorkflow from './components/QuotationWorkflow';
@@ -214,6 +215,11 @@ const ProjectDocumentationCenter = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
+        {/* Breadcrumb */}
+        <div className="mb-6">
+          <Breadcrumb />
+        </div>
+
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
           <div>

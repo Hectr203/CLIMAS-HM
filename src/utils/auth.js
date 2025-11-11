@@ -30,6 +30,7 @@ export const ROLE_PERMISSIONS = {
       '/inventory-management',
       '/client-management',
       '/financial-management',
+      '/user-management',
       '/project-gallery-viewer',
       '/project-detail-gallery',
       '/project-documentation-center',
@@ -257,6 +258,14 @@ export const getAllowedNavigationItems = (userRole) => {
           roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.FINANCIAL_CONTROLLER]
         }
       ]
+    },
+    {
+      label: 'Usuarios',
+      path: '/user-management',
+      icon: 'UserCog',
+      tooltip: 'Gestión de usuarios del sistema',
+      badge: null,
+      roles: [AUTH_ROLES?.ADMIN]
     }
   ];
 
