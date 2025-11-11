@@ -158,15 +158,15 @@ const PersonnelManagement = () => {
   };
 
   const handleExportData = () => {
-    console.log('Exporting personnel data...');
+  // console.log eliminado
   };
 
   const handleViewComplianceDetails = (type) => {
-    console.log('Viewing compliance details for:', type);
+  // console.log eliminado
   };
 
   const handleScheduleTraining = () => {
-    console.log('Scheduling training...');
+  // console.log eliminado
   };
 
   const handleSidebarToggle = () => {
@@ -250,7 +250,7 @@ const PersonnelManagement = () => {
       <div
         className={`transition-all duration-300 ${
           sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'
-        } lg:pt-0 pt-16`}
+        } lg:pt-0`}
       >
         <div className="p-6">
           {/* Breadcrumb */}

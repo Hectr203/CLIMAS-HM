@@ -697,7 +697,7 @@ ${order.notas || 'Sin notas adicionales'}
       />
       <main className={`transition-all duration-300 ${
         sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'
-      } pt-16`}>
+      }`}>
         <div className="p-6">
           <Breadcrumb />
           

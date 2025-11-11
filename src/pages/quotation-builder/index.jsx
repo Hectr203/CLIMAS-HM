@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
+import Breadcrumb from '../../components/ui/Breadcrumb';
 import QuotationForm from './components/QuotationForm';
 import QuotationPreview from './components/QuotationPreview';
 import MaterialIdentification from './components/MaterialIdentification';
@@ -301,7 +302,7 @@ const QuotationBuilder = () => {
               variant="outline"
               iconName="Download"
               iconPosition="left"
-              onClick={() => console.log('Export PDF')}
+              // console.log eliminado
             >
               Exportar PDF
             </Button>
@@ -430,7 +431,7 @@ const QuotationBuilder = () => {
                   {activeStep === 'preview' && (
                     <QuotationPreview
                       quotation={currentQuotation}
-                      onVersionCreate={() => console.log('Create version')}
+                      // console.log eliminado
                     />
                   )}
 
@@ -446,7 +447,7 @@ const QuotationBuilder = () => {
                 {/* Version Control */}
                 <VersionControl
                   quotation={currentQuotation}
-                  onVersionSelect={(version) => console.log('Select version', version)}
+                  // console.log eliminado
                 />
               </div>
             )}

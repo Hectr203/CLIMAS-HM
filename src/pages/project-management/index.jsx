@@ -1,16 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
 import Sidebar from '../../components/ui/Sidebar';
 import Header from '../../components/ui/Header';
+import Breadcrumb from '../../components/ui/Breadcrumb';
 import ProjectFilters from './components/ProjectFilters';
 import ProjectTable from './components/ProjectTable';
-import ProjectStats from './components/ProjectStats';
 import ProjectTimeline from './components/ProjectTimeline';
 import ProjectQuotations from './components/ProjectQuotations';
+import ProjectStats from './components/ProjectStats';
 import CreateProjectModal from './components/CreateProjectModal';
 import EditProjectModal from './components/EditProjectModal';
 import useProyect from '../../hooks/useProyect';
+
+// ⬇️ trae tus notificaciones
+import { useErrorHandler, useNotifications } from 'context/NotificationContext';
 
 /* ====== Cache local para estado UI ====== */
 const UI_ESTADO_KEY = 'proyectos_ui_estado_v1';
@@ -43,10 +47,11 @@ const ProjectManagement = () => {
     proyectos: projects,
     loading: isLoading,
     getProyectos,
-    getProyectoById,
     updateProyecto,
-    deleteProyecto
   } = useProyect();
+
+  const { handleError, handleSuccess } = useErrorHandler();
+  const { showWarning } = useNotifications();
 
   const [filteredProjects, setFilteredProjects] = useState([]);
   const [activeView, setActiveView] = useState('table');
@@ -63,26 +68,21 @@ const ProjectManagement = () => {
     setFilteredProjects(arr);
   }, [projects]);
 
-  // getters
-  const getNombre = (p) => p?.nombre ?? p?.nombreProyecto ?? p?.name ?? '';
-  const getCodigo = (p) => p?.codigo ?? p?.code ?? '';
-  const getEstado = (p) => uiEstadoCache.get(p?.id ?? p?._id) || backendToUiDefault(p?.estado);
-  const getDepto = (p) => p?.departamento ?? p?.department ?? '';
-  const getPrioridad = (p) => p?.prioridad ?? p?.priority ?? '';
-  const getInicio = (p) => p?.cronograma?.fechaInicio ?? p?.startDate ?? null;
-  const getFin = (p) => p?.cronograma?.fechaFin ?? p?.endDate ?? null;
-  const getBudget = (p) => Number(p?.totalPresupuesto ?? p?.presupuesto?.total ?? p?.budget ?? 0);
+  /* ====== filtros */
+  const norm = (s) => (s ?? '').toString().normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ');
 
-  // filtros del componente ProjectFilters (sin cambios de tu UI)
-  const norm = (s) => (s ?? '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/\s+/g, ' ');
   const canonicalEstado = (raw) => {
     const v = norm(raw);
-    if (v.includes('planific') || v.includes('planning')) return 'planificacion';
-    if (v === 'en proceso' || v.includes('progress') || v.includes('in progress') || v.includes('process')) return 'en proceso';
-    if (v === 'en pausa' || v.includes('pause') || v.includes('on hold') || v.includes('on-hold') || v.includes('hold')) return 'en pausa';
-    if (v === 'en revision' || v === 'en revisión' || v.includes('review') || v.includes('revision')) return 'en revision';
-    if (v === 'completado' || v.includes('complet') || v.includes('done') || v.includes('closed')) return 'completado';
-    if (v === 'cancelado' || v.includes('canceled') || v.includes('cancelled') || v.includes('cancel')) return 'cancelado';
+    if (v.includes('planific')) return 'planificacion';
+    if (v.includes('en proceso') || v.includes('progress')) return 'en proceso';
+    if (v.includes('pausa') || v.includes('hold')) return 'en pausa';
+    if (v.includes('revision') || v.includes('review')) return 'en revision';
+    if (v.includes('complet')) return 'completado';
+    if (v.includes('cancel')) return 'cancelado';
     return v;
   };
 
@@ -91,159 +91,90 @@ const ProjectManagement = () => {
 
     if (filters?.search) {
       const q = norm(filters.search);
-      filtered = filtered.filter(project => {
-        const name = norm(getNombre(project));
-        const code = norm(getCodigo(project));
-        const cliente = norm(project?.cliente?.nombre || project?.cliente || '');
-        return name.includes(q) || code.includes(q) || cliente.includes(q);
-      });
+      filtered = filtered.filter(p =>
+        norm(p?.nombre)?.includes(q) ||
+        norm(p?.codigo)?.includes(q) ||
+        norm(p?.cliente?.nombre)?.includes(q)
+      );
     }
 
     if (filters?.status) {
-      const target = canonicalEstado(filters.status);
-      filtered = filtered.filter(project => {
-        const uiEstado = getEstado(project);
-        const canon = canonicalEstado(uiEstado);
-        return canon === target;
-      });
-    }
-
-    if (filters?.department) {
-      const deptMap = { sales: 'Ventas', engineering: 'Ingeniería', installation: 'Instalación', maintenance: 'Mantenimiento', administration: 'Administración' };
-      const targetDept = deptMap[filters.department] || filters.department;
-      filtered = filtered.filter(project => (getDepto(project) || '') === targetDept);
-    }
-
-    if (filters?.priority) {
-      const priorityMap = { low: 'Baja', medium: 'Media', high: 'Alta', urgent: 'Urgente' };
-      const targetPriority = priorityMap[filters.priority] || filters.priority;
-      filtered = filtered.filter(project => (getPrioridad(project) || '') === targetPriority);
-    }
-
-    if (filters?.dateRange) {
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      filtered = filtered.filter(project => {
-        const startDateStr = getInicio(project);
-        if (!startDateStr) return false;
-        const startDate = new Date(startDateStr);
-        if (isNaN(startDate.getTime())) return false;
-        switch (filters.dateRange) {
-          case 'today': return startDate.toDateString() === today.toDateString();
-          case 'week': { const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7); return startDate >= weekAgo && startDate <= now; }
-          case 'month': return startDate.getMonth() === now.getMonth() && startDate.getFullYear() === now.getFullYear();
-          case 'quarter': { const quarter = Math.floor(now.getMonth() / 3); const projectQuarter = Math.floor(startDate.getMonth() / 3); return projectQuarter === quarter && startDate.getFullYear() === now.getFullYear(); }
-          case 'year': return startDate.getFullYear() === now.getFullYear();
-          default: return true;
-        }
-      });
-    }
-
-    if (filters?.minBudget) filtered = filtered.filter(project => getBudget(project) >= Number(filters.minBudget));
-    if (filters?.maxBudget) filtered = filtered.filter(project => getBudget(project) <= Number(filters.maxBudget));
-
-    if (filters?.startDate) {
-      const filterStartDate = new Date(filters.startDate);
-      filtered = filtered.filter(project => {
-        const d = getInicio(project); if (!d) return false;
-        const sd = new Date(d); return sd >= filterStartDate;
-      });
-    }
-
-    if (filters?.endDate) {
-      const filterEndDate = new Date(filters.endDate);
-      filtered = filtered.filter(project => {
-        const d = getFin(project); if (!d) return false;
-        const ed = new Date(d); return ed <= filterEndDate;
-      });
+      filtered = filtered.filter(p =>
+        canonicalEstado(uiEstadoCache.get(p.id) || p.estado) === canonicalEstado(filters.status)
+      );
     }
 
     setFilteredProjects(filtered);
   };
 
   const handleEditProject = (project) => {
-    const id = project?.id ?? project?._id; if (!id) return;
+    const id = project?.id ?? project?._id;
     setSelectedProject({ ...project, id });
     setIsEditModalOpen(true);
   };
+
   const handleStatusUpdate = async (projectId, newStatusUi) => {
     try {
       const estadoBackend = mapUiToBackend(newStatusUi);
       await updateProyecto(projectId, { estado: estadoBackend });
       uiEstadoCache.set(projectId, newStatusUi);
-      await getProyectos({ force: true }).catch(() => {});
+      await getProyectos({ force: true });
+
+      handleSuccess('update', 'Proyecto');
     } catch (error) {
-      console.error('Error al actualizar estado del proyecto:', error);
-      alert('Error al actualizar el estado del proyecto');
+      handleError(error, 'Error al actualizar estado');
     }
   };
-  const handleBulkAction = (action, selectedIds) => { console.log(`Bulk action: ${action}`, selectedIds); };
 
   const handleUpdateProject = async () => {
     try {
       await getProyectos({ force: true });
-      alert('Proyecto actualizado exitosamente');
-      setSelectedProject(null); setIsEditModalOpen(false);
-    } catch {
-      setSelectedProject(null); setIsEditModalOpen(false);
+      handleSuccess('update', 'Proyecto');
+      setSelectedProject(null);
+      setIsEditModalOpen(false);
+    } catch (err) {
+      handleError(err, 'Error al actualizar');
     }
   };
 
-  /* ===== Export desde la barra de filtros ===== */
+  /* ===== Exportar ===== */
   const handleExportFromFilters = () => {
-    const list = filteredProjects || [];
-    if (!list.length) { alert('No hay proyectos para exportar.'); return; }
-    const headers = ['Código','Nombre','Cliente','Estado','Prioridad','Presupuesto (MXN)','Inicio','Fin'];
-    const esc = (s) => {
-      const v = String(s ?? '');
-      const needs = /[",\n]/.test(v);
-      const e = v.replace(/"/g,'""');
-      return needs ? `"${e}"` : e;
-    };
-    const rows = list.map(p => {
-      const code = p?.codigo ?? p?.code ?? '';
-      const name = p?.nombre ?? p?.name ?? '';
-      const client = p?.cliente?.nombre || p?.cliente || '';
-      const status = p?.statusLabel || p?.estado || p?.status || '';
-      const priority = p?.priority || p?.prioridad || '';
-      const budget = Number(p?.totalPresupuesto ?? p?.presupuesto?.total ?? p?.budget ?? 0).toLocaleString('es-MX');
-      const sd = new Date(p?.cronograma?.fechaInicio ?? p?.startDate ?? '').toLocaleDateString('es-MX');
-      const ed = new Date(p?.cronograma?.fechaFin ?? p?.endDate ?? '').toLocaleDateString('es-MX');
-      return [code,name,client,status,priority,budget,sd,ed].map(esc).join(',');
-    });
-    const csv = [headers.join(','), ...rows].join('\n');
-    const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `proyectos_filtrados_${new Date().toISOString().slice(0,10)}.csv`;
-    document.body.appendChild(a); a.click();
-    document.body.removeChild(a);
-  };
+    if (!filteredProjects?.length) {
+      showWarning('No hay proyectos para exportar');
+      return;
+    }
 
-  const onGenerateReportFromTimeline = (periodList /* ya filtrados por ProjectTimeline */, timeframe) => {
-    const headers = ['Código','Nombre','Cliente','Estado','Prioridad','Presupuesto (MXN)','Inicio','Fin'];
-    const esc = (s) => {
-      const v = String(s ?? '');
-      const needs = /[",\n]/.test(v); const e = v.replace(/"/g,'""');
-      return needs ? `"${e}"` : e;
-    };
-    const rows = (periodList || []).map(p => {
-      const code = p?.codigo ?? p?.code ?? '';
-      const name = p?.nombre ?? p?.name ?? '';
-      const client = p?.cliente?.nombre || p?.client?.name || '';
-      const status = p?.statusLabel || p?.estado || p?.status || '';
-      const priority = p?.priority || p?.prioridad || '';
-      const budget = Number(p?.totalPresupuesto ?? p?.presupuesto?.total ?? p?.budget ?? 0).toLocaleString('es-MX');
-      const sd = new Date(p?.startDate ?? p?.cronograma?.fechaInicio ?? '').toLocaleDateString('es-MX');
-      const ed = new Date(p?.endDate ?? p?.cronograma?.fechaFin ?? '').toLocaleDateString('es-MX');
-      return [code,name,client,status,priority,budget,sd,ed].map(esc).join(',');
-    });
-    if (!rows.length) { alert('No hay proyectos en el período.'); return; }
-    const csv = [headers.join(','), ...rows].join('\n');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8;' }));
-    a.download = `cronograma_${timeframe}_${new Date().toISOString().slice(0,10)}.csv`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    try {
+      const headers = ['Código','Nombre','Cliente','Estado','Prioridad','Presupuesto','Inicio','Fin'];
+
+      const rows = filteredProjects.map(p =>
+        [
+          p.codigo,
+          p.nombre,
+          p?.cliente?.nombre,
+          p.estado,
+          p.prioridad,
+          p.presupuesto?.total,
+          new Date(p?.cronograma?.fechaInicio)?.toLocaleDateString('es-MX'),
+          new Date(p?.cronograma?.fechaFin)?.toLocaleDateString('es-MX'),
+        ]
+          .map(v => `"${String(v ?? '').replace(/"/g, '""')}"`)
+          .join(',')
+      );
+
+      const csv = [headers.join(','), ...rows].join('\n');
+      const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `proyectos_${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      handleSuccess('export', 'Proyectos');
+    } catch (e) {
+      handleError(e, 'Error al exportar proyectos');
+    }
   };
 
   if (isLoading) {
@@ -252,7 +183,7 @@ const ProjectManagement = () => {
         <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
         <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
           <Header onMenuToggle={() => setHeaderMenuOpen(!headerMenuOpen)} isMenuOpen={headerMenuOpen} />
-          <div className="pt-16 flex items-center justify-center h-96">
+          <div className="flex items-center justify-center h-96">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
               <p className="text-muted-foreground">Cargando proyectos...</p>
@@ -270,30 +201,36 @@ const ProjectManagement = () => {
       <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
         <Header onMenuToggle={() => setHeaderMenuOpen(!headerMenuOpen)} isMenuOpen={headerMenuOpen} />
 
-        <div className="pt-16">
+        <div className="">
           <div className="container mx-auto px-4 py-8">
+            {/* Breadcrumb */}
+            <div className="mb-6">
+              <Breadcrumb />
+            </div>
+
             {/* Header */}
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
               <div>
                 <h1 className="text-3xl font-bold text-foreground mb-2">Gestión de Proyectos</h1>
-                <p className="text-muted-foreground">Administre el ciclo completo de proyectos HVAC desde la planificación hasta el cierre</p>
+                <p className="text-muted-foreground">
+                  Administre el ciclo completo de proyectos HVAC desde la planificación hasta el cierre
+                </p>
               </div>
 
               <div className="flex items-center space-x-4 mt-4 lg:mt-0">
                 <div className="flex bg-muted rounded-lg p-1">
-                  {[
+                  {[ 
                     { value: 'table', label: 'Tabla', icon: 'Table' },
                     { value: 'timeline', label: 'Cronograma', icon: 'Calendar' },
                     { value: 'quotations', label: 'Cotizaciones', icon: 'FileText' },
-                    { value: 'stats', label: 'Estadísticas', icon: 'BarChart3' }
-                  ].map((option) => (
+                  ].map(option => (
                     <button
                       key={option.value}
                       onClick={() => setActiveView(option.value)}
-                      className={`flex items-center space-x-2 px-3 py-2 rounded-md transition-smooth ${activeView === option.value
+                      className={`flex items-center space-x-2 px-3 py-2 rounded-md transition-smooth
+                        ${activeView === option.value
                           ? 'bg-primary text-primary-foreground'
-                          : 'text-muted-foreground hover:text-foreground'
-                        }`}
+                          : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       <Icon name={option.icon} size={16} />
                       <span className="hidden sm:inline text-sm">{option.label}</span>
@@ -307,10 +244,12 @@ const ProjectManagement = () => {
               </div>
             </div>
 
-            {/* Stats Overview */}
-            {activeView !== 'stats' && filteredProjects?.length > 0 && <ProjectStats projects={filteredProjects} />}
+            {/* ✅ ESTADÍSTICAS SE MANTIENEN */}
+            {activeView !== 'stats' && filteredProjects?.length > 0 && (
+              <ProjectStats projects={filteredProjects} />
+            )}
 
-            {/* Filtros (incluye onExport) */}
+            {/* Filtros */}
             {activeView === 'table' && (
               <ProjectFilters
                 onFiltersChange={handleFiltersChange}
@@ -320,38 +259,35 @@ const ProjectManagement = () => {
               />
             )}
 
-            {/* Main Content */}
             <div className="space-y-6">
               {activeView === 'table' && filteredProjects?.length > 0 && (
                 <ProjectTable
                   projects={filteredProjects}
                   onProjectSelect={handleEditProject}
-                  onBulkAction={handleBulkAction}
+                  onStatusUpdate={handleStatusUpdate}
                 />
               )}
 
               {activeView === 'timeline' && (
                 <ProjectTimeline
                   projects={filteredProjects}
-                  onGenerateReport={onGenerateReportFromTimeline}
+                  onGenerateReport={() => {}}
                 />
               )}
 
-              {activeView === 'quotations' && filteredProjects?.length > 0 && <ProjectQuotations projects={filteredProjects} />}
-
-              {activeView === 'stats' && (
-                <div className="space-y-6">
-                  <ProjectStats projects={filteredProjects} />
-                  {filteredProjects?.length > 0 && <ProjectTimeline projects={filteredProjects} onGenerateReport={onGenerateReportFromTimeline} />}
-                </div>
+              {activeView === 'quotations' && filteredProjects?.length > 0 && (
+                <ProjectQuotations projects={filteredProjects} />
               )}
 
-              {/* Vacíos */}
               {filteredProjects?.length === 0 && (
                 <div className="text-center py-12">
                   <Icon name="Filter" size={64} className="text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-foreground mb-2">No se encontraron proyectos con tus filtros</h3>
-                  <p className="text-muted-foreground mb-6">Intenta con otros filtros o parámetros de búsqueda</p>
+                  <h3 className="text-lg font-medium text-foreground mb-2">
+                    No se encontraron proyectos con tus filtros
+                  </h3>
+                  <p className="text-muted-foreground mb-6">
+                    Intenta con otros filtros o parámetros de búsqueda
+                  </p>
                 </div>
               )}
             </div>
@@ -379,3 +315,4 @@ const ProjectManagement = () => {
 };
 
 export default ProjectManagement;
+ 

@@ -47,7 +47,7 @@ const ChangeRequestPanel = ({ project, onRequestChange }) => {
 
   const handleApproveChange = (changeId) => {
     // This would update the change status to approved
-    console.log('Approving change:', changeId);
+  // console.log eliminado
   };
 
   const getStatusColor = (status) => {

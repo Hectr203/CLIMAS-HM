@@ -458,12 +458,12 @@ const WorkshopOperationsCenter = () => {
   };
 
   const handleReportToProjects = (workOrderId, reportType, reportData) => {
-    console.log(`Reporting to Projects - Order: ${workOrderId}, Type: ${reportType}`, reportData);
+  // console.log eliminado
     // Integration with Projects department
   };
 
   const handleRequestToPurchases = (workOrderId, requestType, requestData) => {
-    console.log(`Request to Purchases - Order: ${workOrderId}, Type: ${requestType}`, requestData);
+  // console.log eliminado
     // Integration with Purchases department
   };
 
@@ -488,7 +488,7 @@ const WorkshopOperationsCenter = () => {
       {/* Main Content */}
       <div className={`transition-all duration-300 ${
         sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'
-      } lg:pt-0 pt-16`}>
+      }`}>
         <div className="p-6">
           {/* Breadcrumb */}
           <div className="mb-6">

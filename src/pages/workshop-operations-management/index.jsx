@@ -244,7 +244,7 @@ import React, { useState, useEffect } from 'react';
               <div className="min-h-screen bg-background flex">
                 <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
                 <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
-                  <div className="pt-16 flex items-center justify-center h-96">
+                  <div className="flex items-center justify-center h-96">
                     <div className="text-center">
                       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
                       <p className="text-muted-foreground">Cargando proyectos...</p>
@@ -276,7 +276,7 @@ import React, { useState, useEffect } from 'react';
 
               <div className={`transition-all duration-300 ${
                 sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'
-              } lg:pt-0 pt-16`}>
+              } lg:pt-0`}>
                 <div className="container mx-auto px-4 py-8">
                   {/* Breadcrumb */}
                   <div className="mb-6">

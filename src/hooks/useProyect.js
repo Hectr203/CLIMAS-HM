@@ -1,6 +1,6 @@
 // hooks/useProyecto.js
-import { useState, useCallback, useRef } from 'react';
-import proyectoService from '../services/proyectoService';
+import { useState, useCallback, useRef } from "react";
+import proyectoService from "../services/proyectoService";
 
 const extractList = (resp) => {
   if (Array.isArray(resp)) return resp;
@@ -11,7 +11,7 @@ const extractList = (resp) => {
 };
 
 const unwrap = (resp) =>
-  (resp && typeof resp === 'object' && 'data' in resp ? resp.data : resp);
+  resp && typeof resp === "object" && "data" in resp ? resp.data : resp;
 
 const useProyecto = () => {
   const [proyectos, setProyectos] = useState([]);
@@ -45,8 +45,8 @@ const useProyecto = () => {
       fetchedOnceRef.current = true;
       return list;
     } catch (err) {
-      if (err?.name !== 'AbortError') {
-        console.error('Error en useProyecto.getProyectos:', err);
+      if (err?.name !== "AbortError") {
+        console.error("Error en useProyecto.getProyectos:", err);
         setError(err);
       }
       throw err;
@@ -61,128 +61,141 @@ const useProyecto = () => {
       const resp = await proyectoService.getProyectoById(id, { signal });
       return unwrap(resp);
     } catch (err) {
-      if (err?.name !== 'AbortError') {
-        console.error('Error en useProyecto.getProyectoById:', err);
+      if (err?.name !== "AbortError") {
+        console.error("Error en useProyecto.getProyectoById:", err);
         setError(err);
       }
       throw err;
     }
   }, []);
 
-  const createProyecto = useCallback(async (payload, { signal, refresh = false } = {}) => {
-    setLoadingSave(true);
-    setError(null);
-    try {
-      const resp = await proyectoService.createProyecto(payload, { signal });
-      const created = unwrap(resp);
-      if (created) {
-        setProyectos((prev) => [...prev, created]);
-        proyectosLenRef.current += 1;
+  const createProyecto = useCallback(
+    async (payload, { signal, refresh = false } = {}) => {
+      setLoadingSave(true);
+      setError(null);
+      try {
+        const resp = await proyectoService.createProyecto(payload, { signal });
+        const created = unwrap(resp);
+        if (created) {
+          setProyectos((prev) => [...prev, created]);
+          proyectosLenRef.current += 1;
+        }
+        if (refresh) {
+          // invalida cache y recarga lista desde backend
+          fetchedOnceRef.current = false;
+          await getProyectos({ force: true, signal });
+        }
+        return created;
+      } catch (err) {
+        if (err?.name !== "AbortError") {
+          console.error("Error en useProyecto.createProyecto:", err);
+          setError(err);
+        }
+        throw err;
+      } finally {
+        setLoadingSave(false);
       }
-      if (refresh) {
-        // invalida cache y recarga lista desde backend
-        fetchedOnceRef.current = false;
-        await getProyectos({ force: true, signal });
-      }
-      return created;
-    } catch (err) {
-      if (err?.name !== 'AbortError') {
-        console.error('Error en useProyecto.createProyecto:', err);
-        setError(err);
-      }
-      throw err;
-    } finally {
-      setLoadingSave(false);
-    }
-  }, [getProyectos]);
+    },
+    [getProyectos]
+  );
 
-  const updateProyecto = useCallback(async (id, payload, { signal, refresh = false } = {}) => {
-    setLoadingSave(true);
-    setError(null);
-    try {
-      const resp = await proyectoService.updateProyecto(id, payload, { signal });
-      const updated = unwrap(resp);
+  const updateProyecto = useCallback(
+    async (id, payload, { signal, refresh = false } = {}) => {
+      setLoadingSave(true);
+      setError(null);
+      try {
+        const resp = await proyectoService.updateProyecto(id, payload, {
+          signal,
+        });
+        const updated = unwrap(resp);
 
-      setProyectos((prev) =>
-        prev.map((p) =>
-          String(p.id ?? p._id) === String(id) ? { ...p, ...updated } : p
-        )
-      );
+        setProyectos((prev) =>
+          prev.map((p) =>
+            String(p.id ?? p._id) === String(id) ? { ...p, ...updated } : p
+          )
+        );
 
-      if (refresh) {
-        fetchedOnceRef.current = false;
-        await getProyectos({ force: true, signal });
+        if (refresh) {
+          fetchedOnceRef.current = false;
+          await getProyectos({ force: true, signal });
+        }
+        return updated;
+      } catch (err) {
+        if (err?.name !== "AbortError") {
+          console.error("Error en useProyecto.updateProyecto:", err);
+          setError(err);
+        }
+        throw err;
+      } finally {
+        setLoadingSave(false);
       }
-      return updated;
-    } catch (err) {
-      if (err?.name !== 'AbortError') {
-        console.error('Error en useProyecto.updateProyecto:', err);
-        setError(err);
-      }
-      throw err;
-    } finally {
-      setLoadingSave(false);
-    }
-  }, [getProyectos]);
+    },
+    [getProyectos]
+  );
 
-  const deleteProyecto = useCallback(async (id, { signal, refresh = false } = {}) => {
-    setLoadingDelete(true);
-    setError(null);
-    try {
-      const resp = await proyectoService.deleteProyecto(id, { signal });
-      setProyectos((prev) => prev.filter((p) => String(p.id ?? p._id) !== String(id)));
-      proyectosLenRef.current = Math.max(0, proyectosLenRef.current - 1);
+  const deleteProyecto = useCallback(
+    async (id, { signal, refresh = false } = {}) => {
+      setLoadingDelete(true);
+      setError(null);
+      try {
+        const resp = await proyectoService.deleteProyecto(id, { signal });
+        setProyectos((prev) =>
+          prev.filter((p) => String(p.id ?? p._id) !== String(id))
+        );
+        proyectosLenRef.current = Math.max(0, proyectosLenRef.current - 1);
 
-      if (refresh) {
-        fetchedOnceRef.current = false;
-        await getProyectos({ force: true, signal });
-      }
+        if (refresh) {
+          fetchedOnceRef.current = false;
+          await getProyectos({ force: true, signal });
+        }
 
-      return unwrap(resp) ?? true;
-    } catch (err) {
-      if (err?.name !== 'AbortError') {
-        console.error('Error en useProyecto.deleteProyecto:', err);
-        setError(err);
+        return unwrap(resp) ?? true;
+      } catch (err) {
+        if (err?.name !== "AbortError") {
+          console.error("Error en useProyecto.deleteProyecto:", err);
+          setError(err);
+        }
+        throw err;
+      } finally {
+        setLoadingDelete(false);
       }
-      throw err;
-    } finally {
-      setLoadingDelete(false);
-    }
-  }, [getProyectos]);
+    },
+    [getProyectos]
+  );
 
   // ========= STATS CACHED (dashboard rápido) =========
   // GET /proyectos/stats/get
-  const getCachedStats = useCallback(
-    async ({ signal } = {}) => {
-      setLoading(true);
-      setError(null);
-      try {
-        const resp = await proyectoService.getCachedStats({ signal });
-        // aquí NO tocamos proyectos, esto es data de métricas.
-        // Puede venir como { data: {...} } o directo {...}
-        return unwrap(resp);
-      } catch (err) {
-        console.error('Error en useProyecto.getCachedStats:', err);
-        setError(err);
-        throw err;
-      } finally {
-        setLoading(false);
-      }
-    },
-    []
-  );
+  const getCachedStats = useCallback(async ({ signal } = {}) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const resp = await proyectoService.getCachedStats({ signal });
+      // aquí NO tocamos proyectos, esto es data de métricas.
+      // Puede venir como { data: {...} } o directo {...}
+      return unwrap(resp);
+    } catch (err) {
+      console.error("Error en useProyecto.getCachedStats:", err);
+      setError(err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   // ========= (currencyapi.com) =========
   const getCurrencyRates = useCallback(
-    async ({ base = 'USD', currencies = [] } = {}, { signal } = {}) => {
+    async ({ base = "USD", currencies = [] } = {}, { signal } = {}) => {
       setLoadingCurrency(true);
       setError(null);
       try {
-        const resp = await proyectoService.getCurrencyRates({ base, currencies }, { signal });
+        const resp = await proyectoService.getCurrencyRates(
+          { base, currencies },
+          { signal }
+        );
         return resp; // JSON completo
       } catch (err) {
-        if (err?.name !== 'AbortError') {
-          console.error('Error en useProyecto.getCurrencyRates:', err);
+        if (err?.name !== "AbortError") {
+          console.error("Error en useProyecto.getCurrencyRates:", err);
           setError(err);
         }
         throw err;
@@ -197,7 +210,7 @@ const useProyecto = () => {
    * Devuelve { MXN: 18.2, EUR: 0.92, ... }
    */
   const getCurrencyRatesMap = useCallback(
-    async ({ base = 'USD', currencies = [] } = {}, { signal } = {}) => {
+    async ({ base = "USD", currencies = [] } = {}, { signal } = {}) => {
       setLoadingCurrency(true);
       setError(null);
       try {
@@ -207,8 +220,8 @@ const useProyecto = () => {
         );
         return map;
       } catch (err) {
-        if (err?.name !== 'AbortError') {
-          console.error('Error en useProyecto.getCurrencyRatesMap:', err);
+        if (err?.name !== "AbortError") {
+          console.error("Error en useProyecto.getCurrencyRatesMap:", err);
           setError(err);
         }
         throw err;

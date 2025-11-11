@@ -3,6 +3,7 @@ import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
 import Sidebar from '../../components/ui/Sidebar';
 import Header from '../../components/ui/Header';
+import Breadcrumb from '../../components/ui/Breadcrumb';
 
 import FilterControls from './components/FilterControls';
 import ExpenseTrackingTable from './components/ExpenseTrackingTable';
@@ -10,6 +11,7 @@ import FinancialSummaryWidget from './components/FinancialSummaryWidget';
 import ReceiptManagementPanel from './components/ReceiptManagementPanel';
 import PaymentAuthorizationModal from './components/PaymentAuthorizationModal';
 import NewExpenseModal from './components/NewExpenseModal';
+import GastosTable from './components/GastosTable';
 import useFinanzas from '../../hooks/useFinanzas';
 
 const FinanzasManagement = () => {
@@ -86,6 +88,7 @@ const FinanzasManagement = () => {
 
   const tabs = [
     { id: 'expenses', label: 'Seguimiento de Gastos', icon: 'Table' },
+    { id: 'ordenes', label: 'Órdenes de Compra', icon: 'ShoppingCart'},
     { id: 'summary', label: 'Resumen Financiero', icon: 'BarChart3' },
     { id: 'receipts', label: 'Gestión de Recibos', icon: 'FileText' },
   ];
@@ -107,9 +110,14 @@ const FinanzasManagement = () => {
       <main
         className={`transition-all duration-300 ${
           sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'
-        } pt-16`}
+        }`}
       >
         <div className="p-6 space-y-6">
+          {/* Breadcrumb */}
+          <div className="mb-6">
+            <Breadcrumb />
+          </div>
+
           {/* HEADER */}
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
             <div>
@@ -210,6 +218,10 @@ const FinanzasManagement = () => {
               </>
             )}
 
+            {activeTab === 'ordenes' && (
+              <GastosTable />   
+              )}
+
             {activeTab === 'summary' && (
               <FinancialSummaryWidget summaryData={{ totalExpenses: 0, totalRevenue: 0 }} />
             )}
@@ -217,6 +229,7 @@ const FinanzasManagement = () => {
             {activeTab === 'receipts' && (
               <ReceiptManagementPanel receipts={[]} />
             )}
+            
           </div>
         </div>
       </main>

@@ -6,6 +6,8 @@ import Select from '../../../components/ui/Select';
 import proyectoService from 'services/proyectoService';
 import clientService from 'services/clientService';
 import usePerson from 'hooks/usePerson';
+// ⬇️ Ajusta esta ruta según tu estructura:
+import { useErrorHandler, useNotifications } from 'context/NotificationContext';
 
 /* ===================== ESTADOS ===================== */
 const estadoOptionsBackend = [
@@ -17,18 +19,6 @@ const estadoOptionsBackend = [
   { value: 'cancelado',     label: 'Cancelado' },
 ];
 const ALLOWED_ESTADOS = estadoOptionsBackend.map(o => o.value);
-
-/* Mapeos de estado (API solo “activo” | “en proceso”) */
-// const backendToUiDefault = (apiEstado) => {
-//   const v = String(apiEstado || '').toLowerCase();
-//   if (v === 'en proceso') return 'en proceso';
-//   if (v === 'activo') return 'planificación';
-//   return 'planificación';
-// };
-// const mapUiToBackend = (uiEstado) => {
-//   const v = String(uiEstado || '').toLowerCase();
-//   return v === 'en proceso' ? 'en proceso' : 'activo';
-// };
 
 /* Cache local del estado UI por proyecto (para recordar lo que eligió el user en vez de lo que vino del backend) */
 const UI_ESTADO_KEY = 'proyectos_ui_estado_v1';
@@ -102,6 +92,10 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
   const { persons, getPersons } = usePerson();
   const [clientOptions, setClientOptions] = useState([]);
 
+  // Notificaciones
+  const { handleError, handleSuccess } = useErrorHandler();
+  const { showError } = useNotifications();
+
   // Controles de USD para equipos
   const [isEquipmentInUSD, setIsEquipmentInUSD] = useState(false);
   const [exchangeRate, setExchangeRate] = useState(18); // MXN por USD
@@ -127,13 +121,14 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
         }));
         if (mounted) setClientOptions(opts);
       } catch (e) {
-        console.error('Error cargando clientes:', e);
+        // Notificamos error al cargar clientes (no bloqueante del modal)
+        handleError(e, 'Error cargando clientes');
       }
     })();
     return () => {
       mounted = false;
     };
-  }, [isOpen]);
+  }, [isOpen, handleError]);
 
   /* ============= CARGA DE PERSONAL (solo 1 vez) ============= */
   const fetchedPersonsRef = useRef(false);
@@ -145,7 +140,7 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
       try {
         await getPersons();
       } catch (e) {
-        console.error('Error cargando empleados:', e);
+        handleError(e, 'Error cargando empleados');
       }
     })();
     return () => {
@@ -164,14 +159,14 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
         const doc = resp?.data ?? resp;
         if (mounted) setServerProject(doc || project);
       } catch (e) {
-        console.error('Error cargando proyecto:', e);
+        handleError(e, 'Error cargando proyecto');
         if (mounted) setServerProject(project || null);
       }
     })();
     return () => {
       mounted = false;
     };
-  }, [isOpen, project?.id]);
+  }, [isOpen, project?.id, handleError, project]);
 
   /* ============= NORMALIZACIÓN DEL PROYECTO PARA EL FORM ============= */
   const normalized = useMemo(() => {
@@ -180,10 +175,9 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
     const cron = doc.cronograma || {};
     const id = doc.id || project?.id;
 
-    // preferimos estado guardado en cache UI (lo que el usuario eligió la última vez),
-    // si no existe tomamos el backend y lo convertimos a estado UI
+    // preferimos estado guardado en cache UI; si no, usamos el del backend tal cual
     const cachedEstado = uiEstadoCache.get(id);
-    const estadoUi = cachedEstado || backendToUiDefault(doc.estado);
+    const estadoUi = cachedEstado || (doc.estado || 'planificación');
 
     return {
       id,
@@ -197,7 +191,7 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
       prioridad: doc.prioridad || '',
       ubicacion: doc.ubicacion || '',
       descripcion: doc.descripcion || '',
-      estado: estadoUi, // <-- ESTE ES EL QUE MUESTRAS EN EL SELECT
+      estado: estadoUi, // <-- seleccion en UI, sin mapeos
       cronograma: {
         fechaInicio: cron?.fechaInicio || '',
         fechaFin: cron?.fechaFin || '',
@@ -247,17 +241,20 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
         setExchangeRate(rate);
         return rate;
       } else {
-        setFxError('No llegó una tasa válida.');
+        const msg = 'No llegó una tasa válida.';
+        setFxError(msg);
+        showError(msg);
         return null;
       }
     } catch (e) {
-      setFxError(e?.message || 'Error llamando currencyapi');
-      console.error('currencyapi error:', e);
+      const msg = e?.message || 'Error llamando currencyapi';
+      setFxError(msg);
+      handleError(e, 'Tipo de cambio');
       return null;
     } finally {
       setLoadingFx(false);
     }
-  }, []);
+  }, [handleError, showError]);
 
   // precarga el tipo de cambio al abrir modal
   useEffect(() => {
@@ -434,9 +431,8 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
       )
         ? formData.personalAsignado
         : [],
-      // 👇 ahora mandamos el estado que entiende tu backend,
-      // NO siempre "activo"
-      estado: mapUiToBackend(formData.estado),
+      // 👉 Enviamos el estado tal cual
+      estado: formData.estado,
       presupuesto: pres,
     };
   };
@@ -464,17 +460,14 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
           _uiEstado: formData.estado,
         });
 
+      // ✅ Notificación de éxito
+      handleSuccess('update', 'Proyecto');
+
       onClose && onClose();
     } catch (err) {
       console.error('Error actualizando proyecto:', err);
-      const detalle =
-        err?.data?.error ||
-        err?.data?.message ||
-        err?.userMessage ||
-        err?.message;
-      alert(
-        `No se pudo actualizar el proyecto.\n${detalle || ''}`
-      );
+      // ❌ Notificación de error formateada
+      handleError(err, 'Error actualizando proyecto');
     } finally {
       setIsSubmitting(false);
     }

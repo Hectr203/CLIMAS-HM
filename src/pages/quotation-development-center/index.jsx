@@ -3,6 +3,7 @@ import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
 import Sidebar from '../../components/ui/Sidebar';
 import Header from '../../components/ui/Header';
+import Breadcrumb from '../../components/ui/Breadcrumb';
 import QuotationBuilder from './components/QuotationBuilder';
 import MaterialRiskChecklist from './components/MaterialRiskChecklist';
 import QuotationPreview from './components/QuotationPreview';
@@ -39,13 +40,14 @@ const QuotationDevelopmentCenter = () => {
       setIsLoading(true);
       try {
         const response = await getCotizaciones();
-        console.log('Respuesta completa del backend:', response);
+  // console.log eliminado
         const cotizaciones = Array.isArray(response.data?.data) ? response.data.data : [];
-        console.log('Cotizaciones obtenidas:', cotizaciones);
+  // console.log eliminado
         // Mapeo adaptado a la estructura real del backend
         const mapped = cotizaciones.map(cotizacion => ({
           id: cotizacion.id || '', // id de Cosmos
           folio: cotizacion.folio || '', // folio
+          clientId: cotizacion.informacion_basica?.cliente?.find?.(c => 'id_cliente' in c)?.id_cliente || '',
           clientName: cotizacion.informacion_basica?.cliente?.find?.(c => c?.nombre_cliente)?.nombre_cliente || '',
           projectName: cotizacion.informacion_basica?.proyecto?.find?.(p => p?.nombre_proyecto)?.nombre_proyecto || '',
           status: 'development',
@@ -85,7 +87,7 @@ const QuotationDevelopmentCenter = () => {
     };
     setQuotations(prev => {
       const updated = [mappedQuotation, ...prev];
-      console.log('Cotizaciones actualizadas:', updated);
+  // console.log eliminado
       return updated;
     });
     setSelectedQuotation(mappedQuotation);
@@ -103,6 +105,7 @@ const QuotationDevelopmentCenter = () => {
       const mapped = cotizaciones.map(cotizacion => ({
         id: cotizacion.id || '',
         folio: cotizacion.folio || '',
+        clientId: cotizacion.informacion_basica?.cliente?.find?.(c => 'id_cliente' in c)?.id_cliente || '',
         clientName: cotizacion.informacion_basica?.cliente?.find?.(c => c?.nombre_cliente)?.nombre_cliente || '',
         projectName: cotizacion.informacion_basica?.proyecto?.find?.(p => p?.nombre_proyecto)?.nombre_proyecto || '',
         status: 'development',
@@ -150,6 +153,13 @@ const QuotationDevelopmentCenter = () => {
   };
 
   const handleQuotationUpdate = (quotationId, updates) => {
+    console.log('🔄 Actualizando cotización:', {
+      quotationId,
+      updates,
+      materialsCount: updates?.materials?.length || 0,
+      riskFactorsCount: updates?.riskAssessment?.factors?.length || 0
+    });
+
     setQuotations(prev => prev?.map(quote => 
       quote?.id === quotationId 
         ? { ...quote, ...updates, lastModified: new Date()?.toISOString()?.split('T')?.[0] }
@@ -235,7 +245,7 @@ const QuotationDevelopmentCenter = () => {
         <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
         <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
           <Header onMenuToggle={() => setHeaderMenuOpen(!headerMenuOpen)} isMenuOpen={headerMenuOpen} />
-          <div className="pt-16 flex items-center justify-center h-96">
+          <div className="flex items-center justify-center h-96">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
               <p className="text-muted-foreground">Cargando centro de desarrollo...</p>
@@ -253,8 +263,13 @@ const QuotationDevelopmentCenter = () => {
       <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
         <Header onMenuToggle={() => setHeaderMenuOpen(!headerMenuOpen)} isMenuOpen={headerMenuOpen} />
         
-        <div className="pt-16">
+        <div className="">
           <div className="container mx-auto px-4 py-8">
+            {/* Breadcrumb */}
+            <div className="mb-6">
+              <Breadcrumb />
+            </div>
+
             {/* Header */}
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
               <div>

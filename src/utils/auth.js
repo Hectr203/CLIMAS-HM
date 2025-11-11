@@ -30,6 +30,7 @@ export const ROLE_PERMISSIONS = {
       '/inventory-management',
       '/client-management',
       '/financial-management',
+      '/user-management',
       '/project-gallery-viewer',
       '/project-detail-gallery',
       '/project-documentation-center',
@@ -257,6 +258,14 @@ export const getAllowedNavigationItems = (userRole) => {
           roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.FINANCIAL_CONTROLLER]
         }
       ]
+    },
+    {
+      label: 'Usuarios',
+      path: '/user-management',
+      icon: 'UserCog',
+      tooltip: 'Gestión de usuarios del sistema',
+      badge: null,
+      roles: [AUTH_ROLES?.ADMIN]
     }
   ];
 
@@ -292,30 +301,96 @@ export const getDefaultPath = (userRole) => {
 
 // Logout user
 export const logoutUser = () => {
+  // Limpiar todos los elementos de autenticación
   localStorage.removeItem('authToken');
+  localStorage.removeItem('token'); 
+  localStorage.removeItem('tokenExpiresAt');
   localStorage.removeItem('userRole');
   localStorage.removeItem('userEmail');
+  localStorage.removeItem('role');
+  localStorage.removeItem('rol');
   localStorage.removeItem('rememberMe');
-  window.location.href = '/login';
+  
+  // Forzar recarga completa para limpiar estado
+  window.location.replace('/login');
 }
 
 import axios from "axios";
+import { jwtDecode } from "jwt-decode";
 
 export function logout() {
+  // Limpiar todos los elementos de autenticación
+  localStorage.removeItem("authToken");
   localStorage.removeItem("token");
-  window.location.href = "/login";
+  localStorage.removeItem("tokenExpiresAt");
+  localStorage.removeItem("userRole");
+  localStorage.removeItem("userEmail");
+  localStorage.removeItem("role");
+  localStorage.removeItem("rol");
+  localStorage.removeItem("rememberMe");
+  
+  // Forzar recarga completa para limpiar estado
+  window.location.replace("/login");
+}
+
+export async function checkBackendTokenConfig() {
+  try {
+    const apiUrl = import.meta.env.VITE_API_URL || "";
+    
+    // Hacer una petición de login de prueba para ver la configuración del token
+    console.log("=== VERIFICANDO CONFIGURACIÓN DEL BACKEND ===");
+    console.log("API URL:", apiUrl);
+    console.log("============================================");
+    
+    return true;
+  } catch (error) {
+    console.error("Error verificando configuración del backend:", error);
+    return false;
+  }
 }
 
 export async function renewToken(currentToken) {
-  const apiUrl = import.meta.env.VITE_API_URL || "";
-  const res = await axios.get(
-    `${apiUrl}/usuarios/token-info`,
-    {
-      headers: { Authorization: `Bearer ${currentToken}` },
+  try {
+    const apiUrl = import.meta.env.VITE_API_URL || "";
+    const response = await axios.post(
+      `${apiUrl}/usuarios/extender-sesion`,
+      {}, // POST sin body
+      {
+        headers: { Authorization: `Bearer ${currentToken}` },
+      }
+    );
+    
+    if (response.data && response.data.success && response.data.data && response.data.data.token) {
+      const newToken = response.data.data.token;
+      localStorage.setItem("authToken", newToken);
+      
+      // Debug info del token renovado
+      try {
+        const decoded = jwtDecode(newToken);
+        if (decoded) {
+          const tokenDurationMs = (decoded.exp - decoded.iat) * 1000;
+          const tokenDurationMin = Math.round(tokenDurationMs / 1000 / 60);
+          
+          console.log("=== TOKEN RENOVADO INFO ===");
+          console.log("Nuevo token emitido en:", new Date(decoded.iat * 1000).toLocaleString());
+          console.log("Nuevo token expira en:", new Date(decoded.exp * 1000).toLocaleString());
+          console.log("Duración configurada:", tokenDurationMin, "minutos");
+          console.log("¿Fue extendido?", decoded.extendedAt ? "Sí" : "No");
+          console.log("========================");
+        }
+      } catch (error) {
+        console.warn("Error al decodificar token renovado:", error);
+      }
+      
+      return newToken;
+    } else {
+      throw new Error("No se recibió un token válido del servidor");
     }
-  );
-  const { nuevoToken } = res.data;
-  localStorage.setItem("authToken", nuevoToken);
-  return nuevoToken;
+  } catch (error) {
+    console.error("Error al renovar token:", error);
+    // Si falla la renovación, hacer logout
+    logout();
+    throw error;
+  }
 }
 // ...existing code...
