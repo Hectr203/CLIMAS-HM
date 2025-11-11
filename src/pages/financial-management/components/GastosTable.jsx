@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import Icon from "../../../components/AppIcon";
 import Button from "../../../components/ui/Button";
-import PaymentAuthorizationModal from "./PaymentAuthorizationModal";
+import ModalGestionCompra from "./ModalGestionCompra";
 import useProyect from "../../../hooks/useProyect";
 import useGastos from "../../../hooks/useGastos";
 import { jsPDF } from "jspdf";
@@ -65,7 +65,8 @@ const GastosTable = () => {
   const [activeTab, setActiveTab] = useState("pendiente");
 
   const { getProyectos } = useProyect();
-  const { getGastos, updateGasto } = useGastos();
+  const { getGastos, updateGasto, approveGasto } = useGastos();
+
 
 
   useEffect(() => {
@@ -96,20 +97,23 @@ const GastosTable = () => {
   const handleOpenView = (orden) => {
   const adaptedExpense = {
     id: orden.id,
-    description: orden.notas || "Sin descripción",
-    amount: new Intl.NumberFormat("es-MX", {
-      style: "currency",
-      currency: "MXN"
-    }).format(orden.totalOrden || 0),
-    category: orden.proveedor?.nombre || "Proveedor no especificado",
+    notas: orden.notas || "Sin descripción",
+    totalOrden: orden.totalOrden || 0,
+    proveedor: orden.proveedor,
     project: orden.numeroOrden,
-    date: new Date(orden.fechaOrden).toLocaleDateString("es-MX"),
-    requestedBy: orden.creadoPor || "Desconocido"
+    fechaOrden: orden.fechaOrden,
+    creadoPor: orden.creadoPor,
+    estado: orden.estado,
+    metodoPago: orden.metodoPago,
+    prioridadAprobacion: orden.prioridadAprobacion,
+    comentariosAprobador: orden.comentariosAprobador,
+    aprobadoPor: orden.aprobadoPor,
   };
 
   setSelectedOrden(adaptedExpense);
   setShowAuthModal(true);
 };
+
 
 
   const tabs = [
@@ -145,16 +149,21 @@ const getStatusLabel = (estado) => {
   }
 };
 
-
-
-
-
+// PDF
 const handleDownloadPDF = (order) => {
   const doc = new jsPDF();
-  const blue = "#0A4A8A";
   const gray = "#333333";
 
-  // === ENCABEZADO AZUL ===
+  // Para que salga el texto bien en el apartado de Metodo de pago
+  const formatText = (text) => {
+    if (!text) return "—";
+    return text
+      .replace(/_/g, " ")
+      .toLowerCase()
+      .replace(/\b\w/g, (c) => c.toUpperCase()); 
+  };
+
+  // ENCABEZADO
   doc.setFillColor(10, 74, 138);
   doc.rect(0, 0, 210, 25, "F");
   doc.setTextColor(255, 255, 255);
@@ -162,38 +171,70 @@ const handleDownloadPDF = (order) => {
   doc.setFont("helvetica", "bold");
   doc.text("ORDEN DE COMPRA", 105, 15, { align: "center" });
 
-  // === DATOS GENERALES ===
+  // DATOS GENERALES
   doc.setFont("helvetica", "bold");
   doc.setTextColor(gray);
   doc.setFontSize(12);
   doc.text("Datos Generales", 105, 35, { align: "center" });
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
   const leftX = 20;
   const rightX = 120;
   const baseY = 44;
 
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  
   doc.text(`Folio: ${order.numeroOrden || "—"}`, leftX, baseY);
   doc.text(`Fecha de Orden: ${formatDate(order.fechaOrden)}`, leftX, baseY + 7);
   doc.text(`Estado: ${getStatusLabel(order.estado)}`, leftX, baseY + 14);
-
   doc.text(`Proveedor: ${order.proveedor?.nombre || "—"}`, rightX, baseY);
   doc.text(`Creado por: ${order.creadoPor || "—"}`, rightX, baseY + 7);
-  doc.text(`Términos de Pago: ${order.terminosPago || "—"}`, rightX, baseY + 14);
+  const maxWidthNotas = 70;
+  const notaTexto = `Notas: ${order.notas || "—"}`;
+  const notaLineas = doc.splitTextToSize(notaTexto, maxWidthNotas);
+  const notaAltura = notaLineas.length * 5;
 
-  // === TÍTULO DETALLE DE PRODUCTOS ===
+  doc.setFont("helvetica", "normal");
+  doc.text(notaLineas, rightX, baseY + 14);
+
+  const pagoY = Math.max(baseY + 25, baseY + 14 + notaAltura + 5);
+
+  //DETALLES DE PAGO
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
-  doc.text("Detalle de Productos", 105, 70, { align: "center" });
+  doc.setTextColor(gray);
+  doc.text("Detalles de Pago", 105, pagoY, { align: "center" });
 
-  // === TABLA DE PRODUCTOS ===
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  const infoPagoY = pagoY + 8;
+
+  const metodoPagoFormateado = formatText(order.metodoPago);
+  const prioridadFormateada = formatText(order.prioridadAprobacion || "Normal");
+
+  doc.text(`Método de Pago: ${metodoPagoFormateado}`, leftX, infoPagoY);
+  doc.text(`Prioridad: ${prioridadFormateada}`, leftX, infoPagoY + 7);
+
+  //COMENTARIOS con salto automático
+  const maxWidthComentarios = 70;
+  const comentarioTexto = `Comentarios: ${order.comentariosAprobador || "Sin comentarios"}`;
+  const comentarioLineas = doc.splitTextToSize(comentarioTexto, maxWidthComentarios);
+  const comentarioAltura = comentarioLineas.length * 5;
+
+  doc.setFont("helvetica", "normal");
+  doc.text(comentarioLineas, rightX, infoPagoY);
+
+  //DETALLE DE PRODUCTOS
+  const tableY = infoPagoY + 9 + comentarioAltura;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("Detalle de Productos", 105, tableY, { align: "center" });
+
   const articulos = Array.isArray(order.articulos)
     ? order.articulos.map((a) => ({
         codigo: a.codigoArticulo || "—",
         descripcion: a.descripcion || a.nombre || "—",
-        unidad: a.unidad || "—",
-        cantidad: a.cantidadOrdenada || 0,
+        cantidadConUnidad: `${a.cantidadOrdenada || 0} ${a.unidad || ""}`.trim(),
         costoUnitario: a.costoUnitario || 0,
         subtotal:
           a.subtotal ||
@@ -201,15 +242,14 @@ const handleDownloadPDF = (order) => {
       }))
     : [];
 
-  const tableY = 75;
+  // Tabla
   doc.autoTable({
-    startY: tableY,
-    head: [["Código", "Descripción", "Unidad", "Cantidad", "Costo Unitario", "Subtotal"]],
+    startY: tableY + 5,
+    head: [["Código", "Descripción", "Cantidad", "Costo Unitario", "Subtotal"]],
     body: articulos.map((a) => [
       a.codigo,
       a.descripcion,
-      a.unidad,
-      a.cantidad,
+      a.cantidadConUnidad,
       formatCurrency(a.costoUnitario),
       formatCurrency(a.subtotal),
     ]),
@@ -225,14 +265,14 @@ const handleDownloadPDF = (order) => {
     margin: { left: 15, right: 15 },
   });
 
-  // === TOTAL EN LA PARTE INFERIOR DERECHA ===
-  const finalY = doc.lastAutoTable.finalY + 10; // posición justo debajo de la tabla
+  // TOTAL
+  const finalY = doc.lastAutoTable.finalY + 10;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(gray);
   doc.text(`Total: ${formatCurrency(order.totalOrden)}`, 195, finalY, { align: "right" });
 
-  // === APROBACIONES FIJAS AL PIE ===
+  // APROBACIONES
   const pageHeight = doc.internal.pageSize.getHeight();
   const approvalSectionY = pageHeight - 35;
 
@@ -241,30 +281,32 @@ const handleDownloadPDF = (order) => {
   doc.setTextColor(gray);
   doc.text("Aprobaciones", 105, approvalSectionY - 5, { align: "center" });
 
-  // Líneas de firma perfectamente simétricas
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-
   const lineY = approvalSectionY + 10;
   const leftXLine = 20;
   const rightXLine = 135;
 
   doc.text("_____________________________", leftXLine, lineY);
   doc.text("_____________________________", rightXLine, lineY);
-
-  // Textos bajo las líneas
   doc.text("Responsable de Aprobación", leftXLine + 10, lineY + 6);
   doc.text("Departamento de Compras", rightXLine + 7, lineY + 6);
 
-  // === GUARDAR ===
+  // GUARDAR PDF
   doc.save(`Orden_${order.numeroOrden || "Compra"}.pdf`);
 };
 
-
-
-
-
-
+const handleAuthorize = async (id, payload) => {
+  try {
+    await approveGasto(id, payload);
+    const updated = await getGastos();
+    setOrdenes(Array.isArray(updated) ? updated : updated.data || []);
+    setActiveTab("aprobado");
+    setShowAuthModal(false);
+  } catch (error) {
+    console.error("Error al autorizar:", error);
+  }
+};
   return (
     <div className="bg-card rounded-lg border border-border">
       {/* Header */}
@@ -325,112 +367,96 @@ const handleDownloadPDF = (order) => {
         )}
 
         {filteredOrders.map((order) => (
-          <div key={order.id} className="p-4 hover:bg-muted/50 transition-smooth">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center space-x-3 mb-2">
-                  <h4 className="font-medium text-foreground">{order.numeroOrden}</h4>
-                  <span
-  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-    order.estado
-  )}`}
->
-  {getStatusLabel(order.estado)}
-</span>
-                </div>
+  <div key={order.id} className="p-4 hover:bg-muted/50 transition-smooth">
+    <div className="flex items-start justify-between">
+      <div className="flex-1">
+        <div className="flex items-center space-x-3 mb-2">
+          <h4 className="font-medium text-foreground">{order.numeroOrden}</h4>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground mb-3">
-                  <div>
-                    <span className="font-medium">Proveedor:</span>
-                    <div className="text-foreground">{order.proveedor?.nombre || "—"}</div>
-                  </div>
-                  <div>
-                    <span className="font-medium">Fecha:</span>
-                    <div className="text-foreground">{formatDate(order.fechaOrden)}</div>
-                  </div>
-                  <div>
-                    <span className="font-medium">Entrega Esperada:</span>
-                    <div className="text-foreground">
-                      {formatDate(order.fechaEntregaEsperada)}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="font-medium">Total:</span>
-                    <div className="text-foreground font-medium">
-                      {formatCurrency(order.totalOrden)}
-                    </div>
-                  </div>
-                </div>
+          {/* Estado actual */}
+          <span
+            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.estado)}`}
+          >
+            {getStatusLabel(order.estado)}
+          </span>
+          {order.esUrgente && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-error/10 text-error">
+              <Icon name="AlertCircle" size={12} className="mr-1" />
+              Urgente
+            </span>
+          )}
+        </div>
 
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleOpenView(order)}
-                    iconName="Eye"
-                    iconSize={16}
-                  >
-                    Ver Detalles
-                  </Button>
-                  {["aprobado", "approved"].includes(order.estado?.toLowerCase()) && (
-  <Button
-    variant="ghost"
-    size="sm"
-    iconName="Download"
-    iconSize={16}
-    onClick={() => handleDownloadPDF(order)}
-  >
-    Descargar
-  </Button>
-)}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    iconName="Trash2"
-                    iconSize={16}
-                    className="text-error hover:text-error"
-                    onClick={() => alert("Eliminar orden")}
-                  >
-                    Eliminar
-                  </Button>
-                </div>
-              </div>
+        {/* Resto de la información */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground mb-3">
+          <div>
+            <span className="font-medium">Proveedor:</span>
+            <div className="text-foreground">{order.proveedor?.nombre || "—"}</div>
+          </div>
+          <div>
+            <span className="font-medium">Fecha:</span>
+            <div className="text-foreground">{formatDate(order.fechaOrden)}</div>
+          </div>
+          <div>
+            <span className="font-medium">Total:</span>
+            <div className="text-foreground font-medium">
+              {formatCurrency(order.totalOrden)}
             </div>
           </div>
-        ))}
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleOpenView(order)}
+            iconName="Eye"
+            iconSize={16}
+          >
+            Ver Detalles
+          </Button>
+
+          {["aprobado", "approved"].includes(order.estado?.toLowerCase()) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              iconName="Download"
+              iconSize={16}
+              onClick={() => handleDownloadPDF(order)}
+            >
+              Descargar
+            </Button>
+          )}
+
+          <Button
+            variant="ghost"
+            size="sm"
+            iconName="Trash2"
+            iconSize={16}
+            className="text-error hover:text-error"
+            onClick={() => alert("Eliminar orden")}
+          >
+            Eliminar
+          </Button>
+        </div>
+      </div>
+    </div>
+  </div>
+))}
       </div>
 
-      <PaymentAuthorizationModal
+<ModalGestionCompra
   isOpen={showAuthModal}
   onClose={() => setShowAuthModal(false)}
   expense={selectedOrden}
-  onAuthorize={async (updated) => {
-    try {
-      // 🔹 Enviar con el formato que tu Azure Function espera
-      await updateGasto(updated.id, {
-        status: "approved",
-        operationType: "status_change",
-        notes: updated.approverComments || "Orden aprobada automáticamente",
-      });
-
-      // 🔹 Actualizar la UI localmente
-      setOrdenes((prev) =>
-        prev.map((o) =>
-          o.id === updated.id
-            ? { ...o, estado: "approved", autorizacion: updated }
-            : o
-        )
-      );
-
-      setActiveTab("aprobado");
-      setShowAuthModal(false);
-    } catch (error) {
-      console.error("Error al aprobar la orden:", error);
-      alert("Ocurrió un error al aprobar la orden. Intenta de nuevo.");
-    }
-  }}
+  onAuthorize={handleAuthorize}
+  mode={
+    selectedOrden?.estado?.toLowerCase() === "approved" ||
+    selectedOrden?.estado?.toLowerCase() === "aprobado"
+      ? "view"
+      : "edit"
+  }
 />
-
 
 
     </div>
