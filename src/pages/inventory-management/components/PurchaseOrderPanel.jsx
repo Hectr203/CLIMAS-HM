@@ -30,57 +30,148 @@ const PurchaseOrderPanel = ({ orders, onViewOrder, onApproveOrder, onCreateOrder
     }).format(new Date(date));
   };
 
-  const onDownloadOrder = (order) => {
-    const doc = new jsPDF();
-    
-    // Configuración inicial
-    doc.setFontSize(20);
-    doc.text('Orden de Compra', 105, 15, { align: 'center' });
-    doc.setFontSize(12);
+//PDF 
+const onDownloadOrder = (order) => {
+  const doc = new jsPDF();
+  const gray = "#333333";
 
-    // Información del encabezado
-    doc.text(`Número: ${order.numeroOrden}`, 15, 30);
-    doc.text(`Fecha: ${formatDate(order.fechaCreacion)}`, 15, 40);
-    doc.text(`Estado: ${getStatusLabel(order.estado)}`, 15, 50);
-    doc.text(`Proveedor: ${order.proveedor?.nombre}`, 15, 60);
-    doc.text(`Términos de Pago: ${order.terminosPago}`, 15, 70);
-    
-    if (order.fechaEntregaEsperada) {
-      doc.text(`Entrega Esperada: ${formatDate(order.fechaEntregaEsperada)}`, 15, 80);
-    }
-
-    // Tabla de artículos
-    const tableHead = [['Código', 'Descripción', 'Cantidad', 'Costo Unit.', 'Subtotal']];
-    const tableBody = order.articulos?.map(item => [
-      item.codigoArticulo,
-      item.descripcion,
-      `${item.cantidadOrdenada} ${item.unidad}`,
-      formatCurrency(item.costoUnitario),
-      formatCurrency(item.subtotal)
-    ]);
-
-    doc.autoTable({
-      head: tableHead,
-      body: tableBody,
-      startY: 90,
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [41, 128, 185] },
-    });
-
-    // Total
-    const finalY = doc.lastAutoTable.finalY || 90;
-    doc.text(`Total: ${formatCurrency(order.totalOrden)}`, 195, finalY + 10, { align: 'right' });
-
-    // Notas si existen
-    if (order.notas) {
-      doc.text('Notas:', 15, finalY + 20);
-      doc.setFontSize(10);
-      doc.text(order.notas, 15, finalY + 30);
-    }
-
-    // Descargar el PDF
-    doc.save(`orden-compra-${order.numeroOrden}.pdf`);
+  // Para que salga el texto bien en el apartado de Metodo de pago
+  const formatText = (text) => {
+    if (!text) return "—";
+    return text
+      .replace(/_/g, " ")
+      .toLowerCase()
+      .replace(/\b\w/g, (c) => c.toUpperCase());
   };
+
+  // ENCABEZADO
+  doc.setFillColor(10, 74, 138);
+  doc.rect(0, 0, 210, 25, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text("ORDEN DE COMPRA", 105, 15, { align: "center" });
+
+  //DATOS GENERALES
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(gray);
+  doc.setFontSize(12);
+  doc.text("Datos Generales", 105, 35, { align: "center" });
+
+  const leftX = 20;
+  const rightX = 120;
+  const baseY = 44;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text(`Número: ${order.numeroOrden || "—"}`, leftX, baseY);
+  doc.text(`Fecha: ${formatDate(order.fechaCreacion)}`, leftX, baseY + 7);
+  doc.text(`Estado: ${getStatusLabel(order.estado)}`, leftX, baseY + 14);
+  doc.text(`Proveedor: ${order.proveedor?.nombre || "—"}`, rightX, baseY);
+  doc.text(`Creado por: ${order.creadoPor || "—"}`, rightX, baseY + 7);
+
+  const maxWidthNotas = 70;
+  const notaTexto = `Notas: ${order.notas || "—"}`;
+  const notaLineas = doc.splitTextToSize(notaTexto, maxWidthNotas);
+  const notaAltura = notaLineas.length * 5;
+
+  doc.text(notaLineas, rightX, baseY + 14);
+
+  if (order.fechaEntregaEsperada) {
+    doc.text(
+      `Entrega Esperada: ${formatDate(order.fechaEntregaEsperada)}`,
+      leftX,
+      baseY + 21
+    );
+  }
+
+  // DETALLES DE PAGO
+  const pagoY = Math.max(baseY + 28, baseY + 14 + notaAltura + 5);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("Detalles de Pago", 105, pagoY, { align: "center" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  const infoPagoY = pagoY + 8;
+  const metodoPagoFormateado = formatText(order.metodoPago);
+  const prioridadFormateada = formatText(order.prioridadAprobacion || "Normal");
+
+  doc.text(`Método de Pago: ${metodoPagoFormateado}`, leftX, infoPagoY);
+  doc.text(`Prioridad: ${prioridadFormateada}`, leftX, infoPagoY + 7);
+  const maxWidthComentarios = 70;
+  const comentarioTexto = `Comentarios: ${order.comentariosAprobador || "Sin comentarios"}`;
+  const comentarioLineas = doc.splitTextToSize(comentarioTexto, maxWidthComentarios);
+  const comentarioAltura = comentarioLineas.length * 5;
+  doc.text(comentarioLineas, rightX, infoPagoY);
+
+  // TABLA DE ARTÍCULOS
+  const tableY = infoPagoY + 9 + comentarioAltura;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("Detalle de Productos", 105, tableY, { align: "center" });
+
+  const tableHead = [
+    ["Código", "Descripción", "Cantidad", "Costo Unit.", "Subtotal"],
+  ];
+
+  const tableBody = order.articulos?.map((item) => [
+    item.codigoArticulo || "—",
+    item.descripcion || item.nombre || "—",
+    `${item.cantidadOrdenada || 0} ${item.unidad || ""}`.trim(),
+    formatCurrency(item.costoUnitario || 0),
+    formatCurrency(item.subtotal || 0),
+  ]);
+
+  doc.autoTable({
+    head: tableHead,
+    body: tableBody,
+    startY: tableY + 5,
+    theme: "grid",
+    styles: { fontSize: 9 },
+    headStyles: {
+      fillColor: [10, 74, 138],
+      textColor: 255,
+      halign: "center",
+      fontStyle: "bold",
+    },
+    bodyStyles: { halign: "center" },
+    margin: { left: 15, right: 15 },
+  });
+
+  // TOTAL
+  const finalY = doc.lastAutoTable.finalY || tableY + 10;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(gray);
+  doc.text(`Total: ${formatCurrency(order.totalOrden)}`, 195, finalY + 10, {
+    align: "right",
+  });
+
+  // SECCIÓN APROBACIONES
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const approvalSectionY = pageHeight - 35;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("Aprobaciones", 105, approvalSectionY - 5, { align: "center" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  const lineY = approvalSectionY + 10;
+  const leftXLine = 20;
+  const rightXLine = 135;
+
+  doc.text("_____________________________", leftXLine, lineY);
+  doc.text("_____________________________", rightXLine, lineY);
+  doc.text("Responsable de Aprobación", leftXLine + 10, lineY + 6);
+  doc.text("Departamento de Compras", rightXLine + 7, lineY + 6);
+
+  // DESCARGAR PDF
+  doc.save(`orden-compra-${order.numeroOrden}.pdf`);
+};
+
+
   const [activeTab, setActiveTab] = useState('pending');
 
   console.log('Órdenes recibidas en PurchaseOrderPanel:', orders);

@@ -50,11 +50,15 @@ const getStatusColor = (status) => {
 
 const matchesEstado = (estado, tab) => {
   const e = (estado || "").toLowerCase();
+
   if (tab === "pendiente") return e === "pendiente" || e === "pending";
   if (tab === "aprobado") return e === "aprobado" || e === "approved";
   if (tab === "pagado") return e === "pagado" || e === "paid";
+  if (tab === "rechazado") return e === "rechazado" || e === "rejected" || e === "cancelled";
+
   return false;
 };
+
 
 const GastosTable = () => {
   const [ordenes, setOrdenes] = useState([]);
@@ -79,11 +83,11 @@ const GastosTable = () => {
       setLoading(true);
       try {
         const data = await getGastos();
-        console.log("📦 Datos obtenidos:", data);
+        console.log("Datos obtenidos:", data);
         if (!alive) return;
         setOrdenes(Array.isArray(data) ? data : data.data || []);
       } catch (err) {
-        console.error("❌ Error al cargar órdenes:", err);
+        console.error("Error al cargar órdenes:", err);
         setErrorMsg("No se pudieron cargar las órdenes de compra.");
       } finally {
         if (alive) setLoading(false);
@@ -116,38 +120,39 @@ const GastosTable = () => {
 
 
 
-  const tabs = [
-    {
-      id: "pendiente",
-      label: "Pendientes",
-      count: ordenes.filter((o) => matchesEstado(o.estado, "pendiente")).length,
-    },
-    {
-      id: "aprobado",
-      label: "Aprobadas",
-      count: ordenes.filter((o) => matchesEstado(o.estado, "aprobado")).length,
-    },
-  ];
+const tabs = [
+  { id: "pendiente", label: "Pendientes", count: ordenes.filter((o) => matchesEstado(o.estado, "pendiente")).length },
+  { id: "aprobado", label: "Aprobadas", count: ordenes.filter((o) => matchesEstado(o.estado, "aprobado")).length },
+  { id: "rechazado", label: "Rechazadas", count: ordenes.filter((o) => matchesEstado(o.estado, "rechazado")).length },
+];
 
-  const filteredOrders = ordenes.filter((o) => matchesEstado(o.estado, activeTab));
+const filteredOrders = ordenes.filter((o) => matchesEstado(o.estado, activeTab));
+
 
   
 const getStatusLabel = (estado) => {
   switch ((estado || "").toLowerCase()) {
     case "pending":
+    case "pendiente":
       return "Pendiente";
     case "approved":
-      return "Aprobado";
+    case "aprobado":
+      return "Aprobada";
     case "received":
-      return "Autorizado";
+    case "autorizado":
+      return "Autorizada";
     case "paid":
-      return "Pagado";
+    case "pagado":
+      return "Pagada";
     case "cancelled":
-      return "Rechazado";
+    case "rejected":
+    case "rechazado":
+      return "Rechazada";
     default:
       return estado || "Desconocido";
   }
 };
+
 
 // PDF
 const handleDownloadPDF = (order) => {
@@ -186,8 +191,8 @@ const handleDownloadPDF = (order) => {
   
   doc.text(`Folio: ${order.numeroOrden || "—"}`, leftX, baseY);
   doc.text(`Fecha de Orden: ${formatDate(order.fechaOrden)}`, leftX, baseY + 7);
-  doc.text(`Estado: ${getStatusLabel(order.estado)}`, leftX, baseY + 14);
-  doc.text(`Proveedor: ${order.proveedor?.nombre || "—"}`, rightX, baseY);
+  doc.text(`Proveedor: ${order.proveedor?.nombre || "—"}`, leftX, baseY + 14);
+  doc.text(`Estado: ${getStatusLabel(order.estado)}`, rightX, baseY);
   doc.text(`Creado por: ${order.creadoPor || "—"}`, rightX, baseY + 7);
   const maxWidthNotas = 70;
   const notaTexto = `Notas: ${order.notas || "—"}`;
@@ -296,17 +301,24 @@ const handleDownloadPDF = (order) => {
   doc.save(`Orden_${order.numeroOrden || "Compra"}.pdf`);
 };
 
-const handleAuthorize = async (id, payload) => {
+const handleAuthorize = async (id, payload, isRejection = false) => {
   try {
-    await approveGasto(id, payload);
+    await approveGasto(id, payload); // Aquí actualizas en backend (estado: rejected o approved)
+
+    // Refrescar la lista después de actualizar
     const updated = await getGastos();
     setOrdenes(Array.isArray(updated) ? updated : updated.data || []);
-    setActiveTab("aprobado");
+
+    // Cambiar de pestaña según si fue aprobado o rechazado
+    setActiveTab(isRejection ? "rechazado" : "aprobado");
+
+    // Cerrar modal
     setShowAuthModal(false);
   } catch (error) {
-    console.error("Error al autorizar:", error);
+    console.error("Error al procesar gasto:", error);
   }
 };
+
   return (
     <div className="bg-card rounded-lg border border-border">
       {/* Header */}
@@ -416,28 +428,21 @@ const handleAuthorize = async (id, payload) => {
             Ver Detalles
           </Button>
 
-          {["aprobado", "approved"].includes(order.estado?.toLowerCase()) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              iconName="Download"
-              iconSize={16}
-              onClick={() => handleDownloadPDF(order)}
-            >
-              Descargar
-            </Button>
-          )}
+          {["aprobado", "approved", "rechazado", "rejected", "cancelled"].includes(
+  order.estado?.toLowerCase()
+) && (
+  <Button
+    variant="ghost"
+    size="sm"
+    iconName="Download"
+    iconSize={16}
+    onClick={() => handleDownloadPDF(order)}
+  >
+    Descargar
+  </Button>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            iconName="Trash2"
-            iconSize={16}
-            className="text-error hover:text-error"
-            onClick={() => alert("Eliminar orden")}
-          >
-            Eliminar
-          </Button>
+          )}
+          
         </div>
       </div>
     </div>
@@ -450,13 +455,16 @@ const handleAuthorize = async (id, payload) => {
   onClose={() => setShowAuthModal(false)}
   expense={selectedOrden}
   onAuthorize={handleAuthorize}
+  onDownload={() => handleDownloadPDF(selectedOrden)} // 👈 le pasamos la función de descarga
   mode={
-    selectedOrden?.estado?.toLowerCase() === "approved" ||
-    selectedOrden?.estado?.toLowerCase() === "aprobado"
-      ? "view"
+    ["approved", "aprobado", "rejected", "rechazado", "cancelled"].includes(
+      selectedOrden?.estado?.toLowerCase()
+    )
+      ? "view" // 👈 modo "ver" para aprobadas y rechazadas
       : "edit"
   }
 />
+
 
 
     </div>

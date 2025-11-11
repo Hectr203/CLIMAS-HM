@@ -10,6 +10,7 @@ const ModalGestionCompra = ({
   expense, 
   onAuthorize, 
   onDelete, 
+  onDownload,
   mode = 'edit'
 }) => {
 
@@ -88,22 +89,31 @@ const ModalGestionCompra = ({
 
 
 
-  // Eliminar orden
-  const handleDelete = async () => {
-    if (!expense?.id) return;
-    const ok = window.confirm('¿Eliminar este pago? Esta acción no se puede deshacer.');
-    if (!ok) return;
+  // Eliminar (enviar a rechazadas)
+const handleDelete = async () => {
+  if (!expense?.id) return;
 
-    setIsDeleting(true);
-    try {
-      await onDelete?.(expense.id);
-      onClose?.();
-    } catch (err) {
-      console.error('Error eliminando pago:', err);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
+  setIsDeleting(true);
+  try {
+    const payload = {
+      decision: "rejected",
+      comentariosAprobador: authData.approverComments || "Pago rechazado por el aprobador.",
+      aprobadoPor: "Juan Pérez - Gerente",
+      prioridad: authData.priority,
+      metodoPago: authData.paymentMethod,
+    };
+
+    console.log("Enviando datos de rechazo:", payload);
+    await onAuthorize?.(expense.id, payload, true);
+    onClose?.();
+  } catch (err) {
+    console.error("Error rechazando pago:", err);
+  } finally {
+    setIsDeleting(false);
+  }
+};
+
+
 
   if (!isOpen) return null;
 
@@ -201,37 +211,47 @@ const ModalGestionCompra = ({
 
           {/* Botones */}
           <div className="flex items-center justify-between pt-6 border-t border-border">
-            {!isViewMode && (
-              <Button
-                type="button"
-                variant="destructive"
-                iconName="Trash2"
-                iconPosition="left"
-                onClick={handleDelete}
-                disabled={isSubmitting || isDeleting}
-              >
-                {isDeleting ? 'Eliminando…' : 'Eliminar pago'}
-              </Button>
-            )}
+  {!isViewMode && (
+    <Button
+      type="button"
+      variant="destructive"
+      iconName="Ban"
+      iconPosition="left"
+      onClick={handleDelete}
+      disabled={isSubmitting || isDeleting}
+    >
+      {isDeleting ? 'Eliminando…' : 'Rechazar Pago'}
+    </Button>
+  )}
 
-            <div className="flex items-center space-x-3">
-              <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting || isDeleting}>
-                {isViewMode ? 'Cerrar' : 'Cancelar'}
-              </Button>
-              {!isViewMode && (
-                <Button
-                  type="submit"
-                  variant="success"
-                  loading={isSubmitting}
-                  disabled={isDeleting}
-                  iconName="Check"
-                  iconPosition="left"
-                >
-                  Autorizar Pago
-                </Button>
-              )}
-            </div>
-          </div>
+  <div className="flex items-center space-x-3">
+    {/* Botón para cerrar */}
+    <Button
+      type="button"
+      variant="outline"
+      onClick={onClose}
+      disabled={isSubmitting || isDeleting}
+    >
+      {isViewMode ? 'Cerrar' : 'Cancelar'}
+    </Button>
+    
+
+    {/* Botón para autorizar */}
+    {!isViewMode && (
+      <Button
+        type="submit"
+        variant="success"
+        loading={isSubmitting}
+        disabled={isDeleting}
+        iconName="Check"
+        iconPosition="left"
+      >
+        Autorizar Pago
+      </Button>
+    )}
+  </div>
+</div>
+
         </form>
       </div>
     </div>
