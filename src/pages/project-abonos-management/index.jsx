@@ -11,84 +11,125 @@ import EditProjectModal from './components/EditProjectModal';
 import RegisterAbonoModal from './components/RegisterAbonoModal';
 import useProyect from '../../hooks/useProyect';
 
-/* ====== Cache local para estado UI ====== */
+/* =========================================================================
+   Cache local para el estado visual (UI) de cada proyecto
+   - Persistimos en localStorage el "estado UI" (planificación / en proceso)
+   - Esto permite mantener el estado visible aunque el backend use otros labels
+   ========================================================================= */
 const UI_ESTADO_KEY = 'proyectos_ui_estado_v1';
 const uiEstadoCache = {
+  // Lee el mapa completo desde localStorage
   _read() { try { return JSON.parse(localStorage.getItem(UI_ESTADO_KEY)) || {}; } catch { return {}; } },
+  // Obtiene el estado de un proyecto por id
   get(id) { if (!id) return null; const m = this._read(); return m[id] || null; },
+  // Setea o elimina el estado para un id; vuelve a guardar en localStorage
   set(id, estado) { if (!id) return; const m = this._read(); if (estado) m[id] = estado; else delete m[id]; localStorage.setItem(UI_ESTADO_KEY, JSON.stringify(m)); },
-  bulkMergeFromApi(list=[]) {
-    const m = this._read(); let changed = false;
-    list.forEach(p => {
+  // Al recibir lista desde API, rellena los estados que falten con un default
+  bulkMergeFromApi(lista = []) {
+    const m = this._read(); let cambiado = false;
+    lista.forEach(p => {
       const id = p?.id ?? p?._id; if (!id) return;
-      if (!m[id]) { const def = backendToUiDefault(p?.estado); if (def) { m[id] = def; changed = true; } }
+      if (!m[id]) { const def = backendToUiDefault(p?.estado); if (def) { m[id] = def; cambiado = true; } }
     });
-    if (changed) localStorage.setItem(UI_ESTADO_KEY, JSON.stringify(m));
+    if (cambiado) localStorage.setItem(UI_ESTADO_KEY, JSON.stringify(m));
   }
 };
-const backendToUiDefault = (apiEstado) => {
-  const v = String(apiEstado || '').toLowerCase();
+
+// Traducción de estados backend → estados UI
+const backendToUiDefault = (estadoApi) => {
+  const v = String(estadoApi || '').toLowerCase();
   if (v === 'en proceso') return 'en proceso';
   if (v === 'activo') return 'planificación';
   return 'planificación';
 };
-const mapUiToBackend = (uiEstado) => {
-  const v = String(uiEstado || '').toLowerCase();
+
+// Traducción de estados UI → estados backend (para actualizar en servidor)
+const mapUiToBackend = (estadoUi) => {
+  const v = String(estadoUi || '').toLowerCase();
   return v === 'en proceso' ? 'en proceso' : 'activo';
 };
 
 const ProjectManagement = () => {
+  /* =========================================================================
+     Hook de proyectos
+     - provee lista de proyectos y operaciones (get/update, etc.)
+     ========================================================================= */
   const {
-    proyectos: projects,
-    loading: isLoading,
+    proyectos,
+    loading: cargando,
     getProyectos,
     // getProyectoById,
     updateProyecto,
     // deleteProyecto
   } = useProyect();
 
-  const [filteredProjects, setFilteredProjects] = useState([]);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedProject, setSelectedProject] = useState(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
-  const [abonosByProject, setAbonosByProject] = useState(() => {
+  /* =========================================================================
+     Estado local de la vista
+     ========================================================================= */
+  const [proyectosFiltrados, setProyectosFiltrados] = useState([]);
+  const [modalCrearAbierto, setModalCrearAbierto] = useState(false);
+  const [modalEditarAbierto, setModalEditarAbierto] = useState(false);
+  const [proyectoSeleccionado, setProyectoSeleccionado] = useState(null);
+  const [barraLateralColapsada, setBarraLateralColapsada] = useState(false);
+  const [menuEncabezadoAbierto, setMenuEncabezadoAbierto] = useState(false);
+
+  // Cache de abonos por proyecto (en local) para cálculos rápidos de "pagado"
+  const [abonosPorProyecto, setAbonosPorProyecto] = useState(() => {
     try {
-      const raw = localStorage.getItem('abonos_proyectos_v1');
-      return raw ? JSON.parse(raw) : {};
+      const bruto = localStorage.getItem('abonos_proyectos_v1');
+      return bruto ? JSON.parse(bruto) : {};
     } catch { return {}; }
   });
-  const [registerAbonoFor, setRegisterAbonoFor] = useState(null);
-  const [showProjectSelector, setShowProjectSelector] = useState(false);
 
+  // Estado para abrir el modal de registro de abono asociado a un proyecto
+  const [registrarAbonoPara, setRegistrarAbonoPara] = useState(null);
+
+  // Control del selector de proyecto (cuando se quiere crear un abono sin abrir desde la tabla)
+  const [mostrarSelectorProyecto, setMostrarSelectorProyecto] = useState(false);
+
+  /* =========================================================================
+     Ciclo de vida
+     - Cargar proyectos al montar
+     - Sincronizar cache UI y lista filtrada cuando cambien los proyectos
+     ========================================================================= */
   useEffect(() => { getProyectos(); }, []);
   useEffect(() => {
-    const arr = Array.isArray(projects) ? projects : [];
-    uiEstadoCache.bulkMergeFromApi(arr);
-    setFilteredProjects(arr);
-  }, [projects]);
+    const arr = Array.isArray(proyectos) ? proyectos : [];
+    uiEstadoCache.bulkMergeFromApi(arr);   // completa estados UI faltantes
+    setProyectosFiltrados(arr);            // por defecto, sin filtros
+  }, [proyectos]);
 
-  // getters
-  const getNombre = (p) => p?.nombre ?? p?.nombreProyecto ?? p?.name ?? '';
-  const getCodigo = (p) => p?.codigo ?? p?.code ?? '';
-  const getEstado = (p) => uiEstadoCache.get(p?.id ?? p?._id) || backendToUiDefault(p?.estado);
-  const getDepto = (p) => p?.departamento ?? p?.department ?? '';
-  const getPrioridad = (p) => p?.prioridad ?? p?.priority ?? '';
-  const getInicio = (p) => p?.cronograma?.fechaInicio ?? p?.startDate ?? null;
-  const getFin = (p) => p?.cronograma?.fechaFin ?? p?.endDate ?? null;
-  const getBudget = (p) => Number(p?.totalPresupuesto ?? p?.presupuesto?.total ?? p?.budget ?? 0);
-  const getProjectId = (p) => p?.id ?? p?._id;
-  const getTotalPagado = (p) => {
-    const pid = getProjectId(p);
-    const list = abonosByProject?.[pid] || [];
-    return list.reduce((acc, a) => acc + (Number(a?.monto) || 0), 0);
+  /* =========================================================================
+     Helpers (getters) para acceder a campos con posibles alias
+     - Manejan nombres alternos según venga del backend
+     ========================================================================= */
+  const obtenerNombre = (p) => p?.nombre ?? p?.nombreProyecto ?? p?.name ?? '';
+  const obtenerCodigo = (p) => p?.codigo ?? p?.code ?? '';
+  const obtenerEstadoUi = (p) => uiEstadoCache.get(p?.id ?? p?._id) || backendToUiDefault(p?.estado);
+  const obtenerDepartamento = (p) => p?.departamento ?? p?.department ?? '';
+  const obtenerPrioridad = (p) => p?.prioridad ?? p?.priority ?? '';
+  const obtenerInicio = (p) => p?.cronograma?.fechaInicio ?? p?.startDate ?? null;
+  const obtenerFin = (p) => p?.cronograma?.fechaFin ?? p?.endDate ?? null;
+  const obtenerPresupuesto = (p) => Number(p?.totalPresupuesto ?? p?.presupuesto?.total ?? p?.budget ?? 0);
+  const obtenerIdProyecto = (p) => p?.id ?? p?._id;
+
+  // Suma local de abonos guardados en cache para un proyecto
+  const obtenerTotalPagado = (p) => {
+    const pid = obtenerIdProyecto(p);
+    const lista = abonosPorProyecto?.[pid] || [];
+    return lista.reduce((acc, a) => acc + (Number(a?.monto) || 0), 0);
   };
 
-  // filtros del componente ProjectFilters (sin cambios de tu UI)
-  const norm = (s) => (s ?? '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/\s+/g, ' ');
-  const canonicalEstado = (raw) => {
-    const v = norm(raw);
+  /* =========================================================================
+     Normalizadores para filtros (eliminan acentos, bajan a minúsculas, etc.)
+     ========================================================================= */
+  const normalizar = (s) => (s ?? '').toString()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().trim().replace(/\s+/g, ' ');
+
+  // Homologa distintos textos de estado a un "canon" para comparar
+  const estadoCanonico = (raw) => {
+    const v = normalizar(raw);
     if (v.includes('planific') || v.includes('planning')) return 'planificacion';
     if (v === 'en proceso' || v.includes('progress') || v.includes('in progress') || v.includes('process')) return 'en proceso';
     if (v === 'en pausa' || v.includes('pause') || v.includes('on hold') || v.includes('on-hold') || v.includes('hold')) return 'en pausa';
@@ -98,183 +139,216 @@ const ProjectManagement = () => {
     return v;
   };
 
-  const handleFiltersChange = (filters) => {
-    let filtered = Array.isArray(projects) ? [...projects] : [];
+  /* =========================================================================
+     Manejo de filtros
+     - Recibe el objeto `filtros` desde <ProjectFilters/>
+     - Aplica búsqueda, estado, departamento, prioridad, fechas, presupuesto y
+       un filtro adicional de "estado de pago" (pagado / en-proceso / sin-pago)
+     ========================================================================= */
+  const manejarCambioFiltros = (filtros) => {
+    let filtrados = Array.isArray(proyectos) ? [...proyectos] : [];
 
-    if (filters?.search) {
-      const q = norm(filters.search);
-      filtered = filtered.filter(project => {
-        const name = norm(getNombre(project));
-        const code = norm(getCodigo(project));
-        const cliente = norm(project?.cliente?.nombre || project?.cliente || '');
-        return name.includes(q) || code.includes(q) || cliente.includes(q);
+    // Búsqueda por nombre, código o cliente
+    if (filtros?.search) {
+      const q = normalizar(filtros.search);
+      filtrados = filtrados.filter(proy => {
+        const nombre = normalizar(obtenerNombre(proy));
+        const codigo = normalizar(obtenerCodigo(proy));
+        const cliente = normalizar(proy?.cliente?.nombre || proy?.cliente || '');
+        return nombre.includes(q) || codigo.includes(q) || cliente.includes(q);
       });
     }
 
-    // Filtro por estado de pago (NUEVO)
-    if (filters?.paymentStatus) {
-      filtered = filtered.filter(project => {
-        const budget = getBudget(project);
-        const paid = getTotalPagado(project);
-        
-        if (filters.paymentStatus === 'pagado') {
-          // Proyectos completamente pagados
-          return budget > 0 && paid >= budget;
-        } else if (filters.paymentStatus === 'en-proceso') {
-          // Proyectos con pagos parciales
-          return budget > 0 && paid > 0 && paid < budget;
-        } else if (filters.paymentStatus === 'sin-pago') {
-          // Proyectos sin pagos
-          return paid === 0 || paid == null;
+    // Filtro por estado de pago (usa cache local de abonos)
+    if (filtros?.paymentStatus) {
+      filtrados = filtrados.filter(proy => {
+        const presupuesto = obtenerPresupuesto(proy);
+        const pagado = obtenerTotalPagado(proy);
+        if (filtros.paymentStatus === 'pagado') {
+          return presupuesto > 0 && pagado >= presupuesto;
+        } else if (filtros.paymentStatus === 'en-proceso') {
+          return presupuesto > 0 && pagado > 0 && pagado < presupuesto;
+        } else if (filtros.paymentStatus === 'sin-pago') {
+          return pagado === 0 || pagado == null;
         }
         return true;
       });
     }
 
-    if (filters?.status) {
-      const target = canonicalEstado(filters.status);
-      filtered = filtered.filter(project => {
-        const uiEstado = getEstado(project);
-        const canon = canonicalEstado(uiEstado);
-        return canon === target;
+    // Filtro por estado del proyecto (normalizado)
+    if (filtros?.status) {
+      const objetivo = estadoCanonico(filtros.status);
+      filtrados = filtrados.filter(proy => {
+        const ui = obtenerEstadoUi(proy);
+        const canon = estadoCanonico(ui);
+        return canon === objetivo;
       });
     }
 
-    if (filters?.department) {
-      const deptMap = { sales: 'Ventas', engineering: 'Ingeniería', installation: 'Instalación', maintenance: 'Mantenimiento', administration: 'Administración' };
-      const targetDept = deptMap[filters.department] || filters.department;
-      filtered = filtered.filter(project => (getDepto(project) || '') === targetDept);
+    // Filtro por departamento (mapea claves en inglés a etiquetas en español)
+    if (filtros?.department) {
+      const mapaDepto = { sales: 'Ventas', engineering: 'Ingeniería', installation: 'Instalación', maintenance: 'Mantenimiento', administration: 'Administración' };
+      const depto = mapaDepto[filtros.department] || filtros.department;
+      filtrados = filtrados.filter(proy => (obtenerDepartamento(proy) || '') === depto);
     }
 
-    if (filters?.priority) {
-      const priorityMap = { low: 'Baja', medium: 'Media', high: 'Alta', urgent: 'Urgente' };
-      const targetPriority = priorityMap[filters.priority] || filters.priority;
-      filtered = filtered.filter(project => (getPrioridad(project) || '') === targetPriority);
+    // Filtro por prioridad (mapea claves a etiquetas)
+    if (filtros?.priority) {
+      const mapaPrioridad = { low: 'Baja', medium: 'Media', high: 'Alta', urgent: 'Urgente' };
+      const prioridad = mapaPrioridad[filtros.priority] || filtros.priority;
+      filtrados = filtrados.filter(proy => (obtenerPrioridad(proy) || '') === prioridad);
     }
 
-    if (filters?.dateRange) {
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      filtered = filtered.filter(project => {
-        const startDateStr = getInicio(project);
-        if (!startDateStr) return false;
-        const startDate = new Date(startDateStr);
-        if (isNaN(startDate.getTime())) return false;
-        switch (filters.dateRange) {
-          case 'today': return startDate.toDateString() === today.toDateString();
-          case 'week': { const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7); return startDate >= weekAgo && startDate <= now; }
-          case 'month': return startDate.getMonth() === now.getMonth() && startDate.getFullYear() === now.getFullYear();
-          case 'quarter': { const quarter = Math.floor(now.getMonth() / 3); const projectQuarter = Math.floor(startDate.getMonth() / 3); return projectQuarter === quarter && startDate.getFullYear() === now.getFullYear(); }
-          case 'year': return startDate.getFullYear() === now.getFullYear();
+    // Filtro por rango de fechas relativo (hoy/semana/mes/trimestre/año)
+    if (filtros?.dateRange) {
+      const ahora = new Date();
+      const hoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+      filtrados = filtrados.filter(proy => {
+        const inicioStr = obtenerInicio(proy);
+        if (!inicioStr) return false;
+        const inicio = new Date(inicioStr);
+        if (isNaN(inicio.getTime())) return false;
+        switch (filtros.dateRange) {
+          case 'today': return inicio.toDateString() === hoy.toDateString();
+          case 'week': { const hace7 = new Date(hoy); hace7.setDate(hace7.getDate() - 7); return inicio >= hace7 && inicio <= ahora; }
+          case 'month': return inicio.getMonth() === ahora.getMonth() && inicio.getFullYear() === ahora.getFullYear();
+          case 'quarter': {
+            const trim = Math.floor(ahora.getMonth() / 3);
+            const trimProy = Math.floor(inicio.getMonth() / 3);
+            return trimProy === trim && inicio.getFullYear() === ahora.getFullYear();
+          }
+          case 'year': return inicio.getFullYear() === ahora.getFullYear();
           default: return true;
         }
       });
     }
 
-    if (filters?.minBudget) filtered = filtered.filter(project => getBudget(project) >= Number(filters.minBudget));
-    if (filters?.maxBudget) filtered = filtered.filter(project => getBudget(project) <= Number(filters.maxBudget));
+    // Filtros por presupuesto mínimo/máximo
+    if (filtros?.minBudget) filtrados = filtrados.filter(proy => obtenerPresupuesto(proy) >= Number(filtros.minBudget));
+    if (filtros?.maxBudget) filtrados = filtrados.filter(proy => obtenerPresupuesto(proy) <= Number(filtros.maxBudget));
 
-    if (filters?.startDate) {
-      const filterStartDate = new Date(filters.startDate);
-      filtered = filtered.filter(project => {
-        const d = getInicio(project); if (!d) return false;
-        const sd = new Date(d); return sd >= filterStartDate;
+    // Filtro por fecha de inicio ≥ selected
+    if (filtros?.startDate) {
+      const filtroInicio = new Date(filtros.startDate);
+      filtrados = filtrados.filter(proy => {
+        const d = obtenerInicio(proy); if (!d) return false;
+        const sd = new Date(d); return sd >= filtroInicio;
       });
     }
 
-    if (filters?.endDate) {
-      const filterEndDate = new Date(filters.endDate);
-      filtered = filtered.filter(project => {
-        const d = getFin(project); if (!d) return false;
-        const ed = new Date(d); return ed <= filterEndDate;
+    // Filtro por fecha de fin ≤ selected
+    if (filtros?.endDate) {
+      const filtroFin = new Date(filtros.endDate);
+      filtrados = filtrados.filter(proy => {
+        const d = obtenerFin(proy); if (!d) return false;
+        const ed = new Date(d); return ed <= filtroFin;
       });
     }
 
-    setFilteredProjects(filtered);
+    setProyectosFiltrados(filtrados);
   };
 
-  const handleEditProject = (project) => {
-    const id = project?.id ?? project?._id; if (!id) return;
-    setSelectedProject({ ...project, id });
-    setIsEditModalOpen(true);
+  /* =========================================================================
+     Acciones sobre proyectos
+     ========================================================================= */
+  // Abre modal de edición con el proyecto seleccionado
+  const manejarEditarProyecto = (proyecto) => {
+    const id = proyecto?.id ?? proyecto?._id; if (!id) return;
+    setProyectoSeleccionado({ ...proyecto, id });
+    setModalEditarAbierto(true);
   };
-  const _handleStatusUpdate = async (projectId, newStatusUi) => {
+
+  // Actualiza el estado del proyecto en backend y sincroniza cache UI
+  const _manejarActualizacionEstado = async (proyectoId, nuevoEstadoUi) => {
     try {
-      const estadoBackend = mapUiToBackend(newStatusUi);
-      await updateProyecto(projectId, { estado: estadoBackend });
-      uiEstadoCache.set(projectId, newStatusUi);
+      const estadoBackend = mapUiToBackend(nuevoEstadoUi);
+      await updateProyecto(proyectoId, { estado: estadoBackend });
+      uiEstadoCache.set(proyectoId, nuevoEstadoUi);
       await getProyectos({ force: true }).catch(() => {});
     } catch (error) {
       console.error('Error al actualizar estado del proyecto:', error);
       alert('Error al actualizar el estado del proyecto');
     }
   };
-  const handleBulkAction = (action, selectedIds) => { console.log(`Bulk action: ${action}`, selectedIds); };
 
-  const openRegisterAbono = (project) => {
-    setRegisterAbonoFor(project);
+  // Placeholder para acciones masivas desde la tabla
+  const manejarAccionMasiva = (accion, idsSeleccionados) => { console.log(`Acción masiva: ${accion}`, idsSeleccionados); };
+
+  /* =========================================================================
+     Flujo de registro de abonos
+     - abrir/cerrar modal
+     - seleccionar proyecto
+     - guardar abono en cache local (para mostrar progreso/pagado)
+     ========================================================================= */
+  const abrirRegistroAbono = (proyecto) => { setRegistrarAbonoPara(proyecto); };
+  const cerrarRegistroAbono = () => {
+    setRegistrarAbonoPara(null);
+    setMostrarSelectorProyecto(false);
   };
-  const closeRegisterAbono = () => {
-    setRegisterAbonoFor(null);
-    setShowProjectSelector(false);
-  };
-  const openNewAbono = () => {
-    if (filteredProjects && filteredProjects.length > 0) {
-      setShowProjectSelector(true);
+  const abrirNuevoAbono = () => {
+    if (proyectosFiltrados && proyectosFiltrados.length > 0) {
+      setMostrarSelectorProyecto(true);
     } else {
       alert('No hay proyectos disponibles para registrar un abono.');
     }
   };
-  const handleProjectSelectForAbono = (project) => {
-    setShowProjectSelector(false);
-    setRegisterAbonoFor(project);
+  const seleccionarProyectoParaAbono = (proyecto) => {
+    setMostrarSelectorProyecto(false);
+    setRegistrarAbonoPara(proyecto);
   };
-  const handleSaveAbono = (payload) => {
+  const manejarGuardarAbono = async (payload) => {
+    // Esperamos: { projectId, fecha, monto, saldoRestante } desde el modal de abonos
     const { projectId, fecha, monto, saldoRestante } = payload || {};
     if (!projectId) return;
-    setAbonosByProject(prev => {
-      const next = { ...prev };
-      const list = Array.isArray(next[projectId]) ? next[projectId] : [];
-      next[projectId] = [...list, { fecha, monto, saldoRestante }];
-      try { localStorage.setItem('abonos_proyectos_v1', JSON.stringify(next)); } catch {}
-      return next;
+    setAbonosPorProyecto(prev => {
+      const siguiente = { ...prev };
+      const lista = Array.isArray(siguiente[projectId]) ? siguiente[projectId] : [];
+      // Añadimos el nuevo abono a la lista del proyecto
+      siguiente[projectId] = [...lista, { fecha, monto, saldoRestante }];
+      try { localStorage.setItem('abonos_proyectos_v1', JSON.stringify(siguiente)); } catch {}
+      return siguiente;
     });
-    closeRegisterAbono();
+    await getProyectos({ force: true });
+    cerrarRegistroAbono();
   };
 
-  const handleUpdateProject = async () => {
+  // Tras editar un proyecto, recarga lista desde backend y cierra modal
+  const manejarActualizarProyecto = async () => {
     try {
       await getProyectos({ force: true });
       alert('Proyecto actualizado exitosamente');
-      setSelectedProject(null); setIsEditModalOpen(false);
+      setProyectoSeleccionado(null); setModalEditarAbierto(false);
     } catch {
-      setSelectedProject(null); setIsEditModalOpen(false);
+      setProyectoSeleccionado(null); setModalEditarAbierto(false);
     }
   };
 
-  /* ===== Export desde la barra de filtros ===== */
-  const handleExportFromFilters = () => {
-    const list = filteredProjects || [];
-    if (!list.length) { alert('No hay proyectos para exportar.'); return; }
-    const headers = ['Código','Nombre','Cliente','Estado','Prioridad','Presupuesto (MXN)','Inicio','Fin'];
-    const esc = (s) => {
+  /* =========================================================================
+     Exportación CSV desde el panel de filtros
+     - Toma la lista actualmente filtrada y la descarga como CSV
+     ========================================================================= */
+  const manejarExportarDesdeFiltros = () => {
+    const lista = proyectosFiltrados || [];
+    if (!lista.length) { alert('No hay proyectos para exportar.'); return; }
+    const encabezados = ['Código','Nombre','Cliente','Estado','Prioridad','Presupuesto (MXN)','Inicio','Fin'];
+    const escapar = (s) => {
       const v = String(s ?? '');
-      const needs = /[",\n]/.test(v);
+      const necesita = /[",\n]/.test(v);
       const e = v.replace(/"/g,'""');
-      return needs ? `"${e}"` : e;
+      return necesita ? `"${e}"` : e;
     };
-    const rows = list.map(p => {
-      const code = p?.codigo ?? p?.code ?? '';
-      const name = p?.nombre ?? p?.name ?? '';
-      const client = p?.cliente?.nombre || p?.cliente || '';
-      const status = p?.statusLabel || p?.estado || p?.status || '';
-      const priority = p?.priority || p?.prioridad || '';
-      const budget = Number(p?.totalPresupuesto ?? p?.presupuesto?.total ?? p?.budget ?? 0).toLocaleString('es-MX');
-      const sd = new Date(p?.cronograma?.fechaInicio ?? p?.startDate ?? '').toLocaleDateString('es-MX');
-      const ed = new Date(p?.cronograma?.fechaFin ?? p?.endDate ?? '').toLocaleDateString('es-MX');
-      return [code,name,client,status,priority,budget,sd,ed].map(esc).join(',');
+    const filas = lista.map(p => {
+      const codigo = p?.codigo ?? p?.code ?? '';
+      const nombre = p?.nombre ?? p?.name ?? '';
+      const cliente = p?.cliente?.nombre || p?.cliente || '';
+      const estado = p?.statusLabel || p?.estado || p?.status || '';
+      const prioridad = p?.priority || p?.prioridad || '';
+      const presupuesto = Number(p?.totalPresupuesto ?? p?.presupuesto?.total ?? p?.budget ?? 0).toLocaleString('es-MX');
+      const ini = new Date(p?.cronograma?.fechaInicio ?? p?.startDate ?? '').toLocaleDateString('es-MX');
+      const fin = new Date(p?.cronograma?.fechaFin ?? p?.endDate ?? '').toLocaleDateString('es-MX');
+      return [codigo,nombre,cliente,estado,prioridad,presupuesto,ini,fin].map(escapar).join(',');
     });
-    const csv = [headers.join(','), ...rows].join('\n');
+    const csv = [encabezados.join(','), ...filas].join('\n');
     const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -283,12 +357,15 @@ const ProjectManagement = () => {
     document.body.removeChild(a);
   };
 
-  if (isLoading) {
+  /* =========================================================================
+     Vista de carga (skeleton)
+     ========================================================================= */
+  if (cargando) {
     return (
       <div className="min-h-screen bg-background flex">
-        <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
-        <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
-          <Header onMenuToggle={() => setHeaderMenuOpen(!headerMenuOpen)} isMenuOpen={headerMenuOpen} />
+        <Sidebar isCollapsed={barraLateralColapsada} onToggle={() => setBarraLateralColapsada(!barraLateralColapsada)} />
+        <div className={`flex-1 transition-all duration-300 ${barraLateralColapsada ? 'ml-16' : 'ml-60'}`}>
+          <Header onMenuToggle={() => setMenuEncabezadoAbierto(!menuEncabezadoAbierto)} isMenuOpen={menuEncabezadoAbierto} />
           <div className="pt-16 flex items-center justify-center h-96">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
@@ -300,59 +377,55 @@ const ProjectManagement = () => {
     );
   }
 
+  /* =========================================================================
+     Render principal
+     - Sidebar + Header fijos
+     - Stats, filtros, tabla, vacíos, modales y selector de proyecto
+     ========================================================================= */
   return (
     <div className="min-h-screen bg-background flex">
-      <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
+      <Sidebar isCollapsed={barraLateralColapsada} onToggle={() => setBarraLateralColapsada(!barraLateralColapsada)} />
 
-      <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
-        <Header onMenuToggle={() => setHeaderMenuOpen(!headerMenuOpen)} isMenuOpen={headerMenuOpen} />
+      <div className={`flex-1 transition-all duration-300 ${barraLateralColapsada ? 'ml-16' : 'ml-60'}`}>
+        <Header onMenuToggle={() => setMenuEncabezadoAbierto(!menuEncabezadoAbierto)} isMenuOpen={menuEncabezadoAbierto} />
 
         <div className="pt-16">
           <div className="container mx-auto px-4 py-8">
-            {/* Header */}
+            {/* Encabezado de la página */}
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
               <div>
                 <h1 className="text-3xl font-bold text-foreground mb-2">Gestión de Proyectos</h1>
                 <p className="text-muted-foreground">Administre el ciclo completo de proyectos HVAC desde la planificación hasta el cierre</p>
               </div>
-
-              <div className="flex items-center space-x-4 mt-4 lg:mt-0">
-                <Button onClick={openNewAbono} iconName="CreditCard" iconPosition="left" variant="default">
-                  Nuevo Abono
-                </Button>
-                <Button onClick={() => setIsCreateModalOpen(true)} iconName="Plus" iconPosition="left" variant="outline">
-                  Nuevo Proyecto
-                </Button>
-              </div>
             </div>
 
-            {/* Stats Overview */}
-            {filteredProjects?.length > 0 && (
-              <ProjectStats projects={filteredProjects} getTotalPagado={getTotalPagado} />
+            {/* Resumen de estadísticas (usa proyectos filtrados y total pagado calculado localmente) */}
+            {proyectosFiltrados?.length > 0 && (
+              <ProjectStats projects={proyectosFiltrados} getTotalPagado={obtenerTotalPagado} />
             )}
 
-            {/* Filtros (incluye onExport) */}
+            {/* Filtros (emitirá onFiltersChange → manejarCambioFiltros) */}
             <ProjectFilters
-              onFiltersChange={handleFiltersChange}
-              totalProjects={projects?.length}
-              filteredProjects={filteredProjects?.length}
-              onExport={handleExportFromFilters}
+              onFiltersChange={manejarCambioFiltros}
+              totalProjects={proyectos?.length}
+              filteredProjects={proyectosFiltrados?.length}
+              onExport={manejarExportarDesdeFiltros}
             />
 
-            {/* Main Content */}
+            {/* Tabla de proyectos o estado vacío */}
             <div className="space-y-6">
-              {filteredProjects?.length > 0 && (
+              {proyectosFiltrados?.length > 0 && (
                 <ProjectTable
-                  projects={filteredProjects}
-                  onProjectSelect={handleEditProject}
-                  onRegisterAbono={openRegisterAbono}
-                  getPaidAmount={getTotalPagado}
-                  onBulkAction={handleBulkAction}
+                  projects={proyectosFiltrados}
+                  onProjectSelect={manejarEditarProyecto}
+                  onRegisterAbono={abrirRegistroAbono}
+                  getPaidAmount={obtenerTotalPagado}
+                  onBulkAction={manejarAccionMasiva}
                 />
               )}
 
-              {/* Vacíos */}
-              {filteredProjects?.length === 0 && (
+              {/* Mensaje de vacío cuando no hay resultados */}
+              {proyectosFiltrados?.length === 0 && (
                 <div className="text-center py-12">
                   <Icon name="Filter" size={64} className="text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-foreground mb-2">No se encontraron proyectos con tus filtros</h3>
@@ -361,60 +434,61 @@ const ProjectManagement = () => {
               )}
             </div>
 
-            {/* Modales */}
+            {/* Modal para crear proyecto (al cerrar, recarga lista) */}
             <CreateProjectModal
-              isOpen={isCreateModalOpen}
-              onClose={() => setIsCreateModalOpen(false)}
+              isOpen={modalCrearAbierto}
+              onClose={() => setModalCrearAbierto(false)}
               onSubmit={() => getProyectos({ force: true })}
             />
 
-            {isEditModalOpen && (
+            {/* Modal para editar proyecto seleccionado */}
+            {modalEditarAbierto && (
               <EditProjectModal
                 isOpen
-                onClose={() => { setIsEditModalOpen(false); setSelectedProject(null); }}
-                onSubmit={handleUpdateProject}
-                project={selectedProject}
+                onClose={() => { setModalEditarAbierto(false); setProyectoSeleccionado(null); }}
+                onSubmit={manejarActualizarProyecto}
+                project={proyectoSeleccionado}
               />
             )}
 
-            {/* Selector de Proyecto para Nuevo Abono */}
-            {showProjectSelector && (
+            {/* Selector de proyecto para registrar un nuevo abono manualmente */}
+            {mostrarSelectorProyecto && (
               <div className="fixed inset-0 z-50 flex items-center justify-center">
-                <div className="absolute inset-0 bg-black/40" onClick={() => setShowProjectSelector(false)} />
+                <div className="absolute inset-0 bg-black/40" onClick={() => setMostrarSelectorProyecto(false)} />
                 <div className="relative bg-card border border-border rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[80vh] overflow-hidden flex flex-col">
                   <div className="p-4 border-b border-border flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <Icon name="CreditCard" size={18} />
                       <h3 className="text-lg font-semibold text-foreground">Seleccionar Proyecto para Nuevo Abono</h3>
                     </div>
-                    <button className="text-muted-foreground hover:text-foreground" onClick={() => setShowProjectSelector(false)} title="Cerrar">
+                    <button className="text-muted-foreground hover:text-foreground" onClick={() => setMostrarSelectorProyecto(false)} title="Cerrar">
                       <Icon name="X" size={18} />
                     </button>
                   </div>
                   <div className="p-4 overflow-y-auto flex-1">
                     <div className="space-y-2">
-                      {filteredProjects && filteredProjects.length > 0 ? (
-                        filteredProjects.map((project) => {
-                          const projectId = project?.id ?? project?._id;
-                          const budget = getBudget(project);
-                          const paid = getTotalPagado(project);
-                          const remaining = Math.max(budget - paid, 0);
+                      {proyectosFiltrados && proyectosFiltrados.length > 0 ? (
+                        proyectosFiltrados.map((proy) => {
+                          const idProyecto = proy?.id ?? proy?._id;
+                          const presupuesto = obtenerPresupuesto(proy);
+                          const pagado = obtenerTotalPagado(proy);
+                          const restante = Math.max(presupuesto - pagado, 0);
                           return (
                             <button
-                              key={projectId}
-                              onClick={() => handleProjectSelectForAbono(project)}
+                              key={idProyecto}
+                              onClick={() => seleccionarProyectoParaAbono(proy)}
                               className="w-full text-left p-4 border border-border rounded-lg hover:bg-muted/50 transition-smooth"
                             >
                               <div className="flex items-center justify-between">
                                 <div className="flex-1">
-                                  <div className="font-medium text-foreground">{getNombre(project)}</div>
+                                  <div className="font-medium text-foreground">{obtenerNombre(proy)}</div>
                                   <div className="text-sm text-muted-foreground mt-1">
-                                    Código: {getCodigo(project)}
+                                    Código: {obtenerCodigo(proy)}
                                   </div>
                                   <div className="text-xs text-muted-foreground mt-1">
-                                    Presupuesto: {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(budget)} | 
-                                    Pagado: {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(paid)} | 
-                                    Restante: {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(remaining)}
+                                    Presupuesto: {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(presupuesto)} | 
+                                    Pagado: {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(pagado)} | 
+                                    Restante: {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(restante)}
                                   </div>
                                 </div>
                                 <Icon name="ChevronRight" size={20} className="text-muted-foreground" />
@@ -433,14 +507,14 @@ const ProjectManagement = () => {
               </div>
             )}
 
-            {/* Registrar Abono */}
-            {registerAbonoFor && (
+            {/* Modal para registrar abono del proyecto seleccionado */}
+            {registrarAbonoPara && (
               <RegisterAbonoModal
                 isOpen
-                project={registerAbonoFor}
-                currentPaid={getTotalPagado(registerAbonoFor)}
-                onClose={closeRegisterAbono}
-                onSave={handleSaveAbono}
+                project={registrarAbonoPara}
+                currentPaid={obtenerTotalPagado(registrarAbonoPara)}
+                onClose={cerrarRegistroAbono}
+                onSave={manejarGuardarAbono}
               />
             )}
           </div>
