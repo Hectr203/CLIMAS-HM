@@ -10,10 +10,20 @@ class AuthService {
    */
   async login(email, password) {
     try {
+      console.log("=== ENVIANDO LOGIN REQUEST ===");
+      console.log("Email:", email);
+      
       const response = await httpService.post("/usuarios/login", {
         email,
         password,
       });
+      
+      console.log("=== RESPUESTA DEL SERVIDOR ===");
+      console.log("Respuesta completa:", response);
+      console.log("¿Tiene token?", !!response.token);
+      console.log("Usuario:", response.usuario);
+      console.log("=============================");
+      
       if (response.token) {
         httpService.setToken(response.token);
       }
@@ -24,6 +34,7 @@ class AuthService {
         token: response.token,
       };
     } catch (error) {
+      console.error("Error en login:", error);
       return {
         success: false,
         error: error.userMessage,
@@ -37,7 +48,7 @@ class AuthService {
    */
   async logout() {
     try {
-      await httpService.post("/auth/logout");
+      await httpService.post("/usuarios/logout");
       httpService.setToken(null);
       return { success: true };
     } catch (error) {
@@ -75,11 +86,11 @@ class AuthService {
    */
   async verifyToken() {
     try {
-      const response = await httpService.get("/auth/verify");
+      const response = await httpService.get("/usuarios/token-info");
       return {
         success: true,
         valid: true,
-        user: response.user,
+        user: response.tokenInfo?.usuario || response.usuario,
       };
     } catch (error) {
       return {
@@ -95,7 +106,7 @@ class AuthService {
    */
   async refreshToken() {
     try {
-      const response = await httpService.post("/auth/refresh");
+      const response = await httpService.post("/usuarios/extender-sesion");
       if (response.token) {
         httpService.setToken(response.token);
       }
