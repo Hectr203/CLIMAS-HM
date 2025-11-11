@@ -21,6 +21,30 @@ const formatearFechaParaApi = (fechaLocalStr) => {
   return `${rellenar(d.getDate())}/${rellenar(d.getMonth() + 1)}/${d.getFullYear()}`;
 };
 
+// Convierte fecha ISO o string a formato compatible con input date
+const deFechaALocalInput = (fecha) => {
+  if (!fecha) return '';
+  let fechaObj;
+  if (typeof fecha === 'string') {
+    // Si viene en formato ISO
+    if (fecha.includes('T')) {
+      fechaObj = new Date(fecha);
+    } else if (fecha.includes('/')) {
+      // Si viene en formato dd/mm/yyyy
+      const [dia, mes, año] = fecha.split('/');
+      fechaObj = new Date(Number(año), Number(mes) - 1, Number(dia));
+    } else {
+      fechaObj = new Date(fecha);
+    }
+  } else {
+    fechaObj = fecha;
+  }
+  
+  if (isNaN(fechaObj.getTime())) return '';
+  const rellenar = (n) => String(n).padStart(2, '0');
+  return `${fechaObj.getFullYear()}-${rellenar(fechaObj.getMonth() + 1)}-${rellenar(fechaObj.getDate())}`;
+};
+
 // Formatea un número con separadores de miles
 const formatearNumeroConSeparadores = (valor) => {
   if (!valor && valor !== 0) return '';
@@ -46,17 +70,16 @@ const limpiarNumeroFormateado = (valor) => {
   return String(valor).replace(/[^\d.]/g, '');
 };
 
-const ModalRegistroAbono = ({ isOpen, onClose, project, currentPaid = 0, onSave }) => {
-  const presupuestoProyecto = Number(project?.budget) || 0;
-  const saldoInicial = Math.max(presupuestoProyecto - Number(currentPaid || 0), 0);
+const EditAbonoModal = ({ isOpen, onClose, abono, project, onSave }) => {
+  const presupuestoProyecto = Number(project?.budget ?? project?.presupuesto?.total ?? project?.totalPresupuesto ?? 0);
 
   // Hook de abonos
-  const { createAbono, loading } = useAbono();
+  const { editAbono, loading } = useAbono();
   
   // Hook para obtener información del proyecto
   const { getProyectoById } = useProyecto();
 
-  // Campos requeridos
+  // Campos del formulario
   const [idProyecto, setIdProyecto] = useState('');
   const [fechaLocal, setFechaLocal] = useState('');
   const [monto, setMonto] = useState(''); // Valor numérico limpio para cálculos
@@ -69,17 +92,34 @@ const ModalRegistroAbono = ({ isOpen, onClose, project, currentPaid = 0, onSave 
   // Información del proyecto obtenida de la API
   const [infoProyecto, setInfoProyecto] = useState({ id: '', nombre: '', presupuesto: 0, clienteId: '' });
   const [totalAbonado, setTotalAbonado] = useState(0);
+  const [montoOriginal, setMontoOriginal] = useState(0);
 
   // Variables auxiliares
-  const [saldo, setSaldo] = useState(saldoInicial);
+  const [saldo, setSaldo] = useState(0);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (isOpen) {
-      const id = project?.id || project?._id || project?.idProyecto || '';
+    if (isOpen && abono) {
+      const id = project?.id || project?._id || project?.idProyecto || abono?.idProyecto || '';
       
       // Establecer el ID del proyecto
       setIdProyecto(id);
+
+      // Cargar datos del abono en el formulario
+      const montoAbono = Number(abono?.montoAbono ?? abono?.monto ?? 0);
+      const fechaAbono = abono?.fecha ?? abono?.createdAt ?? '';
+      const metodoPagoAbono = abono?.metodoPago ?? 'Transferencia';
+      const descripcionAbono = abono?.descripcion ?? '';
+      const descripcionMetodoAbono = abono?.descripcionMetodo ?? '';
+      const notasAbono = abono?.notas ?? '';
+
+      setMonto(montoAbono.toString());
+      setMontoOriginal(montoAbono);
+      setFechaLocal(deFechaALocalInput(fechaAbono));
+      setMetodoPago(metodoPagoAbono);
+      setDescripcion(descripcionAbono);
+      setDescripcionMetodo(descripcionMetodoAbono);
+      setNotas(notasAbono);
 
       // Obtener información del proyecto de la API si tenemos un ID
       if (id) {
@@ -87,7 +127,7 @@ const ModalRegistroAbono = ({ isOpen, onClose, project, currentPaid = 0, onSave 
           .then((respuesta) => {
             const proyectoData = respuesta?.data || respuesta;
             if (proyectoData) {
-            const presupuestoTotal = proyectoData.presupuesto?.total || proyectoData.totalPresupuesto || 0;
+              const presupuestoTotal = proyectoData.presupuesto?.total || proyectoData.totalPresupuesto || 0;
               const totalAbonadoData = proyectoData.resumenFinanciero?.totalAbonado || 0;
               
               setInfoProyecto({
@@ -100,8 +140,8 @@ const ModalRegistroAbono = ({ isOpen, onClose, project, currentPaid = 0, onSave 
               // Establecer el total abonado desde la API
               setTotalAbonado(totalAbonadoData);
               
-              // Actualizar saldo basado en presupuesto obtenido de la API
-              const nuevoSaldo = Math.max(presupuestoTotal - totalAbonadoData, 0);
+              // Calcular saldo: presupuesto - (total abonado - monto original + nuevo monto)
+              const nuevoSaldo = Math.max(presupuestoTotal - (totalAbonadoData - montoAbono + montoAbono), 0);
               setSaldo(nuevoSaldo);
             } else {
               // Fallback si no se obtienen datos
@@ -111,6 +151,7 @@ const ModalRegistroAbono = ({ isOpen, onClose, project, currentPaid = 0, onSave 
                 presupuesto: presupuestoProyecto,
                 clienteId: ''
               });
+              setSaldo(Math.max(presupuestoProyecto - montoAbono, 0));
             }
           })
           .catch((err) => {
@@ -122,35 +163,22 @@ const ModalRegistroAbono = ({ isOpen, onClose, project, currentPaid = 0, onSave 
               presupuesto: presupuestoProyecto,
               clienteId: ''
             });
+            setSaldo(Math.max(presupuestoProyecto - montoAbono, 0));
           });
       } else {
         setInfoProyecto({ id: '', nombre: 'Sin nombre', presupuesto: 0, clienteId: '' });
       }
 
-      // Fecha actual por defecto
-      const hoy = new Date();
-      const yyyy = hoy.getFullYear();
-      const mm = String(hoy.getMonth() + 1).padStart(2, '0');
-      const dd = String(hoy.getDate()).padStart(2, '0');
-      setFechaLocal(`${yyyy}-${mm}-${dd}`);
-
-      setMonto('');
-      setMontoFormateado('');
-      setMetodoPago('Transferencia');
-      setDescripcion('');
-      setDescripcionMetodo('');
-      setNotas('');
-
-      setSaldo(Math.max(presupuestoProyecto - Number(currentPaid || 0), 0));
       setError('');
     }
-  }, [isOpen, project, presupuestoProyecto, currentPaid, getProyectoById]);
+  }, [isOpen, abono, project, presupuestoProyecto, getProyectoById]);
 
-  // Vista previa del total pagado
+  // Vista previa del total pagado (considerando el cambio de monto)
   const totalPagadoPrevio = useMemo(() => {
     const m = Number(monto) || 0;
-    return Number(totalAbonado || 0) + (m > 0 ? m : 0);
-  }, [monto, totalAbonado]);
+    const diferencia = m - montoOriginal;
+    return Number(totalAbonado || 0) + diferencia;
+  }, [monto, totalAbonado, montoOriginal]);
 
   // Progreso del pago
   const progreso = useMemo(() => {
@@ -172,7 +200,8 @@ const ModalRegistroAbono = ({ isOpen, onClose, project, currentPaid = 0, onSave 
     // Calcular saldo si el valor es numérico válido
     const num = Number(valorLimpio);
     if (!isNaN(num) && valorLimpio !== '') {
-      const nuevoSaldo = Math.max(infoProyecto.presupuesto - (Number(totalAbonado || 0) + Math.max(num, 0)), 0);
+      const diferencia = num - montoOriginal;
+      const nuevoSaldo = Math.max(infoProyecto.presupuesto - (Number(totalAbonado || 0) + diferencia), 0);
       setSaldo(nuevoSaldo);
     }
   };
@@ -182,6 +211,10 @@ const ModalRegistroAbono = ({ isOpen, onClose, project, currentPaid = 0, onSave 
     setError('');
     const montoNum = Number(monto);
 
+    if (!abono?.id && !abono?._id) {
+      setError('El ID del abono es obligatorio.');
+      return;
+    }
     if (!idProyecto?.trim()) {
       setError('El ID del proyecto es obligatorio.');
       return;
@@ -206,7 +239,7 @@ const ModalRegistroAbono = ({ isOpen, onClose, project, currentPaid = 0, onSave 
       setError('Método de pago no válido.');
       return;
     }
-    if ((Number(totalAbonado || 0) + montoNum) > infoProyecto.presupuesto) {
+    if (totalPagadoPrevio > infoProyecto.presupuesto) {
       setError('El total pagado excede el importe total del proyecto.');
       return;
     }
@@ -222,11 +255,12 @@ const ModalRegistroAbono = ({ isOpen, onClose, project, currentPaid = 0, onSave 
     };
 
     try {
-      const respuesta = await createAbono(datos);
-      const creado = respuesta?.data || respuesta;
+      const abonoId = abono?.id ?? abono?._id;
+      const respuesta = await editAbono(abonoId, datos);
+      const actualizado = respuesta?.data || respuesta;
 
-      if (creado) {
-        onSave?.(creado);
+      if (actualizado) {
+        onSave?.(actualizado);
         onClose?.();
       }
     } catch (err) {
@@ -235,7 +269,7 @@ const ModalRegistroAbono = ({ isOpen, onClose, project, currentPaid = 0, onSave 
       } else if (err.response?.status === 400) {
         setError(err.response?.data?.message || 'Datos inválidos. Por favor revise los campos.');
       } else {
-        setError('Error al guardar el abono. Por favor intente nuevamente.');
+        setError('Error al actualizar el abono. Por favor intente nuevamente.');
       }
     }
   };
@@ -249,8 +283,8 @@ const ModalRegistroAbono = ({ isOpen, onClose, project, currentPaid = 0, onSave 
         {/* Encabezado */}
         <div className="p-4 border-b border-border flex items-center justify-between bg-card sticky top-0 z-10">
           <div className="flex items-center space-x-2">
-            <Icon name="CreditCard" size={18} />
-            <h3 className="text-lg font-semibold text-foreground">Apartado de Abonos</h3>
+            <Icon name="Edit" size={18} />
+            <h3 className="text-lg font-semibold text-foreground">Editar Abono</h3>
           </div>
           <button
             className="text-muted-foreground hover:text-foreground disabled:opacity-50"
@@ -293,6 +327,17 @@ const ModalRegistroAbono = ({ isOpen, onClose, project, currentPaid = 0, onSave 
                 <div className="h-2 rounded-full bg-primary" style={{ width: `${isNaN(progreso) ? 0 : progreso}%` }} />
               </div>
             </div>
+
+            {/* Información del abono (solo lectura) */}
+            {(abono?.folio || abono?.referencia) && (
+              <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm">
+                <div className="text-blue-800 font-medium mb-1">Información del Abono</div>
+                <div className="text-blue-700">
+                  <span className="font-mono">{abono?.folio ?? abono?.referencia}</span>
+                  {abono?.numeroAbono && <span className="ml-2">N° {abono.numeroAbono}</span>}
+                </div>
+              </div>
+            )}
 
             {/* Campos principales */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -405,7 +450,7 @@ const ModalRegistroAbono = ({ isOpen, onClose, project, currentPaid = 0, onSave 
             <div className="flex items-center justify-end gap-2 pt-2">
               <Button variant="outline" onClick={onClose} disabled={loading}>Cancelar</Button>
               <Button type="submit" iconName="Check" iconPosition="left" disabled={loading}>
-                {loading ? 'Guardando…' : 'Guardar'}
+                {loading ? 'Actualizando…' : 'Actualizar'}
               </Button>
             </div>
           </form>
@@ -415,4 +460,5 @@ const ModalRegistroAbono = ({ isOpen, onClose, project, currentPaid = 0, onSave 
   );
 };
 
-export default ModalRegistroAbono;
+export default EditAbonoModal;
+
