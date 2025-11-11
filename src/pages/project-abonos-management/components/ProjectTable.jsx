@@ -29,6 +29,60 @@ const formatDate = (date) => {
   return d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
 
+// Normalizar estado para comparación
+const normalizarEstado = (estado) => {
+  if (!estado) return '';
+  return String(estado).toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+};
+
+// Obtener el estado normalizado y su etiqueta
+const obtenerEstadoNormalizado = (status, statusLabel) => {
+  const estado = statusLabel || status || '';
+  const normalizado = normalizarEstado(estado);
+  
+  // Mapear a estados canónicos
+  if (normalizado.includes('pausa') || normalizado.includes('pause') || normalizado.includes('hold')) {
+    return { canonico: 'en pausa', label: 'En Pausa' };
+  }
+  if (normalizado.includes('revision') || normalizado.includes('review')) {
+    return { canonico: 'en revision', label: 'En Revisión' };
+  }
+  if (normalizado.includes('completado') || normalizado.includes('complet') || normalizado.includes('done') || normalizado.includes('closed')) {
+    return { canonico: 'completado', label: 'Completado' };
+  }
+  if (normalizado.includes('cancelado') || normalizado.includes('canceled') || normalizado.includes('cancelled') || normalizado.includes('cancel')) {
+    return { canonico: 'cancelado', label: 'Cancelado' };
+  }
+  if (normalizado.includes('proceso') || normalizado.includes('progress') || normalizado.includes('process')) {
+    return { canonico: 'en proceso', label: 'En Proceso' };
+  }
+  if (normalizado.includes('planific') || normalizado.includes('planning') || normalizado.includes('activo') || normalizado.includes('active')) {
+    return { canonico: 'planificacion', label: 'Planificación' };
+  }
+  
+  // Si hay un statusLabel, usarlo; si no, usar el status original
+  return { canonico: normalizado || 'planificacion', label: statusLabel || status || 'Planificación' };
+};
+
+// Obtener clases de color según el estado
+const obtenerColorEstado = (estadoCanonico) => {
+  switch (estadoCanonico) {
+    case 'en proceso':
+      return 'bg-green-100 text-green-800 border-green-200';
+    case 'en pausa':
+      return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    case 'en revision':
+      return 'bg-purple-100 text-purple-800 border-purple-200';
+    case 'completado':
+      return 'bg-blue-100 text-blue-800 border-blue-200';
+    case 'cancelado':
+      return 'bg-red-100 text-red-800 border-red-200';
+    case 'planificacion':
+    default:
+      return 'bg-gray-100 text-gray-800 border-gray-200';
+  }
+};
+
 /* === Map NoSQL -> ViewModel (con USD derivado y resumen financiero del backend) === */
 const mapProjectDocStrict = (doc, clientsMap = {}) => {
   const rawId = doc.id ?? doc._id ?? null;
@@ -152,9 +206,11 @@ const ProjectTable = ({
   projects,          // opcional: lista (array) o wrapper { success, data }
   onBulkAction,
   onRegisterAbono,
+  onViewAbonos,      // callback para ver abonos de un proyecto
   getPaidAmount,     // fallback si el backend aún no envía totalRestante
 }) => {
   const navigate = useNavigate();
+  console.log( "navigate", navigate);
 
   // Hook de proyectos
   const {
@@ -241,6 +297,17 @@ const ProjectTable = ({
         const aTime = aDate ? aDate.getTime() : -Infinity;
         const bTime = bDate ? bDate.getTime() : -Infinity;
         return direction === 'asc' ? aTime - bTime : bTime - aTime;
+      }
+
+      // Ordenar por estado (usar la etiqueta del estado)
+      if (key === 'status') {
+        const estadoA = obtenerEstadoNormalizado(a?.status, a?.statusLabel);
+        const estadoB = obtenerEstadoNormalizado(b?.status, b?.statusLabel);
+        aValue = estadoA.label.toLowerCase();
+        bValue = estadoB.label.toLowerCase();
+        if (aValue < bValue) return direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return direction === 'asc' ? 1 : -1;
+        return 0;
       }
 
       if (typeof aValue === 'number' || typeof bValue === 'number') {
@@ -389,6 +456,11 @@ const ProjectTable = ({
               </th>
               <th className="text-left p-4 font-medium text-foreground">Cliente</th>
               <th className="text-left p-4 font-medium text-foreground">
+                <button onClick={() => handleSort('status')} className="flex items-center space-x-1 hover:text-primary">
+                  <span>Estado</span><Icon name="ArrowUpDown" size={14} />
+                </button>
+              </th>
+              <th className="text-left p-4 font-medium text-foreground">
                 <button onClick={() => handleSort('budget')} className="flex items-center space-x-1 hover:text-primary">
                   <span>Presupuesto</span><Icon name="ArrowUpDown" size={14} />
                 </button>
@@ -432,6 +504,17 @@ const ProjectTable = ({
                     </div>
                   </td>
                   <td className="p-4">
+                    {(() => {
+                      const estadoInfo = obtenerEstadoNormalizado(project?.status, project?.statusLabel);
+                      const colorClasses = obtenerColorEstado(estadoInfo.canonico);
+                      return (
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${colorClasses}`}>
+                          {estadoInfo.label}
+                        </span>
+                      );
+                    })()}
+                  </td>
+                  <td className="p-4">
                     <div className="text-foreground font-medium">{formatCurrency(project?.budget)}</div>
                     {Number(project?.equiposUSD) > 0 && (
                       <div className="text-xs text-muted-foreground mt-1">
@@ -463,6 +546,15 @@ const ProjectTable = ({
                       <Button
                         variant="ghost"
                         size="icon"
+                        onClick={() => onViewAbonos?.(project)}
+                        title="Ver abonos"
+                        aria-label="Ver abonos"
+                      >
+                        <Icon name="Eye" size={16} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => onRegisterAbono?.(project)}
                         title="Registrar abono"
                         aria-label="Registrar abono"
@@ -479,7 +571,7 @@ const ProjectTable = ({
               </React.Fragment>
             ))}
             {sortedProjects?.length === 0 && !loading && (
-              <tr><td colSpan={8} className="p-8 text-center text-muted-foreground">No hay proyectos para mostrar.</td></tr>
+              <tr><td colSpan={9} className="p-8 text-center text-muted-foreground">No hay proyectos para mostrar.</td></tr>
             )}
           </tbody>
         </table>
@@ -522,6 +614,23 @@ const ProjectTable = ({
                 <div className="text-xs text-muted-foreground">{project?.client?.email}</div>
               </div>
               <div>
+                <div className="text-xs text-muted-foreground">Estado</div>
+                <div className="mt-1">
+                  {(() => {
+                    const estadoInfo = obtenerEstadoNormalizado(project?.status, project?.statusLabel);
+                    const colorClasses = obtenerColorEstado(estadoInfo.canonico);
+                    return (
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${colorClasses}`}>
+                        {estadoInfo.label}
+                      </span>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-3">
+              <div>
                 <div className="text-xs text-muted-foreground">Presupuesto</div>
                 <div className="text-sm text-foreground font-medium">{formatCurrency(project?.budget)}</div>
                 {Number(project?.equiposUSD) > 0 && (
@@ -546,6 +655,30 @@ const ProjectTable = ({
                   return <div className="text-sm text-foreground font-medium">{formatCurrency(remaining)}</div>;
                 })()}
               </div>
+            </div>
+
+            {/* Acciones móviles */}
+            <div className="flex items-center space-x-2 mt-3 pt-3 border-t border-border">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onViewAbonos?.(project)}
+                iconName="Eye"
+                iconPosition="left"
+                className="flex-1"
+              >
+                Ver Abonos
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onRegisterAbono?.(project)}
+                iconName="CreditCard"
+                iconPosition="left"
+                className="flex-1"
+              >
+                Registrar
+              </Button>
             </div>
 
             {expandedRows?.includes(project?.id) && (

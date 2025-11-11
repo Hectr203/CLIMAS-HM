@@ -102,13 +102,9 @@ const ProjectFilters = ({
     search: '',
     paymentStatus: '', // Nuevo: 'pagado', 'en-proceso', '' (todos)
     status: '',
-    dateRange: '',
-    startDate: '',
-    endDate: '',
     minBudget: '',
     maxBudget: '',
     department: '',
-    clientType: '',
     priority: '',
   });
 
@@ -131,23 +127,6 @@ const ProjectFilters = ({
     { value: 'installation', label: 'Instalación' },
     { value: 'maintenance', label: 'Mantenimiento' },
     { value: 'administration', label: 'Administración' },
-  ];
-
-  const dateRangeOptions = [
-    { value: '', label: 'Todas las Fechas' },
-    { value: 'today', label: 'Hoy' },
-    { value: 'week', label: 'Esta Semana' },
-    { value: 'month', label: 'Este Mes' },
-    { value: 'quarter', label: 'Este Trimestre' },
-    { value: 'year', label: 'Este Año' },
-  ];
-
-  const clientTypeOptions = [
-    { value: '', label: 'Todos los Clientes' },
-    { value: 'residential', label: 'Residencial' },
-    { value: 'commercial', label: 'Comercial' },
-    { value: 'industrial', label: 'Industrial' },
-    { value: 'government', label: 'Gubernamental' },
   ];
 
   const priorityOptions = [
@@ -176,13 +155,9 @@ const ProjectFilters = ({
       search: '',
       paymentStatus: '',
       status: '',
-      dateRange: '',
-      startDate: '',
-      endDate: '',
       minBudget: '',
       maxBudget: '',
       department: '',
-      clientType: '',
       priority: '',
     };
     setFilters(cleared);
@@ -259,24 +234,10 @@ const ProjectFilters = ({
           className="w-full"
         />
         <Select
-          label="Rango de Fechas"
-          options={dateRangeOptions}
-          value={filters.dateRange}
-          onChange={(value) => handleFilterChange('dateRange', value)}
-          className="w-full"
-        />
-        <Select
           label="Departamento"
           options={departmentOptions}
           value={filters.department}
           onChange={(value) => handleFilterChange('department', value)}
-          className="w-full"
-        />
-        <Select
-          label="Tipo de Cliente"
-          options={clientTypeOptions}
-          value={filters.clientType}
-          onChange={(value) => handleFilterChange('clientType', value)}
           className="w-full"
         />
         <div className="flex items-end">
@@ -348,10 +309,6 @@ const ProjectFilters = ({
               displayValue = statusOptions.find((opt) => opt.value === value)?.label || value;
             if (key === 'department')
               displayValue = departmentOptions.find((opt) => opt.value === value)?.label || value;
-            if (key === 'dateRange')
-              displayValue = dateRangeOptions.find((opt) => opt.value === value)?.label || value;
-            if (key === 'clientType')
-              displayValue = clientTypeOptions.find((opt) => opt.value === value)?.label || value;
             if (key === 'priority')
               displayValue = priorityOptions.find((opt) => opt.value === value)?.label || value;
             if (key === 'minBudget' || key === 'maxBudget') displayValue = `$${value}`;
@@ -406,11 +363,6 @@ export const applyProjectFilters = (projects, filters) => {
     filtered = filtered.filter(
       (project) => project?.department?.toLowerCase() === filters.department.toLowerCase()
     );
-  }
-
-  // Client type
-  if (filters?.clientType) {
-    filtered = filtered.filter((project) => project?.client?.type === filters.clientType);
   }
 
   // Priority

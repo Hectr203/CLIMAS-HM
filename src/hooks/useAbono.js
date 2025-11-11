@@ -85,6 +85,39 @@ const useAbono = () => {
   }, [showHttpError]);
 
   /**
+   * Obtiene abonos por proyecto
+   */
+  const getAbonosByProyecto = useCallback(async (proyectoId, params = {}) => {
+    if (!proyectoId) return { items: [], total: 0 };
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await abonoService.getAbonosByProyecto(proyectoId, params);
+      // La API devuelve { success, data: { total, items }, message }
+      if (response?.success && response?.data) {
+        return {
+          items: Array.isArray(response.data.items) ? response.data.items : [],
+          total: Number(response.data.total) || 0
+        };
+      }
+      // Fallback para respuestas antiguas
+      if (Array.isArray(response)) {
+        return { items: response, total: response.length };
+      }
+      if (response?.data && Array.isArray(response.data)) {
+        return { items: response.data, total: response.data.length };
+      }
+      return { items: [], total: 0 };
+    } catch (err) {
+      setError(err);
+      showHttpError('Error al obtener los abonos del proyecto');
+      return { items: [], total: 0 };
+    } finally {
+      setLoading(false);
+    }
+  }, [showHttpError]);
+
+  /**
    * Crea un abono (evita duplicados)
    */
   const createAbono = useCallback(async (payload) => {
@@ -96,7 +129,7 @@ const useAbono = () => {
     setSuccess(false);
 
     try {
-      // 🔹 Sanitiza y formatea payload
+      // Sanitiza y formatea el payload
       const cleanPayload = {
         idProyecto: payload.idProyecto?.trim(),
         montoAbono: Number(payload.montoAbono),
@@ -244,6 +277,7 @@ const useAbono = () => {
     success,
     getAbonos,
     getAbonoById,
+    getAbonosByProyecto,
     createAbono,
     editAbono,
     deleteAbono,

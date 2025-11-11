@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import Icon from '../../components/AppIcon';
-import Button from '../../components/ui/Button';
 import Sidebar from '../../components/ui/Sidebar';
 import Header from '../../components/ui/Header';
 import ProjectFilters from './components/ProjectFilters';
@@ -9,6 +8,7 @@ import ProjectStats from './components/AbonosStats';
 import CreateProjectModal from './components/CreateProjectModal';
 import EditProjectModal from './components/EditProjectModal';
 import RegisterAbonoModal from './components/RegisterAbonoModal';
+import ViewAbonosModal from './components/ViewAbonosModal';
 import useProyect from '../../hooks/useProyect';
 
 /* =========================================================================
@@ -35,12 +35,18 @@ const uiEstadoCache = {
   }
 };
 
-// Traducción de estados backend → estados UI
+// Traducción de estados backend → estados UI (sin tildes para consistencia)
 const backendToUiDefault = (estadoApi) => {
-  const v = String(estadoApi || '').toLowerCase();
-  if (v === 'en proceso') return 'en proceso';
-  if (v === 'activo') return 'planificación';
-  return 'planificación';
+  const v = String(estadoApi || '').toLowerCase().trim();
+  // Mapear estados del backend a estados UI (sin tildes)
+  if (v === 'en proceso' || v === 'en-proceso' || v === 'in-progress' || v === 'in progress') return 'en proceso';
+  if (v === 'en pausa' || v === 'en-pausa' || v === 'on-hold' || v === 'on hold' || v === 'pausa' || v === 'en pausa') return 'en pausa';
+  if (v === 'en revision' || v === 'en-revision' || v === 'en revisión' || v === 'review') return 'en revision';
+  if (v === 'completado' || v === 'completed' || v === 'completado' || v === 'done') return 'completado';
+  if (v === 'cancelado' || v === 'cancelled' || v === 'canceled') return 'cancelado';
+  if (v === 'planificacion' || v === 'planificación' || v === 'planning') return 'planificacion';
+  if (v === 'activo' || v === 'active') return 'planificacion'; // Por defecto, activo = planificacion
+  return 'planificacion'; // Default
 };
 
 // Traducción de estados UI → estados backend (para actualizar en servidor)
@@ -84,6 +90,9 @@ const ProjectManagement = () => {
   // Estado para abrir el modal de registro de abono asociado a un proyecto
   const [registrarAbonoPara, setRegistrarAbonoPara] = useState(null);
 
+  // Estado para abrir el modal de visualización de abonos
+  const [verAbonosPara, setVerAbonosPara] = useState(null);
+
   // Control del selector de proyecto (cuando se quiere crear un abono sin abrir desde la tabla)
   const [mostrarSelectorProyecto, setMostrarSelectorProyecto] = useState(false);
 
@@ -96,7 +105,11 @@ const ProjectManagement = () => {
   useEffect(() => {
     const arr = Array.isArray(proyectos) ? proyectos : [];
     uiEstadoCache.bulkMergeFromApi(arr);   // completa estados UI faltantes
-    setProyectosFiltrados(arr);            // por defecto, sin filtros
+    // Si la lista filtrada está vacía o tiene la misma cantidad que la lista completa, actualizar
+    if (!proyectosFiltrados || proyectosFiltrados.length === 0 || proyectosFiltrados.length === arr.length) {
+      setProyectosFiltrados(arr);            // por defecto, sin filtros
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proyectos]);
 
   /* =========================================================================
@@ -105,7 +118,26 @@ const ProjectManagement = () => {
      ========================================================================= */
   const obtenerNombre = (p) => p?.nombre ?? p?.nombreProyecto ?? p?.name ?? '';
   const obtenerCodigo = (p) => p?.codigo ?? p?.code ?? '';
-  const obtenerEstadoUi = (p) => uiEstadoCache.get(p?.id ?? p?._id) || backendToUiDefault(p?.estado);
+  const obtenerEstadoUi = (p) => {
+    const id = p?.id ?? p?._id;
+    // 1. Primero intentar obtener del cache local
+    const estadoCache = uiEstadoCache.get(id);
+    if (estadoCache) return estadoCache;
+    
+    // 2. Si no hay en cache, obtener del backend (puede venir en diferentes campos)
+    const estadoBackend = p?.estado ?? p?.status ?? p?.estadoProyecto ?? p?.statusLabel ?? '';
+    if (estadoBackend) {
+      const estadoNormalizado = backendToUiDefault(estadoBackend);
+      // Guardar en cache para futuras consultas (incluso si es planificacion)
+      if (estadoNormalizado) {
+        uiEstadoCache.set(id, estadoNormalizado);
+      }
+      return estadoNormalizado;
+    }
+    
+    // 3. Default (sin tilde para consistencia)
+    return 'planificacion';
+  };
   const obtenerDepartamento = (p) => p?.departamento ?? p?.department ?? '';
   const obtenerPrioridad = (p) => p?.prioridad ?? p?.priority ?? '';
   const obtenerInicio = (p) => p?.cronograma?.fechaInicio ?? p?.startDate ?? null;
@@ -120,6 +152,21 @@ const ProjectManagement = () => {
     return lista.reduce((acc, a) => acc + (Number(a?.monto) || 0), 0);
   };
 
+  // Obtiene el total restante de un proyecto (igual que en ProjectTable)
+  const obtenerTotalRestante = (p) => {
+    // 1) Valor directo desde backend si está presente
+    const resumen = p?.resumenFinanciero || {};
+    const fromDB = resumen?.totalRestante ?? resumen?.saldoPendiente ?? resumen?.saldo_pendiente;
+    if (typeof fromDB === 'number' && !isNaN(fromDB)) {
+      return fromDB;
+    }
+    // 2) Fallback: calcula a partir de presupuesto y pagado
+    const presupuesto = obtenerPresupuesto(p);
+    const pagado = obtenerTotalPagado(p);
+    const restante = Math.max(presupuesto - pagado, 0);
+    return restante;
+  };
+
   /* =========================================================================
      Normalizadores para filtros (eliminan acentos, bajan a minúsculas, etc.)
      ========================================================================= */
@@ -129,14 +176,19 @@ const ProjectManagement = () => {
 
   // Homologa distintos textos de estado a un "canon" para comparar
   const estadoCanonico = (raw) => {
-    const v = normalizar(raw);
-    if (v.includes('planific') || v.includes('planning')) return 'planificacion';
-    if (v === 'en proceso' || v.includes('progress') || v.includes('in progress') || v.includes('process')) return 'en proceso';
-    if (v === 'en pausa' || v.includes('pause') || v.includes('on hold') || v.includes('on-hold') || v.includes('hold')) return 'en pausa';
-    if (v === 'en revision' || v === 'en revisión' || v.includes('review') || v.includes('revision')) return 'en revision';
-    if (v === 'completado' || v.includes('complet') || v.includes('done') || v.includes('closed')) return 'completado';
-    if (v === 'cancelado' || v.includes('canceled') || v.includes('cancelled') || v.includes('cancel')) return 'cancelado';
-    return v;
+    if (!raw) return 'planificacion';
+    const v = normalizar(String(raw));
+    
+    // Orden de verificación: de más específico a más general
+    // "en pausa" debe verificarse antes de "en proceso" para evitar conflictos
+    if (v.includes('pausa') || v.includes('pause') || v.includes('hold')) return 'en pausa';
+    if (v.includes('revision') || v.includes('review')) return 'en revision';
+    if (v.includes('completado') || v.includes('complet') || v.includes('done') || v.includes('closed')) return 'completado';
+    if (v.includes('cancelado') || v.includes('canceled') || v.includes('cancelled') || v.includes('cancel')) return 'cancelado';
+    if (v.includes('proceso') || v.includes('progress') || v.includes('process')) return 'en proceso';
+    if (v.includes('planific') || v.includes('planning') || v.includes('activo') || v.includes('active')) return 'planificacion';
+    
+    return v || 'planificacion';
   };
 
   /* =========================================================================
@@ -159,17 +211,21 @@ const ProjectManagement = () => {
       });
     }
 
-    // Filtro por estado de pago (usa cache local de abonos)
+    // Filtro por estado de pago (basado en Total restante)
     if (filtros?.paymentStatus) {
       filtrados = filtrados.filter(proy => {
         const presupuesto = obtenerPresupuesto(proy);
-        const pagado = obtenerTotalPagado(proy);
+        const totalRestante = obtenerTotalRestante(proy);
+        
         if (filtros.paymentStatus === 'pagado') {
-          return presupuesto > 0 && pagado >= presupuesto;
+          // Pagados: Total restante = 0
+          return totalRestante === 0;
         } else if (filtros.paymentStatus === 'en-proceso') {
-          return presupuesto > 0 && pagado > 0 && pagado < presupuesto;
+          // En Proceso de Pago: Total restante < Presupuesto (y > 0)
+          return totalRestante > 0 && totalRestante < presupuesto;
         } else if (filtros.paymentStatus === 'sin-pago') {
-          return pagado === 0 || pagado == null;
+          // Sin Pagos: Total restante = Presupuesto
+          return presupuesto > 0 && totalRestante === presupuesto;
         }
         return true;
       });
@@ -177,11 +233,51 @@ const ProjectManagement = () => {
 
     // Filtro por estado del proyecto (normalizado)
     if (filtros?.status) {
-      const objetivo = estadoCanonico(filtros.status);
+      // Mapear valores del selector a valores canónicos (sin acentos)
+      const mapaEstado = {
+        'planning': 'planificacion',
+        'in-progress': 'en proceso',
+        'on-hold': 'en pausa',
+        'review': 'en revision',
+        'completed': 'completado',
+        'cancelled': 'cancelado'
+      };
+      const estadoObjetivo = mapaEstado[filtros.status] || estadoCanonico(filtros.status);
+      const estadoObjetivoNormalizado = normalizar(estadoObjetivo);
+      
       filtrados = filtrados.filter(proy => {
-        const ui = obtenerEstadoUi(proy);
-        const canon = estadoCanonico(ui);
-        return canon === objetivo;
+        // Obtener estado del proyecto - intentar múltiples fuentes
+        let estadoProyecto = null;
+        
+        // 1. Intentar desde el objeto raw (datos originales del backend)
+        const estadoRaw = proy?.raw?.estado ?? proy?.raw?.status ?? proy?.raw?.estadoProyecto ?? proy?.raw?.statusLabel;
+        if (estadoRaw) {
+          estadoProyecto = backendToUiDefault(estadoRaw);
+        }
+        
+        // 2. Si no hay raw, intentar desde los campos directos del proyecto
+        if (!estadoProyecto) {
+          const estadoDirecto = proy?.estado ?? proy?.status ?? proy?.estadoProyecto ?? proy?.statusLabel;
+          if (estadoDirecto) {
+            estadoProyecto = backendToUiDefault(estadoDirecto);
+          }
+        }
+        
+        // 3. Si aún no hay estado, usar la función obtenerEstadoUi (cache + backend)
+        if (!estadoProyecto) {
+          estadoProyecto = obtenerEstadoUi(proy);
+        }
+        
+        // Normalizar el estado del proyecto a formato canónico
+        const estadoProyectoCanonico = estadoCanonico(estadoProyecto);
+        
+        // Normalizar ambos para comparación (sin acentos, minúsculas)
+        const estadoProyectoNormalizado = normalizar(estadoProyectoCanonico);
+        
+        // Comparar estados normalizados
+        const coincide = estadoProyectoNormalizado === estadoObjetivoNormalizado;
+        
+        return coincide;
       });
     }
 
@@ -196,30 +292,11 @@ const ProjectManagement = () => {
     if (filtros?.priority) {
       const mapaPrioridad = { low: 'Baja', medium: 'Media', high: 'Alta', urgent: 'Urgente' };
       const prioridad = mapaPrioridad[filtros.priority] || filtros.priority;
-      filtrados = filtrados.filter(proy => (obtenerPrioridad(proy) || '') === prioridad);
-    }
-
-    // Filtro por rango de fechas relativo (hoy/semana/mes/trimestre/año)
-    if (filtros?.dateRange) {
-      const ahora = new Date();
-      const hoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
       filtrados = filtrados.filter(proy => {
-        const inicioStr = obtenerInicio(proy);
-        if (!inicioStr) return false;
-        const inicio = new Date(inicioStr);
-        if (isNaN(inicio.getTime())) return false;
-        switch (filtros.dateRange) {
-          case 'today': return inicio.toDateString() === hoy.toDateString();
-          case 'week': { const hace7 = new Date(hoy); hace7.setDate(hace7.getDate() - 7); return inicio >= hace7 && inicio <= ahora; }
-          case 'month': return inicio.getMonth() === ahora.getMonth() && inicio.getFullYear() === ahora.getFullYear();
-          case 'quarter': {
-            const trim = Math.floor(ahora.getMonth() / 3);
-            const trimProy = Math.floor(inicio.getMonth() / 3);
-            return trimProy === trim && inicio.getFullYear() === ahora.getFullYear();
-          }
-          case 'year': return inicio.getFullYear() === ahora.getFullYear();
-          default: return true;
-        }
+        const prioridadProy = obtenerPrioridad(proy);
+        const prioridadNormalizada = normalizar(prioridadProy);
+        const prioridadFiltroNormalizada = normalizar(prioridad);
+        return prioridadNormalizada === prioridadFiltroNormalizada;
       });
     }
 
@@ -285,7 +362,9 @@ const ProjectManagement = () => {
     setRegistrarAbonoPara(null);
     setMostrarSelectorProyecto(false);
   };
-  const abrirNuevoAbono = () => {
+  const abrirVerAbonos = (proyecto) => { setVerAbonosPara(proyecto); };
+  const cerrarVerAbonos = () => { setVerAbonosPara(null); };
+  const _abrirNuevoAbono = () => {
     if (proyectosFiltrados && proyectosFiltrados.length > 0) {
       setMostrarSelectorProyecto(true);
     } else {
@@ -297,19 +376,55 @@ const ProjectManagement = () => {
     setRegistrarAbonoPara(proyecto);
   };
   const manejarGuardarAbono = async (payload) => {
-    // Esperamos: { projectId, fecha, monto, saldoRestante } desde el modal de abonos
-    const { projectId, fecha, monto, saldoRestante } = payload || {};
-    if (!projectId) return;
-    setAbonosPorProyecto(prev => {
+    const projectId =
+      payload?.projectId ??
+      payload?.idProyecto ??
+      payload?.project_id ??
+      payload?.proyectoId ??
+      obtenerIdProyecto(registrarAbonoPara);
+
+    if (!projectId) {
+      console.warn('No se pudo determinar el ID del proyecto al registrar el abono.');
+      return;
+    }
+
+    const fecha =
+      payload?.fecha ??
+      payload?.fechaAbono ??
+      payload?.fechaPago ??
+      payload?.createdAt ??
+      payload?.fecha_creacion ??
+      new Date().toISOString();
+
+    const monto = Number(
+      payload?.monto ??
+      payload?.montoAbono ??
+      payload?.monto_abono ??
+      payload?.amount ?? 0
+    ) || 0;
+
+    const saldoRestante =
+      payload?.saldoRestante ??
+      payload?.saldo_restante ??
+      payload?.saldo ??
+      payload?.saldoRestanteDespues ??
+      null;
+
+    setAbonosPorProyecto((prev) => {
       const siguiente = { ...prev };
       const lista = Array.isArray(siguiente[projectId]) ? siguiente[projectId] : [];
-      // Añadimos el nuevo abono a la lista del proyecto
       siguiente[projectId] = [...lista, { fecha, monto, saldoRestante }];
       try { localStorage.setItem('abonos_proyectos_v1', JSON.stringify(siguiente)); } catch {}
       return siguiente;
     });
-    await getProyectos({ force: true });
+
     cerrarRegistroAbono();
+
+    try {
+      await getProyectos({ force: true });
+    } catch (errorRecarga) {
+      console.error('Error al recargar los proyectos después de registrar un abono:', errorRecarga);
+    }
   };
 
   // Tras editar un proyecto, recarga lista desde backend y cierra modal
@@ -419,6 +534,7 @@ const ProjectManagement = () => {
                   projects={proyectosFiltrados}
                   onProjectSelect={manejarEditarProyecto}
                   onRegisterAbono={abrirRegistroAbono}
+                  onViewAbonos={abrirVerAbonos}
                   getPaidAmount={obtenerTotalPagado}
                   onBulkAction={manejarAccionMasiva}
                 />
@@ -515,6 +631,15 @@ const ProjectManagement = () => {
                 currentPaid={obtenerTotalPagado(registrarAbonoPara)}
                 onClose={cerrarRegistroAbono}
                 onSave={manejarGuardarAbono}
+              />
+            )}
+
+            {/* Modal para visualizar abonos del proyecto seleccionado */}
+            {verAbonosPara && (
+              <ViewAbonosModal
+                isOpen
+                project={verAbonosPara}
+                onClose={cerrarVerAbonos}
               />
             )}
           </div>

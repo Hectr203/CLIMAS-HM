@@ -54,7 +54,7 @@ const abonoService = {
    * @returns {Promise<Object>}
    */
   async updateAbono(id, data) {
-    return await httpService.put(`${BASE_PATH}/${id}`, data);
+    return await httpService.patch(`${BASE_PATH}/editar/${id}`, data);
   },
 
   /**
