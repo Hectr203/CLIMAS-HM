@@ -48,7 +48,6 @@ const getPriorityColor = (p) => {
   return map[v] || 'text-gray-600';
 };
 
-/* === ESTADOS (normalización + opciones + color) === */
 const STATUS_OPTIONS = [
   { key: 'planning', label: 'Planificación' },
   { key: 'in_progress', label: 'En Progreso' },
@@ -137,7 +136,7 @@ const resolveProjectStatus = (project) => {
   return { key: 'planning', label: 'Planificación' };
 };
 
-/* ===== Normalizador Proyecto ===== */
+/* Normalizador Proyecto */
 const mapProjectDocStrict = (doc) => {
   const id = doc.id ?? doc._id ?? safeUUID();
   const code = doc.codigo ?? doc.code ?? '—';
@@ -223,7 +222,7 @@ const mapProjectDocStrict = (doc) => {
   };
 };
 
-/* ===== Hydration desde /clientes ===== */
+/*Hydration desde /clientes*/
 const normalizeClientRecord = (c) => {
   const id = c?.id ?? c?._id ?? c?.clienteId ?? c?.idCliente ?? null;
   const name =
@@ -268,14 +267,11 @@ const ProjectTable = ({
   const [selectedProjects, setSelectedProjects] = useState([]);
   const [expandedRows, setExpandedRows] = useState([]);
   const [newAbonoDraft, setNewAbonoDraft] = useState({});
-
-  // client cache: id → {name,email,contact}
   const [clientCache, setClientCache] = useState({});
   const [clientsLoaded, setClientsLoaded] = useState(false);
 
-  // paginación
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]); // 5 por defecto
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]); 
 
   /* Cargar proyectos si no vienen por props */
   useEffect(() => {
@@ -301,7 +297,7 @@ const ProjectTable = ({
     };
   }, [projects]);
 
-  /* Cargar TODOS los clientes una vez y mapear por id */
+  //Cargar TODOS los clientes una vez y mapear por id 
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -327,7 +323,7 @@ const ProjectTable = ({
     };
   }, []);
 
-  /* Base docs */
+  //Base docs
   const baseSourceDocs = useMemo(() => {
     return Array.isArray(projects) && projects.length > 0 ? projects : remoteDocs;
   }, [projects, remoteDocs]);
@@ -337,7 +333,7 @@ const ProjectTable = ({
     return baseSourceDocs.map(mapProjectDocStrict);
   }, [baseSourceDocs]);
 
-  /* Draft abono por proyecto */
+  // Draft abono por proyecto
   useEffect(() => {
     setNewAbonoDraft((prev) => {
       const clone = { ...prev };
@@ -347,13 +343,13 @@ const ProjectTable = ({
       return clone;
     });
   }, [normalizedProjects]);
+  
 
-  /* Sorting */
   const handleSort = (key) => {
     let direction = 'asc';
     if (sortConfig?.key === key && sortConfig?.direction === 'asc') direction = 'desc';
     setSortConfig({ key, direction });
-    setCurrentPage(1); // reiniciar a primera página en cada cambio de orden
+    setCurrentPage(1); 
   };
 
   const sortedProjects = useMemo(() => {
@@ -385,14 +381,13 @@ const ProjectTable = ({
     });
   }, [normalizedProjects, sortConfig]);
 
-  /* Paginated slice */
+  //Paginated slice 
   const totalItems = sortedProjects.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = Math.min(startIndex + pageSize, totalItems);
   const pageItems = sortedProjects.slice(startIndex, endIndex);
 
-  // clamp de página cuando cambian totales/tamaño
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
     if (currentPage < 1) setCurrentPage(1);
@@ -409,7 +404,7 @@ const ProjectTable = ({
   const prevPage = () => goToPage(currentPage - 1);
   const nextPage = () => goToPage(currentPage + 1);
 
-  /* Helpers cliente */
+  // Helpers cliente
   const getPossibleClientId = (p) => {
     const r = p?.raw || {};
     return (
@@ -455,7 +450,7 @@ const ProjectTable = ({
     return c.email || c.correo || c.contacto?.email || c.telefono || c.phone || 'Sin contacto';
   };
 
-  /* Select/expand */
+  //Select/expand 
   const handleSelectProject = (id) =>
     setSelectedProjects((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
@@ -473,7 +468,7 @@ const ProjectTable = ({
   const toggleRowExpansion = (id) =>
     setExpandedRows((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
-  /* Delete */
+  // Delete
   const handleDelete = async (project) => {
     if (!project?.id) return;
     const ok = window.confirm(`¿Eliminar el proyecto "${project?.name || project?.code}"?`);
