@@ -1,10 +1,14 @@
-// ...existing code...
 import { createContext, useContext, useState, useCallback } from 'react';
 
 /**
  * Contexto para el manejo de notificaciones
  */
-const NotificationContext = createContext();
+export const NotificationContext = createContext();
+
+/**
+ * Hook personalizado para usar el contexto de notificaciones
+ */
+
 
 /**
  * Tipos de notificación

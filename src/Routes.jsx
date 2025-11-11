@@ -24,6 +24,7 @@ import SalesOpportunityManagement from './pages/sales-opportunity-management';
 import QuotationDevelopmentCenter from './pages/quotation-development-center';
 import SalesExecutionMonitoring from './pages/sales-execution-monitoring';
 import ProjectAbonosManagement from './pages/project-abonos-management';
+import UserManagement from './pages/user-management';
 
 const Routes = () => {
   return (
@@ -153,6 +154,14 @@ const Routes = () => {
               element={
                 <ProtectedRoute requiredPath="/sales-opportunity-management">
                   <SalesOpportunityManagement />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/user-management" 
+              element={
+                <ProtectedRoute requiredPath="/user-management">
+                  <UserManagement />
                 </ProtectedRoute>
               } 
             />

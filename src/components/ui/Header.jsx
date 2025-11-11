@@ -50,6 +50,9 @@ const Header = ({ onMenuToggle, isMenuOpen = false }) => {
     }
   };
 
+  // Ocultar Header temporalmente
+  return null;
+
   return (
     <header className="fixed top-0 left-0 right-0 bg-card border-b border-border z-1000">
       <div className="flex items-center justify-between h-16 px-4 lg:px-6">

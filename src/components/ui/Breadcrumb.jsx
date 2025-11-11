@@ -13,7 +13,19 @@ const Breadcrumb = ({ customItems = null }) => {
     '/financial-management': { label: 'Gestión Financiera', icon: 'DollarSign' },
     '/client-management': { label: 'Gestión de Clientes', icon: 'Users' },
     '/personnel-management': { label: 'Gestión de personal', icon: 'UserCheck' },
-    '/inventory-management': { label: 'Gestión de inventario', icon: 'Package' }
+    '/inventory-management': { label: 'Gestión de inventario', icon: 'Package' },
+    '/user-management': { label: 'Gestión de Usuarios', icon: 'Users' },
+    '/sales-opportunity-management': { label: 'Oportunidades de Venta', icon: 'TrendingUp' },
+    '/quotation-builder': { label: 'Creación de Cotizaciones', icon: 'FileText' },
+    '/quotation-development-center': { label: 'Centro de Desarrollo de Cotizaciones', icon: 'FileEdit' },
+    '/sales-execution-monitoring': { label: 'Monitoreo de Ejecución de Ventas', icon: 'BarChart' },
+    '/workshop-operations-center': { label: 'Centro de Operaciones de Taller', icon: 'Wrench' },
+    '/workshop-operations-management': { label: 'Gestión de Operaciones de Taller', icon: 'Settings' },
+    '/project-workflow-management': { label: 'Gestión de Flujo de Trabajo', icon: 'GitBranch' },
+    '/project-documentation-center': { label: 'Centro de Documentación', icon: 'FolderOpen' },
+    '/project-gallery-viewer': { label: 'Galería de Proyectos', icon: 'Image' },
+    '/project-detail-gallery': { label: 'Detalles de Galería', icon: 'Images' },
+    '/project-abonos-management': { label: 'Gestión de Abonos', icon: 'CreditCard' }
   };
 
   const generateBreadcrumbs = () => {

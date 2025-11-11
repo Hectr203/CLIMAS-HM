@@ -3,6 +3,7 @@ import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
 import Sidebar from '../../components/ui/Sidebar';
 import Header from '../../components/ui/Header';
+import Breadcrumb from '../../components/ui/Breadcrumb';
 
 import FilterControls from './components/FilterControls';
 import ExpenseTrackingTable from './components/ExpenseTrackingTable';
@@ -109,9 +110,14 @@ const FinanzasManagement = () => {
       <main
         className={`transition-all duration-300 ${
           sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'
-        } pt-16`}
+        }`}
       >
         <div className="p-6 space-y-6">
+          {/* Breadcrumb */}
+          <div className="mb-6">
+            <Breadcrumb />
+          </div>
+
           {/* HEADER */}
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
             <div>

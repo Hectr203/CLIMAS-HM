@@ -417,7 +417,7 @@ const ClientManagement = () => {
       {/* Main Content */}
       <div className={`transition-all duration-300 ${
         sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'
-      } lg:pt-0 pt-16`}>
+      }`}>
         <div className="flex">
               {/* Main Content */}
               <div className={`flex-1 transition-all duration-300 ${showSidebar ? 'mr-96' : ''}`}>
