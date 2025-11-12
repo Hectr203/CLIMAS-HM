@@ -243,7 +243,7 @@ import React, { useState, useEffect } from 'react';
             return (
               <div className="min-h-screen bg-background flex">
                 <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
-                <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
+                <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'}`}>
                   <div className="flex items-center justify-center h-96">
                     <div className="text-center">
                       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
@@ -281,7 +281,7 @@ import React, { useState, useEffect } from 'react';
                   {/* Breadcrumb */}
                   <div className="mb-6">
                     <Breadcrumb customItems={[
-                      { label: 'Dashboard', path: '/main-dashboard', icon: 'Home' },
+                      { label: 'Dashboard', path: '/dashboard', icon: 'Home' },
                       { label: 'Gestión Operativa - Área de Taller', path: '/workshop-operations-management', icon: 'Wrench', current: true }
                     ]} />
                   </div>

@@ -348,7 +348,7 @@ const ClientManagement = () => {
 
   const handleViewProjects = (client) => {
     console.log('Ver proyectos del cliente:', client);
-    window.location.href = `/project-management?client=${client?.id}`;
+    window.location.href = `/proyectos?client=${client?.id}`;
   };
 
   const handleViewContracts = (client) => {
