@@ -1,9 +1,290 @@
 import React from 'react';
-        import Icon from '../../../components/AppIcon';
-        import Button from '../../../components/ui/Button';
+import Icon from '../../../components/AppIcon';
+import Button from '../../../components/ui/Button';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
-        const WorkflowControls = ({ selectedOrder, currentShift, totalOrders }) => {
+        
+
+  const WorkflowControls = ({ selectedOrder, currentShift, totalOrders, workOrdersIds = [], workOrders = [], onForceRemove, onRevertStatus, localMissingByOrder = {} }) => {
           const isWorkingHours = currentShift === 'morning';
+          const selectedMissingPPE = Array.isArray(selectedOrder?.safetyChecklistMissing)
+            ? selectedOrder.safetyChecklistMissing
+            : (Array.isArray(selectedOrder?.raw?.safetyChecklistMissing) ? selectedOrder.raw.safetyChecklistMissing : []);
+          const resolvePriority = () => {
+            if (!selectedOrder) return '';
+            // direct values
+            const direct = selectedOrder?.prioridadLabel || selectedOrder?.prioridad || selectedOrder?.priorityValue || selectedOrder?.raw?.prioridad || selectedOrder?.raw?.priority || '';
+            if (direct) return direct;
+
+            // try matching related records in provided workOrders prop
+            try {
+              const candidates = [];
+              // possible keys on selectedOrder/raw: id, ordenTrabajo, trabajoId
+              if (selectedOrder?.id) candidates.push(String(selectedOrder.id));
+              if (selectedOrder?.ordenTrabajo) candidates.push(String(selectedOrder.ordenTrabajo));
+              if (selectedOrder?.raw?.trabajoId) candidates.push(String(selectedOrder.raw.trabajoId));
+              if (selectedOrder?.raw?.id) candidates.push(String(selectedOrder.raw.id));
+
+              for (const w of (workOrders || [])) {
+                if (!w) continue;
+                const keys = [w?.id, w?.ordenTrabajo, w?.trabajoId, (w?.raw && w.raw?.trabajoId), (w?.raw && w.raw?.id)].filter(Boolean).map(String);
+                if (keys.some(k => candidates.includes(k))) {
+                  const p = w?.prioridad || w?.prioridadLabel || w?.priority || w?.priorityLabel || (w?.raw && (w.raw.prioridad || w.raw.priority)) || '';
+                  if (p) return p;
+                }
+              }
+            } catch (e) {
+              // ignore
+            }
+
+            // last resort: use estado if it looks like a priority
+            try {
+              const estado = (selectedOrder?.raw?.estado || selectedOrder?.raw?.status || selectedOrder?.estado || selectedOrder?.status || '').toString();
+              if (estado) {
+                const low = estado.toLowerCase();
+                if (['alta','high','urgent','urgente','crítica','critica','media','baja','low'].some(s => low.includes(s))) return selectedOrder?.raw?.estado || estado;
+              }
+            } catch (e) {}
+
+            return '';
+          };
+
+          // helpers moved into component scope to avoid returning objects into JSX
+          const formatProgress = (p) => {
+            if (p === null || p === undefined || p === '') return '0%';
+            // Normalize into a numeric value removing non-numeric characters except dot and minus
+            const normalizeToNumber = (val) => {
+              if (typeof val === 'number') return val;
+              if (typeof val !== 'string') return NaN;
+              const s = val.trim();
+              // if contains percent sign, strip it but keep decimal
+              const cleaned = s.replace(/[^0-9.+-]/g, '');
+              const n = Number(cleaned);
+              return Number.isFinite(n) ? n : NaN;
+            };
+
+            const num = normalizeToNumber(p);
+            if (Number.isNaN(num)) return String(p);
+
+            let percent = num;
+            // If it's clearly a fraction (0 < num <= 1) treat as fraction
+            if (percent > 0 && percent <= 1) {
+              percent = percent * 100;
+            } else if (percent > 100) {
+              // If it's an unexpectedly large number (e.g. 1500) try dividing by 100 (common scale issues)
+              const maybe = percent / 100;
+              if (maybe > 0 && maybe <= 100) percent = maybe;
+              // otherwise leave as-is (will be rounded)
+            }
+            if (percent < 0) percent = 0;
+            if (percent > 100) percent = 100;
+
+            return `${Math.round(percent)}%`;
+          };
+
+          const formatDate = (v) => {
+            if (!v && v !== 0) return '';
+            try {
+              // If value is a plain YYYY-MM-DD string, construct a local Date to avoid timezone shifts
+              if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) {
+                const [y, m, d] = v.split('-').map(Number);
+                const dt = new Date(y, m - 1, d); // local date
+                return dt.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+              }
+              const d = (v instanceof Date) ? v : new Date(v);
+              if (Number.isNaN(d.getTime())) return String(v);
+              return d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+            } catch (e) {
+              return String(v);
+            }
+          };
+
+          // Generate a PDF report for the selected order.
+          const generateReport = () => {
+            if (!selectedOrder) return;
+
+            // Helper: try to determine daily progress delta from multiple possible aliases.
+            const computeDailyProgressDelta = () => {
+              try {
+                const raw = selectedOrder?.raw || {};
+                const todayKey = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                const today = todayKey(new Date());
+
+                // possible history aliases
+                const candidates = raw.progressHistory || raw.progress_logs || raw.updates || raw.progressUpdates || raw.progreso_historial || raw.history || raw.progress_log || null;
+                if (Array.isArray(candidates) && candidates.length) {
+                  // normalize entries to {date, value}
+                  const entries = candidates.map(e => {
+                    if (typeof e === 'number') return { date: today, value: Number(e) };
+                    if (typeof e === 'string') {
+                      // try parse `YYYY-MM-DD:value` or `YYYY-MM-DD` formats
+                      const m = e.match(/(\d{4}-\d{2}-\d{2}).*?([0-9+.\-%]+)/);
+                      if (m) return { date: m[1], value: Number(String(m[2]).replace('%','')) };
+                      return { date: today, value: Number(e.replace(/[^0-9.+-]/g,'')) };
+                    }
+                    // assume object with date/value
+                    return { date: (e.date || e.fecha || e.d) || today, value: Number(e.value ?? e.progreso ?? e.progress ?? e.porcentaje ?? 0) };
+                  });
+
+                  const todays = entries.filter(en => String(en.date).startsWith(today));
+                  if (todays.length >= 2) {
+                    const first = todays[0].value;
+                    const last = todays[todays.length-1].value;
+                    return Math.round((last - first) * 100) / 100;
+                  }
+                  if (todays.length === 1) {
+                    // try to find the most recent previous entry
+                    const before = entries.filter(en => !String(en.date).startsWith(today)).sort((a,b)=> new Date(a.date)-new Date(b.date)).pop();
+                    if (before) return Math.round(((todays[0].value || 0) - (before.value || 0)) * 100) / 100;
+                    return Math.round((todays[0].value || 0) * 100) / 100;
+                  }
+                }
+
+                // fallback: try comparing selectedOrder.progress with selectedOrder.raw?.previousProgress or selectedOrder?.previousProgress
+                const cur = Number(selectedOrder?.progress ?? selectedOrder?.estadoProgreso ?? selectedOrder?.progreso ?? 0);
+                const prev = Number(selectedOrder?.raw?.previousProgress ?? selectedOrder?.previousProgress ?? 0);
+                if (!Number.isNaN(cur) && !Number.isNaN(prev)) return Math.round((cur - prev) * 100) / 100;
+                return null;
+              } catch (e) {
+                return null;
+              }
+            };
+
+            // Helper: build materials rows
+            const buildMaterials = () => {
+              const raw = selectedOrder?.materials || selectedOrder?.raw?.materials || selectedOrder?.raw?.materiales || null;
+              if (!raw) return [];
+              // If array of items
+              if (Array.isArray(raw)) {
+                return raw.map(it => {
+                  const name = it?.name || it?.nombre || it?.item || '';
+                  const required = Number(it?.required ?? it?.cantidad ?? it?.total ?? 0);
+                  const received = Number(it?.received ?? it?.recibido ?? it?.have ?? 0);
+                  const missing = Math.max(0, required - received);
+                  return { name, required, received, missing };
+                });
+              }
+
+              // If object with totals
+              const total = Number(raw?.total ?? raw?.required ?? raw?.cantidad ?? 0);
+              const received = Number(raw?.received ?? raw?.recibido ?? raw?.have ?? 0);
+              const missing = Math.max(0, total - received);
+              return [{ name: raw?.name || raw?.nombre || 'Materiales', required: total, received, missing }];
+            };
+
+            const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+            const margin = 40;
+            const title = `Reporte - Orden ${selectedOrder?.ordenTrabajo || selectedOrder?.id || ''}`;
+            doc.setFontSize(14);
+            doc.text(title, margin, 50);
+            doc.setFontSize(10);
+            const now = new Date();
+            doc.text(`Generado: ${now.toLocaleString()}`, margin, 68);
+
+            // main key/value table
+            const rows = [];
+            rows.push(['Orden Trabajo', String(selectedOrder?.ordenTrabajo || selectedOrder?.id || '')]);
+            rows.push(['Cliente', String(selectedOrder?.clientName || selectedOrder?.clientLabel || (selectedOrder?.cliente && (selectedOrder.cliente.nombre || selectedOrder.cliente)) || '')]);
+              rows.push(['Progreso', formatProgress(selectedOrder?.progress ?? selectedOrder?.progreso ?? selectedOrder?.estadoProgreso ?? 0)]);
+              rows.push(['Prioridad', String(resolvePriority() || selectedOrder?.raw?.prioridad || selectedOrder?.raw?.estado || selectedOrder?.estado || '')]);
+              const rawDate = selectedOrder?.fechaLimite || selectedOrder?.estimatedCompletion || selectedOrder?.proyectoFecha || selectedOrder?.raw?.fechaLimite || selectedOrder?.raw?.fecha || selectedOrder?.raw?.estimatedCompletion || selectedOrder?.raw?.fechaEstimada || '';
+              const fechaVal = (() => {
+                try { const f = formatDate(rawDate); return f && f.length ? f : '-'; } catch (e) { return '-'; }
+              })();
+              rows.push(['Fecha límite', String(fechaVal)]);
+            const techs = (() => {
+              const fromSelected = (selectedOrder?.assignedTechnicians || selectedOrder?.tecnicoAsignado || selectedOrder?.tecnicos || []);
+              let techArray = Array.isArray(fromSelected) ? fromSelected : (fromSelected ? [fromSelected] : []);
+              if (!techArray.length && selectedOrder?.raw) {
+                const rawTech = selectedOrder.raw.tecnicoAsignado || selectedOrder.raw.tecnicos || selectedOrder.raw.assignedTechnicians || null;
+                if (rawTech) techArray = Array.isArray(rawTech) ? rawTech : [rawTech];
+              }
+              return techArray.map(t => (t?.name || t?.nombre || (typeof t === 'string' ? t : ''))).filter(Boolean).join(', ');
+            })();
+            rows.push(['Técnicos', techs || '']);
+
+            // Determine whether safety checklist was completed either on server or locally persisted
+            let safetyCompleted = false;
+            try {
+              const selectedKey = selectedOrder ? (selectedOrder?.id || selectedOrder?.ordenTrabajo || selectedOrder?.folio || '') : '';
+              const rawSaved = (selectedKey && localStorage.getItem(`wb_safety_check_${selectedKey}`)) ? JSON.parse(localStorage.getItem(`wb_safety_check_${selectedKey}`)) : null;
+              const localCompleted = !!(rawSaved && rawSaved.completed);
+              safetyCompleted = !!selectedOrder?.safetyChecklistCompleted || localCompleted;
+            } catch (e) {
+              safetyCompleted = !!selectedOrder?.safetyChecklistCompleted;
+            }
+
+            if (safetyCompleted) {
+              rows.push(['Verificación de Seguridad', 'Completada y revisada']);
+            }
+            // Determine current flow/column and readiness for shipment
+            const mapToColumnLabel = (val) => {
+              if (!val) return '';
+              const v = String(val).toLowerCase().trim();
+              if (['material-reception','recepcion material','recepción material','recepción_material','recepción','pendiente','pendiente por revisar','new','nuevo'].includes(v)) return 'Recepción Material';
+              if (['safety-checklist','lista seguridad','seguridad','safety','checklist seguridad'].includes(v)) return 'Lista Seguridad';
+              if (['manufacturing','fabricación','fabricacion','en progreso','progreso','producción','produccion','en pausa','pausa','pausado'].includes(v)) return 'Fabricación';
+              if (['quality-control','control calidad','calidad','qc','quality','revisión'].includes(v)) return 'Control Calidad';
+              if (['ready-shipment','listo envío','listo envio','envío','envio','enviado','completada','completado','listo'].includes(v)) return 'Listo Envío';
+              if (['material-reception','safety-checklist','manufacturing','quality-control','ready-shipment'].includes(v)) return v;
+              return String(val);
+            };
+
+            const currentFlow = mapToColumnLabel(selectedOrder?.status || selectedOrder?.raw?.status || selectedOrder?.estado || selectedOrder?.raw?.estado || '');
+            const isReadyForShipment = (() => {
+              const status = (selectedOrder?.status || selectedOrder?.raw?.status || selectedOrder?.estado || selectedOrder?.raw?.estado || '').toString().toLowerCase();
+              const progressVal = Number(selectedOrder?.progress ?? selectedOrder?.progreso ?? selectedOrder?.estadoProgreso ?? 0) || 0;
+              const completedFlag = !!(selectedOrder?.completed || selectedOrder?.raw?.completed);
+              return (['ready-shipment','listo envío','listo envio','enviado','completado','completada','listo'].some(s => status.includes(s)) || progressVal >= 100 || completedFlag) ? 'Sí' : 'No';
+            })();
+
+            rows.push(['Flujo actual', currentFlow || '']);
+            rows.push(['Listo Envío', isReadyForShipment]);
+
+            doc.autoTable({
+              startY: 90,
+              head: [['Proyecto', 'Datos']],
+              body: rows,
+              theme: 'grid',
+              styles: { fontSize: 10 }
+            });
+
+            // Materials table
+            const mats = buildMaterials();
+            if (mats.length) {
+              const startY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 200;
+              const matRows = mats.map(m => [m.name || '', String(m.required || 0), String(m.received || 0), String(m.missing || 0)]);
+              doc.autoTable({
+                startY,
+                head: [['Material', 'Req.', 'Recibidos', 'Faltantes']],
+                body: matRows,
+                theme: 'grid',
+                styles: { fontSize: 10 }
+              });
+            }
+
+            const selectedKey = selectedOrder ? (selectedOrder?.id || selectedOrder?.ordenTrabajo || selectedOrder?.folio || '') : '';
+            const localMissing = Array.isArray(localMissingByOrder?.[selectedKey]) ? localMissingByOrder[selectedKey] : [];
+            const recorded = Array.isArray(selectedMissingPPE) ? selectedMissingPPE : (selectedMissingPPE ? [selectedMissingPPE] : []);
+            const missingList = Array.from(new Set([...(recorded || []), ...(localMissing || [])]));
+            if (missingList.length) {
+              const startY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 250;
+              doc.setFontSize(12);
+              const rowsMissing = missingList.map(m => [String(m || '')]);
+              doc.autoTable({
+                startY: startY + 8,
+                head: [['Faltantes Lista de seguridad']],
+                body: rowsMissing,
+                theme: 'grid',
+                styles: { fontSize: 10 }
+              });
+            }
+
+            // Footer note and save
+            const fileName = `Reporte_Orden_${String(selectedOrder?.ordenTrabajo || selectedOrder?.id || '').replace(/\s+/g,'_')}_${now.toISOString().slice(0,10)}.pdf`;
+            doc.save(fileName);
+          };
 
           return (
             <div className="bg-card border rounded-lg p-4">
@@ -35,45 +316,168 @@ import React from 'react';
                 <div className="text-sm text-muted-foreground">Órdenes activas</div>
               </div>
 
+              
+
               {/* Selected Order Info */}
               {selectedOrder && (
                 <div className="mb-4 p-3 bg-primary/10 rounded-lg border border-primary/20 overflow-hidden">
-                  <div className="font-medium mb-2">Orden Seleccionada</div>
-                  <div className="text-sm space-y-1">
-                    <div className="truncate"><strong>ID:</strong> <span className="ml-1 inline-block max-w-[18rem] truncate">{selectedOrder?.id}</span></div>
-                    <div className="truncate"><strong>Cliente:</strong> <span className="ml-1 inline-block max-w-[18rem] truncate">{selectedOrder?.clientName}</span></div>
-                    <div className="truncate"><strong>Estado:</strong> <span className="ml-1 inline-block max-w-[18rem] truncate">{selectedOrder?.statusLabel}</span></div>
-                    <div className="truncate"><strong>Progreso:</strong> <span className="ml-1 inline-block">{selectedOrder?.progress}%</span></div>
+                  <div className="font-medium mb-2 text-center">Orden Seleccionada</div>
+                  <div className="text-sm grid grid-cols-2 gap-3">
+                    {/* helpers defined in component scope: formatProgress, formatDate */}
+                    <div className="truncate">
+                      <strong className="block">Orden Trabajo</strong>
+                      <span className="block mt-1 font-medium">{selectedOrder?.ordenTrabajo || selectedOrder?.id}</span>
+                    </div>
+
+                    <div className="truncate">
+                      <strong className="block">Progreso</strong>
+                      <span className="block mt-1">
+                        {(() => {
+                          // Collect possible progress sources (many aliases)
+                          const candidates = [
+                            selectedOrder?.progress,
+                            selectedOrder?.progreso,
+                            selectedOrder?.raw?.progreso,
+                            selectedOrder?.raw?.estadoProgreso,
+                            selectedOrder?.raw?.progress,
+                            selectedOrder?.raw?.estado,
+                            selectedOrder?.raw?.porcentaje,
+                            selectedOrder?.porcentaje,
+                          ].filter(v => v !== undefined && v !== null);
+
+                          // normalize helper (reuse logic similar to formatProgress but return numeric percent)
+                          const normalizeNumericPercent = (val) => {
+                            if (val === null || val === undefined || val === '') return NaN;
+                            const s = (typeof val === 'string') ? val.trim() : String(val);
+                            // strip non numeric except dot and minus
+                            const cleaned = s.replace(/[^0-9.+-]/g, '');
+                            const n = Number(cleaned);
+                            if (Number.isNaN(n)) return NaN;
+                            let num = n;
+                            if (num > 0 && num <= 1) num = num * 100;
+                            else if (num > 100) {
+                              const maybe = num / 100;
+                              if (maybe > 0 && maybe <= 100) num = maybe;
+                            }
+                            if (num < 0) num = 0;
+                            if (num > 100) num = 100;
+                            return num;
+                          };
+
+                          let best = NaN;
+                          for (const c of candidates) {
+                            const n = normalizeNumericPercent(c);
+                            if (Number.isNaN(n)) continue;
+                            // prefer values that look like whole percentages (>=1)
+                            if (n >= 1 && (Number.isNaN(best) || n > best)) {
+                              best = n; // pick the largest clear percentage
+                            } else if (Number.isNaN(best)) {
+                              best = n;
+                            }
+                          }
+
+                          // fallback to any available raw if none normalized
+                          const fallback = candidates.length ? candidates[0] : null;
+
+                          if (!Number.isNaN(best)) return formatProgress(best);
+                          if (fallback !== null && fallback !== undefined) return formatProgress(fallback);
+                          return '0%';
+                        })()}
+                      </span>
+                    </div>
+
+                    <div className="truncate">
+                      <strong className="block">Cliente</strong>
+                      <span className="block mt-1">{selectedOrder?.clientName || selectedOrder?.clientLabel || (selectedOrder?.cliente && (selectedOrder.cliente.nombre || selectedOrder.cliente)) || ''}</span>
+                    </div>
+
+                    <div className="truncate">
+                      <strong className="block">Proyecto</strong>
+                      <span className="block mt-1">
+                        {(
+                          selectedOrder?.projectRef ||
+                          selectedOrder?.proyectoNombre ||
+                          selectedOrder?.raw?.proyecto ||
+                          selectedOrder?.raw?.projectName ||
+                          selectedOrder?.raw?.project ||
+                          selectedOrder?.project?.name ||
+                          selectedOrder?.project?.nombre ||
+                          ''
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="truncate">
+                      <strong className="block">Prioridad</strong>
+                      <span className="block mt-1">{(resolvePriority()) || selectedOrder?.raw?.prioridad || selectedOrder?.raw?.estado || selectedOrder?.estado || ''}</span>
+                    </div>
+
+                    <div className="truncate">
+                      <strong className="block">Fecha límite</strong>
+                      <span className="block mt-1">
+                        {(() => {
+                          const rawDate = selectedOrder?.fechaLimite || selectedOrder?.estimatedCompletion || selectedOrder?.proyectoFecha || selectedOrder?.raw?.fechaLimite || selectedOrder?.raw?.fecha || selectedOrder?.raw?.estimatedCompletion || selectedOrder?.raw?.fechaEstimada || '';
+                          try {
+                            return formatDate(rawDate);
+                          } catch (e) {
+                            return rawDate || '';
+                          }
+                        })()}
+                      </span>
+                    </div>
+
+                    {/* Técnicos ocupa toda la fila en caso de necesitar más espacio */}
+                    {(() => {
+                      const fromSelected = (selectedOrder?.assignedTechnicians || selectedOrder?.tecnicoAsignado || selectedOrder?.tecnicos || []);
+                      let techArray = Array.isArray(fromSelected) ? fromSelected : (fromSelected ? [fromSelected] : []);
+                      if (!techArray.length && selectedOrder?.raw) {
+                        const rawTech = selectedOrder.raw.tecnicoAsignado || selectedOrder.raw.tecnicos || selectedOrder.raw.assignedTechnicians || null;
+                        if (rawTech) techArray = Array.isArray(rawTech) ? rawTech : [rawTech];
+                      }
+                      if (!techArray.length) return null;
+                      const names = techArray.map(t => (t?.name || t?.nombre || (typeof t === 'string' ? t : ''))).filter(Boolean);
+                      if (!names.length) return null;
+                      return (
+                        <div className="truncate col-span-2 mt-1">
+                          <strong className="block">Técnicos</strong>
+                          <span className="block mt-1">{names.join(', ')}</span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               )}
 
               {/* Quick Actions */}
               <div className="space-y-2">
+                {selectedOrder && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    iconName="RefreshCw"
+                    onClick={() => onRevertStatus?.(selectedOrder)}
+                  >
+                    Regresar progreso
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="outline"
                   className="w-full"
                   iconName="FileText"
+                  onClick={() => {
+                    try {
+                      generateReport();
+                    } catch (e) {
+                      // fallback: no-op
+                    }
+                  }}
                 >
                   Generar Reporte
                 </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full"
-                  iconName="Bell"
-                >
-                  Notificar Proyectos
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full"
-                  iconName="RefreshCw"
-                >
-                  Actualizar Estado
-                </Button>
+                
+                
               </div>
 
               {/* Working Hours Reminder */}
