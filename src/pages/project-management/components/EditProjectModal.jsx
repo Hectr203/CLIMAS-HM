@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback, } from 'react';
 import Button from '../../../components/ui/Button';
 import Icon from '../../../components/AppIcon';
 import Input from '../../../components/ui/Input';
@@ -6,10 +6,10 @@ import Select from '../../../components/ui/Select';
 import proyectoService from 'services/proyectoService';
 import clientService from 'services/clientService';
 import usePerson from 'hooks/usePerson';
-// ⬇️ Ajusta esta ruta según tu estructura:
 import { useErrorHandler, useNotifications } from 'context/NotificationContext';
+import { useEstados, useMunicipios } from '../../../hooks/useEstado';
 
-/* ===================== ESTADOS ===================== */
+/* ===================== ESTADOS (STATUS DEL PROYECTO) ===================== */
 const estadoOptionsBackend = [
   { value: 'planificación', label: 'Planificación' },
   { value: 'en proceso',    label: 'En Progreso' },
@@ -18,9 +18,8 @@ const estadoOptionsBackend = [
   { value: 'completado',    label: 'Completado' },
   { value: 'cancelado',     label: 'Cancelado' },
 ];
-const ALLOWED_ESTADOS = estadoOptionsBackend.map(o => o.value);
+const ALLOWED_ESTADOS = estadoOptionsBackend.map((o) => o.value);
 
-/* Cache local del estado UI por proyecto (para recordar lo que eligió el user en vez de lo que vino del backend) */
 const UI_ESTADO_KEY = 'proyectos_ui_estado_v1';
 const uiEstadoCache = {
   _read() {
@@ -41,7 +40,7 @@ const uiEstadoCache = {
     if (estado) m[id] = estado;
     else delete m[id];
     localStorage.setItem(UI_ESTADO_KEY, JSON.stringify(m));
-  }
+  },
 };
 
 /* ===================== CATÁLOGOS ===================== */
@@ -88,20 +87,26 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
   const [errors, setErrors] = useState({});
   const [serverProject, setServerProject] = useState(null);
 
-  // Personas / Clientes
   const { persons, getPersons } = usePerson();
   const [clientOptions, setClientOptions] = useState([]);
 
-  // Notificaciones
   const { handleError, handleSuccess } = useErrorHandler();
   const { showError } = useNotifications();
 
-  // Controles de USD para equipos
   const [isEquipmentInUSD, setIsEquipmentInUSD] = useState(false);
-  const [exchangeRate, setExchangeRate] = useState(18); // MXN por USD
-  const [uiEquipmentUSD, setUiEquipmentUSD] = useState(''); // display
+  const [exchangeRate, setExchangeRate] = useState(18);
+  const [uiEquipmentUSD, setUiEquipmentUSD] = useState('');
   const [loadingFx, setLoadingFx] = useState(false);
   const [fxError, setFxError] = useState(null);
+
+  /* ============= ESTADOS/MUNICIPIOS (UBICACIÓN) ============= */
+  const { estados, loading: loadingEstados, error: errorEstados } = useEstados();
+  const [selectedEstadoCode, setSelectedEstadoCode] = useState('');
+  const {
+    municipios,
+    loading: loadingMunicipios,
+    error: errorMunicipios,
+  } = useMunicipios(selectedEstadoCode || '');
 
   /* ============= CARGA DE CLIENTES ============= */
   useEffect(() => {
@@ -121,7 +126,6 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
         }));
         if (mounted) setClientOptions(opts);
       } catch (e) {
-        // Notificamos error al cargar clientes (no bloqueante del modal)
         handleError(e, 'Error cargando clientes');
       }
     })();
@@ -175,7 +179,55 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
     const cron = doc.cronograma || {};
     const id = doc.id || project?.id;
 
-    // preferimos estado guardado en cache UI; si no, usamos el del backend tal cual
+    // ubicacion puede venir:
+    // 1) objeto { estado, municipio, direccion }
+    // 2) string simple
+    // 3) string JSON
+    let rawUbicacion = doc.ubicacion;
+    if (typeof rawUbicacion === 'string') {
+      const trimmed = rawUbicacion.trim();
+      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (parsed && typeof parsed === 'object') {
+            rawUbicacion = parsed;
+          }
+        } catch {
+          // ignorar, se usa como string normal abajo
+        }
+      }
+    }
+
+    let ubicacion = {
+      estado: '',
+      municipio: '',
+      direccion: '',
+    };
+
+    if (rawUbicacion && typeof rawUbicacion === 'object') {
+      ubicacion = {
+        estado:
+          rawUbicacion.estado ||
+          rawUbicacion.estadoCode ||
+          '',
+        municipio:
+          rawUbicacion.municipio ||
+          rawUbicacion.municipioNombre ||
+          '',
+        direccion:
+          rawUbicacion.direccion ||
+          rawUbicacion.dirección ||
+          rawUbicacion.direccionCompleta ||
+          '',
+      };
+    } else if (typeof rawUbicacion === 'string') {
+      ubicacion = {
+        estado: '',
+        municipio: '',
+        direccion: rawUbicacion || '',
+      };
+    }
+
     const cachedEstado = uiEstadoCache.get(id);
     const estadoUi = cachedEstado || (doc.estado || 'planificación');
 
@@ -189,9 +241,9 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
       nombre: doc.nombre || doc.nombreProyecto || '',
       departamento: doc.departamento || '',
       prioridad: doc.prioridad || '',
-      ubicacion: doc.ubicacion || '',
+      estado: estadoUi,
+      ubicacion,
       descripcion: doc.descripcion || '',
-      estado: estadoUi, // <-- seleccion en UI, sin mapeos
       cronograma: {
         fechaInicio: cron?.fechaInicio || '',
         fechaFin: cron?.fechaFin || '',
@@ -217,7 +269,10 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
   /* ============= STATE DEL FORM (CONTROLADO) ============= */
   const [formData, setFormData] = useState(normalized);
   useEffect(() => {
-    if (isOpen) setFormData(normalized);
+    if (isOpen) {
+      setFormData(normalized);
+      setSelectedEstadoCode(normalized?.ubicacion?.estado || '');
+    }
   }, [normalized, isOpen]);
 
   /* ============= FX / TIPO DE CAMBIO USD↔MXN ============= */
@@ -226,14 +281,11 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
       setFxError(null);
       setLoadingFx(true);
 
-      // usamos getCurrencyRates existente en tu service
       const apiResp = await proyectoService.getCurrencyRates({
         base: 'USD',
         currencies: ['MXN'],
       });
 
-      // apiResp esperado:
-      // { data: { MXN: { code:'MXN', value:18.2 }, ... }, meta: {...} }
       const mxnInfo = apiResp?.data?.MXN;
       const rate = Number(mxnInfo?.value || 0);
 
@@ -256,13 +308,6 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
     }
   }, [handleError, showError]);
 
-  // precarga el tipo de cambio al abrir modal
-  useEffect(() => {
-    if (!isOpen) return;
-    fetchUsdMxnRate();
-  }, [isOpen, fetchUsdMxnRate]);
-
-  // inicializar toggle USD/MXN basándonos en _metaEquipos.capturadoEn
   useEffect(() => {
     if (!isOpen) return;
     const cap = formData?.presupuesto?._metaEquipos?.capturadoEn;
@@ -274,7 +319,6 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
     }
   }, [isOpen, formData?.presupuesto?._metaEquipos?.capturadoEn]);
 
-  // cuando mostramos en USD, calculamos display USD = MXN / rate
   useEffect(() => {
     if (!isEquipmentInUSD) return;
     const mxn = toNumberOrUndef(formData?.presupuesto?.equipos) ?? 0;
@@ -340,6 +384,25 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
     }
   };
 
+  const handleUbicacion = (field, value) => {
+    setFormData((s) => ({
+      ...s,
+      ubicacion: {
+        ...(s.ubicacion || { estado: '', municipio: '', direccion: '' }),
+        [field]: value,
+      },
+    }));
+    const errorKey =
+      field === 'estado'
+        ? 'ubicacionEstado'
+        : field === 'municipio'
+        ? 'ubicacionMunicipio'
+        : 'ubicacionDireccion';
+    if (errors[errorKey]) {
+      setErrors((e) => ({ ...e, [errorKey]: undefined }));
+    }
+  };
+
   const handleP = (k, raw) => {
     const n =
       raw === '' || raw == null ? undefined : toNumberOrUndef(raw);
@@ -349,8 +412,7 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
     }));
   };
 
-  // toggle USD <-> MXN en el bloque "Equipos"
-  const toggleUSD = async (checked) => {
+  const toggleUSD = (checked) => {
     setIsEquipmentInUSD(checked);
     setFormData((s) => ({
       ...s,
@@ -362,15 +424,7 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
       },
     }));
 
-    if (checked) {
-      const rate = (await fetchUsdMxnRate()) ?? exchangeRate;
-      const mxn =
-        toNumberOrUndef(formData?.presupuesto?.equipos) ?? 0;
-      const usd = rate ? mxn / rate : 0;
-      setUiEquipmentUSD(
-        usd ? formatWithCommas(usd, 2) : '0.00'
-      );
-    } else {
+    if (!checked) {
       setUiEquipmentUSD('');
     }
   };
@@ -381,11 +435,17 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
     if (!formData.nombre) e.nombre = 'Requerido';
     if (!formData.departamento)
       e.departamento = 'Requerido';
-    if (!formData.ubicacion) e.ubicacion = 'Requerido';
+
+    const ub = formData.ubicacion || {};
+    if (!ub.estado) e.ubicacionEstado = 'Requerido';
+    if (!ub.municipio) e.ubicacionMunicipio = 'Requerido';
+    if (!ub.direccion) e.ubicacionDireccion = 'Requerido';
+
     if (!ALLOWED_ESTADOS.includes(formData.estado))
       e.estado = 'Estado inválido';
     if (isEquipmentInUSD && !(exchangeRate > 0))
       e.exchangeRate = 'Tipo de cambio inválido';
+
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -412,7 +472,6 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
       capturadoEn: isEquipmentInUSD ? 'USD' : 'MXN',
     };
 
-    // si el toggle USD está activo, calculamos USD a partir de MXN/rate
     if (isEquipmentInUSD) {
       const mxn = toNumberOrUndef(p.equipos) ?? 0;
       const rate = rateSafe(exchangeRate);
@@ -420,24 +479,29 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
       if (usd != null) pres.equipoDolares = usd;
     }
 
+    const ub = formData.ubicacion || {};
+
     return {
       nombre: formData.nombre,
       departamento: formData.departamento,
       prioridad: formData.prioridad,
-      ubicacion: formData.ubicacion,
+      ubicacion: {
+        estado: ub.estado || '',
+        municipio: ub.municipio || '',
+        direccion: ub.direccion || '',
+      },
       descripcion: formData.descripcion,
       personalAsignado: Array.isArray(
         formData.personalAsignado
       )
         ? formData.personalAsignado
         : [],
-      // 👉 Enviamos el estado tal cual
       estado: formData.estado,
       presupuesto: pres,
     };
   };
 
-  /* ============= SUBMIT (Guardar Cambios) ============= */
+  /* ============= SUBMIT ============= */
   const handleSubmit = async (e) => {
     e?.preventDefault();
     if (!validate()) return;
@@ -449,24 +513,23 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
         payload
       );
 
-      // guardamos en cache el estado "bonito" que eligió el usuario
       uiEstadoCache.set(formData.id, formData.estado);
 
-      // avisamos al padre para que refresque dashboard/stats
-      onSubmit &&
+      if (onSubmit) {
+        // Deja que el padre decida si muestra mensaje de éxito
         onSubmit({
           id: formData.id,
           ...payload,
           _uiEstado: formData.estado,
         });
-
-      // ✅ Notificación de éxito
-      handleSuccess('update', 'Proyecto');
+      } else {
+        // Solo mostramos el mensaje aquí si no hay onSubmit
+        handleSuccess('update', 'Proyecto');
+      }
 
       onClose && onClose();
     } catch (err) {
       console.error('Error actualizando proyecto:', err);
-      // ❌ Notificación de error formateada
       handleError(err, 'Error actualizando proyecto');
     } finally {
       setIsSubmitting(false);
@@ -489,6 +552,12 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
 
   if (!isOpen) return null;
 
+  const ub = formData.ubicacion || {
+    estado: '',
+    municipio: '',
+    direccion: '',
+  };
+
   /* ===================== RENDER ===================== */
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-1050 p-4">
@@ -507,6 +576,7 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
             variant="ghost"
             size="icon"
             onClick={onClose}
+            disabled={isSubmitting}
           >
             <Icon name="X" size={20} />
           </Button>
@@ -588,17 +658,117 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
               required
             />
 
-            <Input
-              label="Ubicación"
-              type="text"
-              placeholder="Ej: Ciudad de México, CDMX"
-              value={asStr(formData?.ubicacion)}
-              onChange={(e) =>
-                handle('ubicacion', e.target.value)
-              }
-              error={errors?.ubicacion}
-              required
-            />
+            {/* Ubicación */}
+            <div className="md:col-span-2 mt-2">
+              <h3 className="text-lg font-medium text-foreground mb-2">
+                Ubicación del Proyecto
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Seleccione estado y municipio, luego escriba la dirección completa del sitio.
+              </p>
+            </div>
+
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4 items-center">
+              <div className="flex flex-col justify-end h-full">
+                <Select
+                  label={
+                    <>
+                      Estado <span className="text-destructive">*</span>
+                    </>
+                  }
+                  value={ub.estado}
+                  onChange={(value) => {
+                    handleUbicacion('estado', value);
+                    handleUbicacion('municipio', '');
+                    setSelectedEstadoCode(value || '');
+                  }}
+                  options={
+                    estados
+                      ? [
+                          { value: '', label: 'Selecciona un estado' },
+                          ...estados.map((e) => ({
+                            value: e.code,
+                            label: e.name,
+                          })),
+                        ]
+                      : []
+                  }
+                  loading={loadingEstados}
+                  error={errors?.ubicacionEstado}
+                  required
+                  disabled={loadingEstados || !!errorEstados}
+                  placeholder={
+                    loadingEstados ? 'Cargando estados...' : 'Selecciona un estado'
+                  }
+                  searchable
+                  className="h-12 md:h-14 w-full text-base"
+                />
+              </div>
+
+              <div className="flex flex-col justify-end h-full">
+                <Select
+                  label={
+                    <>
+                      Municipio <span className="text-destructive">*</span>
+                    </>
+                  }
+                  value={ub.municipio}
+                  onChange={(value) =>
+                    handleUbicacion('municipio', value)
+                  }
+                  options={
+                    ub.estado === ''
+                      ? [{ value: '', label: 'Selecciona un estado primero' }]
+                      : loadingMunicipios
+                      ? [{ value: '', label: 'Cargando municipios...' }]
+                      : errorMunicipios
+                      ? [{ value: '', label: 'Error al cargar municipios' }]
+                      : [
+                          { value: '', label: 'Selecciona un municipio' },
+                          ...(municipios
+                            ? Object.values(municipios.municipios || {}).map(
+                                (m) => ({
+                                  value: m,
+                                  label: m,
+                                })
+                              )
+                            : []),
+                        ]
+                  }
+                  loading={loadingMunicipios}
+                  error={errors?.ubicacionMunicipio}
+                  required
+                  disabled={
+                    ub.estado === '' ||
+                    loadingMunicipios ||
+                    !!errorMunicipios
+                  }
+                  placeholder={
+                    ub.estado === ''
+                      ? 'Selecciona un estado primero'
+                      : loadingMunicipios
+                      ? 'Cargando municipios...'
+                      : 'Selecciona un municipio'
+                  }
+                  searchable
+                  className="h-12 md:h-14 w-full text-base"
+                />
+              </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <Input
+                label="Dirección"
+                required
+                value={ub.direccion}
+                onChange={(e) =>
+                  handleUbicacion('direccion', e?.target?.value)
+                }
+                error={errors?.ubicacionDireccion}
+                placeholder="Dirección completa"
+                className="h-12 md:h-14 w-full text-base"
+              />
+            </div>
 
             {/* Descripción */}
             <div className="md:col-span-2">
@@ -666,7 +836,6 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
                 </label>
               </div>
 
-              {/* Campo Equipos */}
               <input
                 type="text"
                 inputMode="decimal"
@@ -681,10 +850,7 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
                 onChange={(e) =>
                   isEquipmentInUSD
                     ? undefined
-                    : handleP(
-                        'equipos',
-                        e?.target?.value
-                      )
+                    : handleP('equipos', e?.target?.value)
                 }
                 readOnly={isEquipmentInUSD}
                 className={`w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent ${
@@ -701,10 +867,7 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
                       label="Tipo de cambio (MXN / USD)"
                       type="text"
                       inputMode="decimal"
-                      value={formatWithCommas(
-                        exchangeRate,
-                        4
-                      )}
+                      value={formatWithCommas(exchangeRate, 4)}
                       onChange={() => {}}
                       readOnly
                       disabled
@@ -719,9 +882,7 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
                     iconName="RefreshCcw"
                     iconPosition="left"
                   >
-                    {loadingFx
-                      ? 'Actualizando…'
-                      : 'Actualizar tipo de cambio'}
+                    {loadingFx ? 'Actualizando…' : 'Actualizar tipo de cambio'}
                   </Button>
 
                   <div className="text-sm text-muted-foreground whitespace-nowrap">
@@ -826,9 +987,7 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
               <Select
                 label="Personal Asignado"
                 options={personnelOptions}
-                value={asArr(
-                  formData?.personalAsignado
-                ).map(String)}
+                value={asArr(formData?.personalAsignado).map(String)}
                 onChange={(value) =>
                   handle(
                     'personalAsignado',
@@ -848,6 +1007,7 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
               type="button"
               variant="outline"
               onClick={onClose}
+              disabled={isSubmitting}
             >
               Cancelar
             </Button>
@@ -857,9 +1017,7 @@ const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
               iconName="Save"
               iconPosition="left"
             >
-              {isSubmitting
-                ? 'Guardando...'
-                : 'Guardar Cambios'}
+              {isSubmitting ? 'Guardando...' : 'Guardar Cambios'}
             </Button>
           </div>
         </form>
