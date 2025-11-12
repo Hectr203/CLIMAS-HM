@@ -17,6 +17,23 @@ const AbonosStats = ({ projects = [], getTotalPagado }) => {
 
     const getBudget = (p) => Number(p?.totalPresupuesto ?? p?.presupuesto?.total ?? p?.budget ?? 0);
     
+    // Función para obtener el total restante (consistente con la lógica del filtro)
+    const obtenerTotalRestante = (p) => {
+      // 1) Valor directo desde backend si está presente
+      const resumen = p?.resumenFinanciero || p?.financialSummary || {};
+      const fromDB = resumen?.totalRestante ?? resumen?.saldoPendiente ?? resumen?.saldo_pendiente;
+      if (typeof fromDB === 'number' && !isNaN(fromDB)) {
+        return fromDB;
+      }
+      // 2) Fallback: calcula a partir de presupuesto y pagado
+      const presupuesto = getBudget(p);
+      const pagado = typeof getTotalPagado === 'function' 
+        ? Number(getTotalPagado(p) || 0) 
+        : 0;
+      const restante = Math.max(presupuesto - pagado, 0);
+      return restante;
+    };
+    
     let totalBudget = 0;
     let totalRecaudado = 0;
     let pagados = 0;
@@ -28,21 +45,23 @@ const AbonosStats = ({ projects = [], getTotalPagado }) => {
       const paid = typeof getTotalPagado === 'function' 
         ? Number(getTotalPagado(project) || 0) 
         : 0;
+      const totalRestante = obtenerTotalRestante(project);
       
       totalBudget += budget;
       totalRecaudado += paid;
 
-      // Determinar estado de pago
-      if (budget > 0) {
-        if (paid >= budget) {
-          pagados++;
-        } else if (paid > 0) {
-          enProceso++;
-        }
+      // Determinar estado de pago usando la misma lógica que el filtro
+      // Pagados: Total restante = 0
+      if (totalRestante === 0 && budget > 0) {
+        pagados++;
+      } 
+      // En Proceso de Pago: Total restante > 0 y < Presupuesto
+      else if (totalRestante > 0 && totalRestante < budget) {
+        enProceso++;
       }
 
       // Contar proyectos en pausa
-      const estado = project?.estado ?? project?.status ?? '';
+      const estado = project?.estado ?? project?.status ?? project?.statusLabel ?? '';
       const estadoLower = String(estado).toLowerCase();
       if (estadoLower.includes('pausa') || estadoLower.includes('pause') || estadoLower.includes('on-hold') || estadoLower.includes('hold')) {
         enPausa++;

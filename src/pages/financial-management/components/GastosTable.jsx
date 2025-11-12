@@ -2,9 +2,11 @@
 import React, { useEffect, useState } from "react";
 import Icon from "../../../components/AppIcon";
 import Button from "../../../components/ui/Button";
-import PaymentAuthorizationModal from "./PaymentAuthorizationModal";
+import ModalGestionCompra from "./ModalGestionCompra";
 import useProyect from "../../../hooks/useProyect";
 import useGastos from "../../../hooks/useGastos";
+import { jsPDF } from "jspdf";
+import "jspdf-autotable";
 
 const formatDate = (date) => {
   if (!date) return "—";
@@ -48,11 +50,15 @@ const getStatusColor = (status) => {
 
 const matchesEstado = (estado, tab) => {
   const e = (estado || "").toLowerCase();
+
   if (tab === "pendiente") return e === "pendiente" || e === "pending";
   if (tab === "aprobado") return e === "aprobado" || e === "approved";
   if (tab === "pagado") return e === "pagado" || e === "paid";
+  if (tab === "rechazado") return e === "rechazado" || e === "rejected" || e === "cancelled";
+
   return false;
 };
+
 
 const GastosTable = () => {
   const [ordenes, setOrdenes] = useState([]);
@@ -63,7 +69,8 @@ const GastosTable = () => {
   const [activeTab, setActiveTab] = useState("pendiente");
 
   const { getProyectos } = useProyect();
-  const { getGastos, updateGasto } = useGastos();
+  const { getGastos, updateGasto, approveGasto } = useGastos();
+
 
 
   useEffect(() => {
@@ -76,11 +83,11 @@ const GastosTable = () => {
       setLoading(true);
       try {
         const data = await getGastos();
-        console.log("📦 Datos obtenidos:", data);
+        console.log("Datos obtenidos:", data);
         if (!alive) return;
         setOrdenes(Array.isArray(data) ? data : data.data || []);
       } catch (err) {
-        console.error("❌ Error al cargar órdenes:", err);
+        console.error("Error al cargar órdenes:", err);
         setErrorMsg("No se pudieron cargar las órdenes de compra.");
       } finally {
         if (alive) setLoading(false);
@@ -94,15 +101,17 @@ const GastosTable = () => {
   const handleOpenView = (orden) => {
   const adaptedExpense = {
     id: orden.id,
-    description: orden.notas || "Sin descripción",
-    amount: new Intl.NumberFormat("es-MX", {
-      style: "currency",
-      currency: "MXN"
-    }).format(orden.totalOrden || 0),
-    category: orden.proveedor?.nombre || "Proveedor no especificado",
+    notas: orden.notas || "Sin descripción",
+    totalOrden: orden.totalOrden || 0,
+    proveedor: orden.proveedor,
     project: orden.numeroOrden,
-    date: new Date(orden.fechaOrden).toLocaleDateString("es-MX"),
-    requestedBy: orden.creadoPor || "Desconocido"
+    fechaOrden: orden.fechaOrden,
+    creadoPor: orden.creadoPor,
+    estado: orden.estado,
+    metodoPago: orden.metodoPago,
+    prioridadAprobacion: orden.prioridadAprobacion,
+    comentariosAprobador: orden.comentariosAprobador,
+    aprobadoPor: orden.aprobadoPor,
   };
 
   setSelectedOrden(adaptedExpense);
@@ -110,39 +119,205 @@ const GastosTable = () => {
 };
 
 
-  const tabs = [
-    {
-      id: "pendiente",
-      label: "Pendientes",
-      count: ordenes.filter((o) => matchesEstado(o.estado, "pendiente")).length,
-    },
-    {
-      id: "aprobado",
-      label: "Aprobadas",
-      count: ordenes.filter((o) => matchesEstado(o.estado, "aprobado")).length,
-    },
-  ];
 
-  const filteredOrders = ordenes.filter((o) => matchesEstado(o.estado, activeTab));
+const tabs = [
+  { id: "pendiente", label: "Pendientes", count: ordenes.filter((o) => matchesEstado(o.estado, "pendiente")).length },
+  { id: "aprobado", label: "Aprobadas", count: ordenes.filter((o) => matchesEstado(o.estado, "aprobado")).length },
+  { id: "rechazado", label: "Rechazadas", count: ordenes.filter((o) => matchesEstado(o.estado, "rechazado")).length },
+];
+
+const filteredOrders = ordenes.filter((o) => matchesEstado(o.estado, activeTab));
+
 
   
 const getStatusLabel = (estado) => {
   switch ((estado || "").toLowerCase()) {
     case "pending":
+    case "pendiente":
       return "Pendiente";
     case "approved":
-      return "Aprobado";
+    case "aprobado":
+      return "Aprobada";
     case "received":
-      return "Autorizado";
+    case "autorizado":
+      return "Autorizada";
     case "paid":
-      return "Pagado";
+    case "pagado":
+      return "Pagada";
     case "cancelled":
-      return "Rechazado";
+    case "rejected":
+    case "rechazado":
+      return "Rechazada";
     default:
       return estado || "Desconocido";
   }
 };
 
+
+// PDF
+const handleDownloadPDF = (order) => {
+  const doc = new jsPDF();
+  const gray = "#333333";
+
+  // Para que salga el texto bien en el apartado de Metodo de pago
+  const formatText = (text) => {
+    if (!text) return "—";
+    return text
+      .replace(/_/g, " ")
+      .toLowerCase()
+      .replace(/\b\w/g, (c) => c.toUpperCase()); 
+  };
+
+  // ENCABEZADO
+  doc.setFillColor(10, 74, 138);
+  doc.rect(0, 0, 210, 25, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text("ORDEN DE COMPRA", 105, 15, { align: "center" });
+
+  // DATOS GENERALES
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(gray);
+  doc.setFontSize(12);
+  doc.text("Datos Generales", 105, 35, { align: "center" });
+
+  const leftX = 20;
+  const rightX = 120;
+  const baseY = 44;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  
+  doc.text(`Folio: ${order.numeroOrden || "—"}`, leftX, baseY);
+  doc.text(`Fecha de Orden: ${formatDate(order.fechaOrden)}`, leftX, baseY + 7);
+  doc.text(`Proveedor: ${order.proveedor?.nombre || "—"}`, leftX, baseY + 14);
+  doc.text(`Estado: ${getStatusLabel(order.estado)}`, rightX, baseY);
+  doc.text(`Creado por: ${order.creadoPor || "—"}`, rightX, baseY + 7);
+  const maxWidthNotas = 70;
+  const notaTexto = `Notas: ${order.notas || "—"}`;
+  const notaLineas = doc.splitTextToSize(notaTexto, maxWidthNotas);
+  const notaAltura = notaLineas.length * 5;
+
+  doc.setFont("helvetica", "normal");
+  doc.text(notaLineas, rightX, baseY + 14);
+
+  const pagoY = Math.max(baseY + 25, baseY + 14 + notaAltura + 5);
+
+  //DETALLES DE PAGO
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.setTextColor(gray);
+  doc.text("Detalles de Pago", 105, pagoY, { align: "center" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  const infoPagoY = pagoY + 8;
+
+  const metodoPagoFormateado = formatText(order.metodoPago);
+  const prioridadFormateada = formatText(order.prioridadAprobacion || "Normal");
+
+  doc.text(`Método de Pago: ${metodoPagoFormateado}`, leftX, infoPagoY);
+  doc.text(`Prioridad: ${prioridadFormateada}`, leftX, infoPagoY + 7);
+
+  //COMENTARIOS con salto automático
+  const maxWidthComentarios = 70;
+  const comentarioTexto = `Comentarios: ${order.comentariosAprobador || "Sin comentarios"}`;
+  const comentarioLineas = doc.splitTextToSize(comentarioTexto, maxWidthComentarios);
+  const comentarioAltura = comentarioLineas.length * 5;
+
+  doc.setFont("helvetica", "normal");
+  doc.text(comentarioLineas, rightX, infoPagoY);
+
+  //DETALLE DE PRODUCTOS
+  const tableY = infoPagoY + 9 + comentarioAltura;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("Detalle de Productos", 105, tableY, { align: "center" });
+
+  const articulos = Array.isArray(order.articulos)
+    ? order.articulos.map((a) => ({
+        codigo: a.codigoArticulo || "—",
+        descripcion: a.descripcion || a.nombre || "—",
+        cantidadConUnidad: `${a.cantidadOrdenada || 0} ${a.unidad || ""}`.trim(),
+        costoUnitario: a.costoUnitario || 0,
+        subtotal:
+          a.subtotal ||
+          (a.cantidadOrdenada || 0) * (a.costoUnitario || 0),
+      }))
+    : [];
+
+  // Tabla
+  doc.autoTable({
+    startY: tableY + 5,
+    head: [["Código", "Descripción", "Cantidad", "Costo Unitario", "Subtotal"]],
+    body: articulos.map((a) => [
+      a.codigo,
+      a.descripcion,
+      a.cantidadConUnidad,
+      formatCurrency(a.costoUnitario),
+      formatCurrency(a.subtotal),
+    ]),
+    theme: "grid",
+    styles: { fontSize: 9 },
+    headStyles: {
+      fillColor: [10, 74, 138],
+      textColor: 255,
+      halign: "center",
+      fontStyle: "bold",
+    },
+    bodyStyles: { halign: "center" },
+    margin: { left: 15, right: 15 },
+  });
+
+  // TOTAL
+  const finalY = doc.lastAutoTable.finalY + 10;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(gray);
+  doc.text(`Total: ${formatCurrency(order.totalOrden)}`, 195, finalY, { align: "right" });
+
+  // APROBACIONES
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const approvalSectionY = pageHeight - 35;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.setTextColor(gray);
+  doc.text("Aprobaciones", 105, approvalSectionY - 5, { align: "center" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  const lineY = approvalSectionY + 10;
+  const leftXLine = 20;
+  const rightXLine = 135;
+
+  doc.text("_____________________________", leftXLine, lineY);
+  doc.text("_____________________________", rightXLine, lineY);
+  doc.text("Responsable de Aprobación", leftXLine + 10, lineY + 6);
+  doc.text("Departamento de Compras", rightXLine + 7, lineY + 6);
+
+  // GUARDAR PDF
+  doc.save(`Orden_${order.numeroOrden || "Compra"}.pdf`);
+};
+
+const handleAuthorize = async (id, payload, isRejection = false) => {
+  try {
+    await approveGasto(id, payload); // Aquí actualizas en backend (estado: rejected o approved)
+
+    // Refrescar la lista después de actualizar
+    const updated = await getGastos();
+    setOrdenes(Array.isArray(updated) ? updated : updated.data || []);
+
+    // Cambiar de pestaña según si fue aprobado o rechazado
+    setActiveTab(isRejection ? "rechazado" : "aprobado");
+
+    // Cerrar modal
+    setShowAuthModal(false);
+  } catch (error) {
+    console.error("Error al procesar gasto:", error);
+  }
+};
 
   return (
     <div className="bg-card rounded-lg border border-border">
@@ -204,108 +379,90 @@ const getStatusLabel = (estado) => {
         )}
 
         {filteredOrders.map((order) => (
-          <div key={order.id} className="p-4 hover:bg-muted/50 transition-smooth">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center space-x-3 mb-2">
-                  <h4 className="font-medium text-foreground">{order.numeroOrden}</h4>
-                  <span
-  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-    order.estado
-  )}`}
->
-  {getStatusLabel(order.estado)}
-</span>
-                </div>
+  <div key={order.id} className="p-4 hover:bg-muted/50 transition-smooth">
+    <div className="flex items-start justify-between">
+      <div className="flex-1">
+        <div className="flex items-center space-x-3 mb-2">
+          <h4 className="font-medium text-foreground">{order.numeroOrden}</h4>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground mb-3">
-                  <div>
-                    <span className="font-medium">Proveedor:</span>
-                    <div className="text-foreground">{order.proveedor?.nombre || "—"}</div>
-                  </div>
-                  <div>
-                    <span className="font-medium">Fecha:</span>
-                    <div className="text-foreground">{formatDate(order.fechaOrden)}</div>
-                  </div>
-                  <div>
-                    <span className="font-medium">Entrega Esperada:</span>
-                    <div className="text-foreground">
-                      {formatDate(order.fechaEntregaEsperada)}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="font-medium">Total:</span>
-                    <div className="text-foreground font-medium">
-                      {formatCurrency(order.totalOrden)}
-                    </div>
-                  </div>
-                </div>
+          {/* Estado actual */}
+          <span
+            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.estado)}`}
+          >
+            {getStatusLabel(order.estado)}
+          </span>
+          {order.esUrgente && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-error/10 text-error">
+              <Icon name="AlertCircle" size={12} className="mr-1" />
+              Urgente
+            </span>
+          )}
+        </div>
 
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleOpenView(order)}
-                    iconName="Eye"
-                    iconSize={16}
-                  >
-                    Ver Detalles
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    iconName="Download"
-                    iconSize={16}
-                    onClick={() => alert("Descargar PDF")}
-                  >
-                    Descargar
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    iconName="Trash2"
-                    iconSize={16}
-                    className="text-error hover:text-error"
-                    onClick={() => alert("Eliminar orden")}
-                  >
-                    Eliminar
-                  </Button>
-                </div>
-              </div>
+        {/* Resto de la información */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground mb-3">
+          <div>
+            <span className="font-medium">Proveedor:</span>
+            <div className="text-foreground">{order.proveedor?.nombre || "—"}</div>
+          </div>
+          <div>
+            <span className="font-medium">Fecha:</span>
+            <div className="text-foreground">{formatDate(order.fechaOrden)}</div>
+          </div>
+          <div>
+            <span className="font-medium">Total:</span>
+            <div className="text-foreground font-medium">
+              {formatCurrency(order.totalOrden)}
             </div>
           </div>
-        ))}
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleOpenView(order)}
+            iconName="Eye"
+            iconSize={16}
+          >
+            Ver Detalles
+          </Button>
+
+          {["aprobado", "approved", "rechazado", "rejected", "cancelled"].includes(
+  order.estado?.toLowerCase()
+) && (
+  <Button
+    variant="ghost"
+    size="sm"
+    iconName="Download"
+    iconSize={16}
+    onClick={() => handleDownloadPDF(order)}
+  >
+    Descargar
+  </Button>
+
+          )}
+          
+        </div>
+      </div>
+    </div>
+  </div>
+))}
       </div>
 
-      <PaymentAuthorizationModal
+<ModalGestionCompra
   isOpen={showAuthModal}
   onClose={() => setShowAuthModal(false)}
   expense={selectedOrden}
-  onAuthorize={async (updated) => {
-    try {
-      // 🔹 Enviar con el formato que tu Azure Function espera
-      await updateGasto(updated.id, {
-        status: "approved",
-        operationType: "status_change",
-        notes: updated.approverComments || "Orden aprobada automáticamente",
-      });
-
-      // 🔹 Actualizar la UI localmente
-      setOrdenes((prev) =>
-        prev.map((o) =>
-          o.id === updated.id
-            ? { ...o, estado: "approved", autorizacion: updated }
-            : o
-        )
-      );
-
-      setActiveTab("aprobado");
-      setShowAuthModal(false);
-    } catch (error) {
-      console.error("Error al aprobar la orden:", error);
-      alert("Ocurrió un error al aprobar la orden. Intenta de nuevo.");
-    }
-  }}
+  onAuthorize={handleAuthorize}
+  onDownload={() => handleDownloadPDF(selectedOrden)} // 👈 le pasamos la función de descarga
+  mode={
+    ["approved", "aprobado", "rejected", "rechazado", "cancelled"].includes(
+      selectedOrden?.estado?.toLowerCase()
+    )
+      ? "view" // 👈 modo "ver" para aprobadas y rechazadas
+      : "edit"
+  }
 />
 
 

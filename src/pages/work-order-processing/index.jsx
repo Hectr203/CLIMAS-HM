@@ -333,7 +333,7 @@ const WorkOrderProcessing = () => {
         <Header onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)} isMenuOpen={mobileMenuOpen} />
       </div>
 
-      <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'} lg:pt-0 pt-16`}>
+      <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'}`}>
         <div className="p-6">
           <div className="mb-6">
             <Breadcrumb />
