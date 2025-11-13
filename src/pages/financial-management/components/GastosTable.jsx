@@ -363,16 +363,10 @@ const handleDownloadPDF = (order) => {
 
 const handleAuthorize = async (id, payload, isRejection = false) => {
   try {
-    await approveGasto(id, payload); // Aquí actualizas en backend (estado: rejected o approved)
-
-    // Refrescar la lista después de actualizar
+    await approveGasto(id, payload);
     const updated = await getGastos();
     setOrdenes(Array.isArray(updated) ? updated : updated.data || []);
-
-    // Cambiar de pestaña según si fue aprobado o rechazado
     setActiveTab(isRejection ? "rechazado" : "aprobado");
-
-    // Cerrar modal
     setShowAuthModal(false);
   } catch (error) {
     console.error("Error al procesar gasto:", error);
@@ -388,9 +382,6 @@ const handleAuthorize = async (id, payload, isRejection = false) => {
           <h3 className="text-lg font-semibold text-foreground">Órdenes de Compra</h3>
         </div>
       </div>
-    
-
-
 
       {/* Tabs */}
       <div className="flex border-b border-border">

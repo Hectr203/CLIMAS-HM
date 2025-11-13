@@ -47,48 +47,49 @@ const { oportunities, getOportunities, deleteWorkOrder } = useOperac();
     () => (workOrders?.length ? workOrders : oportunities || []),
     [workOrders, oportunities]
   );
-
   
+    // PARA ELIMINARLO PERO NO DESDE EL BACK SI NO VISUAL
+const [deletedOrderIds, setDeletedOrderIds] = useState(() => {
+  const stored = localStorage.getItem("deletedWorkOrders");
+  return stored ? new Set(JSON.parse(stored)) : new Set();
+});
 
-  const sortedOrders = useMemo(() => {
-    const sorted = [...dataSource];
-    if (!sortConfig.key) return sorted;
-    sorted.sort((a, b) => {
-      const aVal = a[sortConfig.key] || "";
-      const bVal = b[sortConfig.key] || "";
-      if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
-      if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
-      return 0;
-    });
-    return sorted;
-  }, [dataSource, sortConfig]);
+useEffect(() => {
+  localStorage.setItem("deletedWorkOrders", JSON.stringify([...deletedOrderIds]));
+}, [deletedOrderIds]);
+
+const sortedOrders = useMemo(() => {
+  const filtered = dataSource.filter((order) => !deletedOrderIds.has(order.id));
+  if (!sortConfig.key) return filtered;
+  const sorted = [...filtered];
+  sorted.sort((a, b) => {
+    const aVal = a[sortConfig.key] || "";
+    const bVal = b[sortConfig.key] || "";
+    if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
+    if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
+    return 0;
+  });
+  return sorted;
+}, [dataSource, sortConfig, deletedOrderIds]);
+
 
   const totalPages = Math.ceil(sortedOrders.length / itemsPerPage);
   const paginatedData = sortedOrders.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-  
-
 const handleDelete = (order) => {
   showConfirm(`¿Seguro que deseas eliminar la orden "${order.ordenTrabajo}"?`, {
-    onConfirm: async () => {
-      const success = await deleteWorkOrder(order.id);
-
-      if (success) {
-  showOperationSuccess("delete", "Orden de trabajo");
-  onEditOrder?.({ type: "delete", id: order.id });
-} else {
-        showHttpError("No se pudo eliminar la orden");
-      }
+    onConfirm: () => {
+      setDeletedOrderIds((prev) => new Set([...prev, order.id]));
+      showOperationSuccess("delete", "Orden de trabajo");
+      onEditOrder?.({ type: "delete", id: order.id });
     },
     onCancel: () => {
       showInfo("Eliminación cancelada");
-    }
+    },
   });
 };
-
-
   const handleSort = (key) => {
     setSortConfig((prev) => ({
       key,

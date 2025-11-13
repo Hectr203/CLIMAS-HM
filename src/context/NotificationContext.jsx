@@ -111,7 +111,7 @@ export const NotificationProvider = ({ children }) => {
     const messages = {
       create: `${resource} creado exitosamente`,
       update: `${resource} actualizado exitosamente`,
-      delete: `${resource} eliminado exitosamente`,
+      delete: `${resource} Eliminada exitosamente`,
       save: `${resource} guardado exitosamente`,
       send: `${resource} enviado exitosamente`,
       default: 'Operación completada exitosamente'
