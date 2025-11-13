@@ -1,19 +1,21 @@
 // src/hooks/useCommunication.js
-import { useState } from 'react';
-import { useNotifications } from '../context/NotificationContext';
-import communicationService from '../services/communicationService';
+import { useState } from "react";
+import { useNotifications } from "../context/NotificationContext";
+import communicationService from "../services/communicationService";
 
 const useCommunication = () => {
   const getComunicacionByCotizacionId = async (cotizacionId) => {
-  // console.log eliminado
+    // console.log eliminado
     setLoading(true);
     setError(null);
     try {
-      const response = await communicationService.getComunicacionByCotizacionId(cotizacionId);
+      const response = await communicationService.getComunicacionByCotizacionId(
+        cotizacionId
+      );
       return response;
     } catch (err) {
       setError(err);
-      showHttpError('Error al obtener comunicación por cotización');
+      showHttpError("Error al obtener comunicación por cotización");
       return null;
     } finally {
       setLoading(false);
@@ -31,12 +33,12 @@ const useCommunication = () => {
     try {
       const response = await communicationService.createCommunication(commData);
       setSuccess(true);
-      showOperationSuccess('Comunicación enviada exitosamente');
+      showOperationSuccess("Comunicación enviada exitosamente");
       return response;
     } catch (err) {
       setError(err);
       setSuccess(false);
-      showHttpError('Error al enviar comunicación');
+      showHttpError("Error al enviar comunicación");
       return null;
     } finally {
       setLoading(false);
@@ -48,14 +50,16 @@ const useCommunication = () => {
     setError(null);
     setSuccess(false);
     try {
-      const response = await communicationService.createCotizacionCommunication(commData);
+      const response = await communicationService.createCotizacionCommunication(
+        commData
+      );
       setSuccess(true);
-      showOperationSuccess('Comunicación de cotización enviada exitosamente');
+      showOperationSuccess("Comunicación de cotización enviada exitosamente");
       return response;
     } catch (err) {
       setError(err);
       setSuccess(false);
-      showHttpError('Error al enviar comunicación de cotización');
+      showHttpError("Error al enviar comunicación de cotización");
       return null;
     } finally {
       setLoading(false);
@@ -66,11 +70,29 @@ const useCommunication = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await communicationService.getComunicacionesByCliente(clienteId);
+      const response = await communicationService.getComunicacionesByCliente(
+        clienteId
+      );
       return response;
     } catch (err) {
-      setError(err);
-      showHttpError('Error al obtener historial de comunicaciones');
+      // No hacer nada si no hay comunicaciones (404 es normal)
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getComunicacionesByOportunidad = async (oportunidadId) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response =
+        await communicationService.getComunicacionesByOportunidad(
+          oportunidadId
+        );
+      return response;
+    } catch (err) {
+      // No hacer nada si no hay comunicaciones (404 es normal)
       return null;
     } finally {
       setLoading(false);
@@ -81,10 +103,11 @@ const useCommunication = () => {
     createCommunication,
     createCotizacionCommunication,
     getComunicacionesByCliente,
+    getComunicacionesByOportunidad,
     getComunicacionByCotizacionId,
     loading,
     error,
-    success
+    success,
   };
 };
 

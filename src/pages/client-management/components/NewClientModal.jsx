@@ -5,6 +5,7 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import { useNotifications } from '../../../context/NotificationContext.jsx';
+import { useEstados, useMunicipios } from '../../../hooks/useEstado';
 
 const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialData = null }) => {
   const { createClient, editClient } = useClient();
@@ -15,7 +16,6 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
     email: '',
     phone: '',
     industry: '',
-    location: '',
     status: 'Activo',
     relationshipHealth: 'Buena',
     rfc: '',
@@ -25,13 +25,19 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
     totalValue: 0,
     lastContact: new Date()?.toISOString()?.split('T')?.[0],
     nextFollowUp: '',
-    address: '',
-    city: '',
-    state: '',
-    postalCode: '',
     website: '',
-    notes: ''
+    notes: '',
+    estadoEmpresa: '',
+    municipioEmpresa: '',
+    estadoDireccion: '',
+    municipioDireccion: '',
+    direccionCompleta: ''
   });
+
+  // Hooks para estados y municipios
+  const { estados, loading: loadingEstados, error: errorEstados } = useEstados();
+  const { municipios: municipiosEmpresa, loading: loadingMunicipiosEmpresa, error: errorMunicipiosEmpresa } = useMunicipios(formData.estadoEmpresa);
+  const { municipios: municipiosDireccion, loading: loadingMunicipiosDireccion, error: errorMunicipiosDireccion } = useMunicipios(formData.estadoDireccion);
 
   React.useEffect(() => {
     if (isOpen && mode === 'edit' && initialData) {
@@ -41,7 +47,6 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
         email: initialData.email || '',
         phone: initialData.phone || initialData.telefono || '',
         industry: initialData.industry || initialData.industria || '',
-        location: initialData.location || initialData.ubicacionEmpre || '',
         status: initialData.status || initialData.estado || 'Activo',
         relationshipHealth: initialData.relationshipHealth || initialData.relacion || 'Buena',
         rfc: initialData.rfc || '',
@@ -51,12 +56,13 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
         totalValue: initialData.totalValue || 0,
         lastContact: initialData.lastContact || '',
         nextFollowUp: initialData.nextFollowUp || initialData.proximoSeguimiento || '',
-        address: initialData.address || (initialData.ubicacion && initialData.ubicacion.direccion) || '',
-        city: initialData.city || (initialData.ubicacion && initialData.ubicacion.ciudad) || '',
-        state: initialData.state || (initialData.ubicacion && initialData.ubicacion.estado) || '',
-        postalCode: initialData.postalCode || (initialData.ubicacion && initialData.ubicacion.codigoPostal) || '',
         website: initialData.website || initialData.sitioWeb || '',
-        notes: initialData.notes || initialData.notas || ''
+        notes: initialData.notes || initialData.notas || '',
+        estadoEmpresa: initialData.ubicacionEmpre?.estado || '',
+        municipioEmpresa: initialData.ubicacionEmpre?.municipio || '',
+        estadoDireccion: (initialData.ubicacion && initialData.ubicacion.estado) || '',
+        municipioDireccion: (initialData.ubicacion && initialData.ubicacion.municipio) || '',
+        direccionCompleta: initialData.address || (initialData.ubicacion && initialData.ubicacion.direccion) || ''
       });
     }
   }, [isOpen, mode, initialData]);
@@ -109,34 +115,65 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
 
     if (!formData?.companyName?.trim()) {
       newErrors.companyName = 'El nombre de la empresa es requerido';
+    } else if (formData.companyName.length < 3) {
+      newErrors.companyName = 'El nombre debe tener al menos 3 caracteres';
     }
 
     if (!formData?.contactPerson?.trim()) {
       newErrors.contactPerson = 'La persona de contacto es requerida';
+    } else if (formData.contactPerson.length < 3) {
+      newErrors.contactPerson = 'El nombre debe tener al menos 3 caracteres';
     }
 
     if (!formData?.email?.trim()) {
       newErrors.email = 'El email es requerido';
-    } else if (!/\S+@\S+\.\S+/?.test(formData?.email)) {
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/?.test(formData?.email)) {
       newErrors.email = 'El formato del email no es válido';
     }
 
     if (!formData?.phone?.trim()) {
       newErrors.phone = 'El teléfono es requerido';
+    } else if (!/^\d{10}$/?.test(formData?.phone)) {
+      newErrors.phone = 'El teléfono debe tener exactamente 10 dígitos';
     }
 
     if (!formData?.industry) {
       newErrors.industry = 'La industria es requerida';
     }
 
-    if (!formData?.location?.trim()) {
-      newErrors.location = 'La ubicación es requerida';
-    }
-
     if (!formData?.rfc?.trim()) {
       newErrors.rfc = 'El RFC es requerido';
-    } else if (!/^[A-Z&Ñ]{3,4}[0-9]{6}[A-Z0-9]{3}$/?.test(formData?.rfc?.toUpperCase())) {
-      newErrors.rfc = 'El formato del RFC no es válido';
+    } else if (!/^[A-Z&Ñ]{3,4}[0-9]{6}[A-Z0-9]{3}$/?.test(formData?.rfc)) {
+      newErrors.rfc = 'El formato del RFC no es válido (Ej. ABC123456XYZ)';
+    }
+
+    // Validación para sitio web (opcional pero si se llena debe ser válido)
+    if (formData?.website?.trim() && !/^https?:\/\/.+\..+/?.test(formData?.website)) {
+      newErrors.website = 'El formato del sitio web no es válido (debe comenzar con http:// o https://)';
+    }
+
+    // Validación para ubicación empresa
+    if (!formData?.estadoEmpresa?.trim()) {
+      newErrors.estadoEmpresa = 'El estado de la ubicación de la empresa es requerido';
+    }
+
+    if (!formData?.municipioEmpresa?.trim()) {
+      newErrors.municipioEmpresa = 'El municipio de la ubicación de la empresa es requerido';
+    }
+
+    // Validación para dirección del cliente
+    if (!formData?.estadoDireccion?.trim()) {
+      newErrors.estadoDireccion = 'El estado de la dirección es requerido';
+    }
+
+    if (!formData?.municipioDireccion?.trim()) {
+      newErrors.municipioDireccion = 'El municipio de la dirección es requerido';
+    }
+
+    if (!formData?.direccionCompleta?.trim()) {
+      newErrors.direccionCompleta = 'La dirección completa es requerida';
+    } else if (formData.direccionCompleta.length < 10) {
+      newErrors.direccionCompleta = 'La dirección debe ser más específica (mínimo 10 caracteres)';
     }
 
     setErrors(newErrors);
@@ -144,10 +181,64 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
   };
 
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    // Validación y formateo para teléfono
+    if (field === 'phone') {
+      // Eliminar caracteres no numéricos
+      let cleanValue = value.replace(/\D/g, '');
+      // Limitar a 10 dígitos
+      cleanValue = cleanValue.slice(0, 10);
+      setFormData(prev => ({
+        ...prev,
+        [field]: cleanValue
+      }));
+    } 
+    // Validación para RFC - solo mayúsculas y alfanumérico
+    else if (field === 'rfc') {
+      const cleanValue = value.toUpperCase().replace(/[^A-ZÑ&0-9]/g, '').slice(0, 13);
+      setFormData(prev => ({
+        ...prev,
+        [field]: cleanValue
+      }));
+    }
+    // Validación para nombre de empresa - limitar caracteres
+    else if (field === 'companyName') {
+      const cleanValue = value.slice(0, 100);
+      setFormData(prev => ({
+        ...prev,
+        [field]: cleanValue
+      }));
+    }
+    // Validación para persona de contacto
+    else if (field === 'contactPerson') {
+      const cleanValue = value.slice(0, 100);
+      setFormData(prev => ({
+        ...prev,
+        [field]: cleanValue
+      }));
+    }
+    // Validación para dirección completa
+    else if (field === 'direccionCompleta') {
+      const cleanValue = value.slice(0, 200);
+      setFormData(prev => ({
+        ...prev,
+        [field]: cleanValue
+      }));
+    }
+    // Validación para sitio web
+    else if (field === 'website') {
+      const cleanValue = value.slice(0, 150);
+      setFormData(prev => ({
+        ...prev,
+        [field]: cleanValue
+      }));
+    }
+    // Otros campos sin validación especial
+    else {
+      setFormData(prev => ({
+        ...prev,
+        [field]: value
+      }));
+    }
 
     // Clear error when user starts typing
     if (errors?.[field]) {
@@ -169,13 +260,15 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
       email: formData.email,
       telefono: formData.phone,
       industria: formData.industry,
-      ubicacion: {
-        direccion: formData.address,
-        ciudad: formData.city,
-        estado: formData.state,
-        codigoPostal: formData.postalCode
+      ubicacionEmpre: {
+        estado: formData.estadoEmpresa,
+        municipio: formData.municipioEmpresa,
       },
-      ubicacionEmpre: formData.location,
+      ubicacion: {
+        estado: formData.estadoDireccion,
+        municipio: formData.municipioDireccion,
+        direccion: formData.direccionCompleta
+      },
       rfc: formData.rfc?.toUpperCase(),
       sitioWeb: formData.website,
       estado: formData.status,
@@ -217,7 +310,6 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
       email: '',
       phone: '',
       industry: '',
-      location: '',
       status: 'Activo',
       relationshipHealth: 'Buena',
       rfc: '',
@@ -227,12 +319,13 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
       totalValue: 0,
       lastContact: new Date()?.toISOString()?.split('T')?.[0],
       nextFollowUp: '',
-      address: '',
-      city: '',
-      state: '',
-      postalCode: '',
       website: '',
-      notes: ''
+      notes: '',
+      estadoEmpresa: '',
+      municipioEmpresa: '',
+      estadoDireccion: '',
+      municipioDireccion: '',
+      direccionCompleta: ''
     });
     setErrors({});
     onClose();
@@ -308,12 +401,18 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
             <div>
               <Input
                 label="Teléfono"
-                placeholder="Ej. +52 81 1234-5678"
+                placeholder="1234567890 (10 dígitos)"
                 value={formData?.phone}
                 onChange={(e) => handleInputChange('phone', e?.target?.value)}
                 error={errors?.phone}
                 required
+                maxLength={10}
               />
+              {formData?.phone && formData.phone.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formData.phone.length}/10 dígitos
+                </p>
+              )}
             </div>
 
             <div>
@@ -328,26 +427,78 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
               />
             </div>
 
-            <div>
-              <Input
-                label="Ubicación"
-                placeholder="Ej. Monterrey, N.L."
-                value={formData?.location}
-                onChange={(e) => handleInputChange('location', e?.target?.value)}
-                error={errors?.location}
-                required
-              />
+            {/* Ubicación de la Empresa */}
+            <div className="md:col-span-2 mt-6">
+              <h3 className="text-lg font-medium text-foreground mb-4 flex items-center">
+                <Icon name="Building" size={20} className="mr-2" />
+                Ubicación de la Empresa
+              </h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Estado y municipio donde se encuentra ubicada la empresa
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:col-span-2">
+              <div>
+                <Select
+                  label={<>Estado <span className="text-destructive">*</span></>}
+                  value={formData.estadoEmpresa}
+                  onChange={value => {
+                    handleInputChange('estadoEmpresa', value);
+                    handleInputChange('municipioEmpresa', '');
+                  }}
+                  options={
+                    estados ? [{ value: '', label: 'Selecciona un estado' }, ...estados.map(e => ({ value: e.code, label: e.name }))] : []
+                  }
+                  loading={loadingEstados}
+                  error={errors?.estadoEmpresa}
+                  required
+                  disabled={loadingEstados || !!errorEstados}
+                  placeholder={loadingEstados ? 'Cargando estados...' : 'Selecciona un estado'}
+                  searchable
+                />
+              </div>
+              <div>
+                <Select
+                  label={<>Municipio <span className="text-destructive">*</span></>}
+                  value={formData.municipioEmpresa}
+                  onChange={value => handleInputChange('municipioEmpresa', value)}
+                  options={
+                    formData.estadoEmpresa === ''
+                      ? [{ value: '', label: 'Selecciona un estado primero' }]
+                      : loadingMunicipiosEmpresa
+                        ? [{ value: '', label: 'Cargando municipios...' }]
+                        : errorMunicipiosEmpresa
+                          ? [{ value: '', label: 'Error al cargar municipios' }]
+                          : [{ value: '', label: 'Selecciona un municipio' }, ...(municipiosEmpresa ? Object.values(municipiosEmpresa.municipios || {}).map((m, idx) => ({ value: m, label: m })) : [])]
+                  }
+                  loading={loadingMunicipiosEmpresa}
+                  error={errors?.municipioEmpresa}
+                  required
+                  disabled={formData.estadoEmpresa === '' || loadingMunicipiosEmpresa || !!errorMunicipiosEmpresa}
+                  placeholder={formData.estadoEmpresa === '' ? 'Selecciona un estado primero' : loadingMunicipiosEmpresa ? 'Cargando municipios...' : 'Selecciona un municipio'}
+                  searchable
+                />
+              </div>
+            </div>
+
+            {/* RFC y Sitio Web */}
+            <div className="md:col-span-2 mt-6">
+              <h3 className="text-lg font-medium text-foreground mb-4 flex items-center">
+                <Icon name="FileText" size={20} className="mr-2" />
+                Información Fiscal y Web
+              </h3>
             </div>
 
             <div>
               <Input
                 label="RFC"
-                placeholder="Ej. GIM850315ABC"
+                placeholder="Ej. ABC123456XYZ"
                 value={formData?.rfc}
-                onChange={(e) => handleInputChange('rfc', e?.target?.value?.toUpperCase())}
+                onChange={(e) => handleInputChange('rfc', e?.target?.value)}
                 error={errors?.rfc}
                 required
-                maxLength="13"
+                maxLength={13}
               />
             </div>
 
@@ -357,6 +508,7 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
                 placeholder="Ej. https://www.empresa.com.mx"
                 value={formData?.website}
                 onChange={(e) => handleInputChange('website', e?.target?.value)}
+                error={errors?.website}
               />
             </div>
 
@@ -407,49 +559,76 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
               />
             </div>
 
-            {/* Información Adicional */}
+            {/* Dirección del Cliente */}
             <div className="md:col-span-2 mt-6">
               <h3 className="text-lg font-medium text-foreground mb-4 flex items-center">
                 <Icon name="MapPin" size={20} className="mr-2" />
-                Dirección
+                Dirección del Cliente
               </h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Dirección completa donde se puede contactar o visitar al cliente
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:col-span-2">
+              <div>
+                <Select
+                  label={<>Estado <span className="text-destructive">*</span></>}
+                  value={formData.estadoDireccion}
+                  onChange={value => {
+                    handleInputChange('estadoDireccion', value);
+                    handleInputChange('municipioDireccion', '');
+                  }}
+                  options={
+                    estados ? [{ value: '', label: 'Selecciona un estado' }, ...estados.map(e => ({ value: e.code, label: e.name }))] : []
+                  }
+                  loading={loadingEstados}
+                  error={errors?.estadoDireccion}
+                  required
+                  disabled={loadingEstados || !!errorEstados}
+                  placeholder={loadingEstados ? 'Cargando estados...' : 'Selecciona un estado'}
+                  searchable
+                />
+              </div>
+              <div>
+                <Select
+                  label={<>Municipio <span className="text-destructive">*</span></>}
+                  value={formData.municipioDireccion}
+                  onChange={value => handleInputChange('municipioDireccion', value)}
+                  options={
+                    formData.estadoDireccion === ''
+                      ? [{ value: '', label: 'Selecciona un estado primero' }]
+                      : loadingMunicipiosDireccion
+                        ? [{ value: '', label: 'Cargando municipios...' }]
+                        : errorMunicipiosDireccion
+                          ? [{ value: '', label: 'Error al cargar municipios' }]
+                          : [{ value: '', label: 'Selecciona un municipio' }, ...(municipiosDireccion ? Object.values(municipiosDireccion.municipios || {}).map((m, idx) => ({ value: m, label: m })) : [])]
+                  }
+                  loading={loadingMunicipiosDireccion}
+                  error={errors?.municipioDireccion}
+                  required
+                  disabled={formData.estadoDireccion === '' || loadingMunicipiosDireccion || !!errorMunicipiosDireccion}
+                  placeholder={formData.estadoDireccion === '' ? 'Selecciona un estado primero' : loadingMunicipiosDireccion ? 'Cargando municipios...' : 'Selecciona un municipio'}
+                  searchable
+                />
+              </div>
             </div>
 
             <div className="md:col-span-2">
               <Input
-                label="Dirección"
-                placeholder="Ej. Av. Constitución 1234"
-                value={formData?.address}
-                onChange={(e) => handleInputChange('address', e?.target?.value)}
+                label="Dirección completa"
+                placeholder="Ej. Av. Constitución 1234, Col. Centro"
+                value={formData?.direccionCompleta}
+                onChange={(e) => handleInputChange('direccionCompleta', e?.target?.value)}
+                error={errors?.direccionCompleta}
+                required
+                maxLength={200}
               />
-            </div>
-
-            <div>
-              <Input
-                label="Ciudad"
-                placeholder="Ej. Monterrey"
-                value={formData?.city}
-                onChange={(e) => handleInputChange('city', e?.target?.value)}
-              />
-            </div>
-
-            <div>
-              <Input
-                label="Estado"
-                placeholder="Ej. Nuevo León"
-                value={formData?.state}
-                onChange={(e) => handleInputChange('state', e?.target?.value)}
-              />
-            </div>
-
-            <div>
-              <Input
-                label="Código Postal"
-                placeholder="Ej. 64000"
-                value={formData?.postalCode}
-                onChange={(e) => handleInputChange('postalCode', e?.target?.value)}
-                maxLength="5"
-              />
+              {formData?.direccionCompleta && formData.direccionCompleta.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formData.direccionCompleta.length}/200 caracteres
+                </p>
+              )}
             </div>
 
             <div className="md:col-span-2 mt-6">

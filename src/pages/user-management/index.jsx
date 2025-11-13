@@ -52,7 +52,7 @@ const UserManagement = () => {
           isCollapsed={sidebarCollapsed} 
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
-        <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
+        <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'}`}>
           <Header 
             onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
             isMenuOpen={mobileMenuOpen}
@@ -75,7 +75,7 @@ const UserManagement = () => {
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
 
-      <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
+      <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'}`}>
         <Header 
           onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
           isMenuOpen={mobileMenuOpen}

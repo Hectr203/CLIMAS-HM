@@ -234,6 +234,7 @@ const mapProjectDocStrict = (doc) => {
         : null,
     workOrders: Array.isArray(doc.workOrders) ? doc.workOrders : undefined,
     equiposUSD,
+    // 🔵 Abonos originales quedan en raw (el cálculo se comenta más abajo)
     abonos: Array.isArray(doc.abonos) ? doc.abonos : [],
     createdAt: doc.createdAt ?? null,
     updatedAt: doc.updatedAt ?? null,
@@ -291,7 +292,8 @@ const ProjectTable = ({
   const [sortConfig, setSortConfig] = useState({ key: 'startDate', direction: 'desc' });
   const [selectedProjects, setSelectedProjects] = useState([]);
   const [expandedRows, setExpandedRows] = useState([]);
-  const [newAbonoDraft, setNewAbonoDraft] = useState({});
+  // 🔵 Estado de borrador de abonos (COMENTADO)
+  // const [newAbonoDraft, setNewAbonoDraft] = useState({});
   const [clientCache, setClientCache] = useState({});
   const [clientsLoaded, setClientsLoaded] = useState(false);
 
@@ -362,6 +364,8 @@ const ProjectTable = ({
     return baseSourceDocs.map(mapProjectDocStrict);
   }, [baseSourceDocs]);
 
+  // 🔵 Inicialización de borradores de abono (COMENTADO)
+  /*
   useEffect(() => {
     setNewAbonoDraft((prev) => {
       const clone = { ...prev };
@@ -371,6 +375,7 @@ const ProjectTable = ({
       return clone;
     });
   }, [normalizedProjects]);
+  */
 
   const handleSort = (key) => {
     let direction = 'asc';
@@ -493,6 +498,7 @@ const ProjectTable = ({
   const usingLocalShadow = Array.isArray(localDocs);
 
   //Eliminar (optimista, sin refresh) —>>> MENSAJE EDITADO
+  // 🔴 Eliminar (optimista, sin refresh)
   const handleDelete = (project) => {
     if (!project?.id) return;
 
@@ -594,7 +600,8 @@ const ProjectTable = ({
     }
   };
 
-  /* Abonos */
+  /* ====== ABONOS: helpers COMENTADOS ====== */
+  /*
   const getProjectLiveSnapshot = (projectId) => {
     const source = usingLocalShadow ? localDocs : remoteDocs;
     const inSource = source?.find((d) => (d.id || d._id) === projectId);
@@ -647,6 +654,7 @@ const ProjectTable = ({
     }
     setNewAbonoDraft((prev) => ({ ...prev, [project.id]: { fecha: '', monto: '', nota: '' } }));
   };
+  */
 
   /* ===== Render ===== */
   return (
@@ -720,9 +728,10 @@ const ProjectTable = ({
 
           <tbody>
             {pageItems?.map((project) => {
-              const { presupuestoTotal, abonosList, totalAbonado, restante, percent } = getTotalsForProject(project);
-              const draft = newAbonoDraft[project.id] || { fecha: '', monto: '', nota: '' };
-              const isPagado = restante <= 0;
+              // 🔵 Totales de abonos por proyecto (COMENTADO)
+              // const { presupuestoTotal, abonosList, totalAbonado, restante, percent } = getTotalsForProject(project);
+              // const draft = newAbonoDraft[project.id] || { fecha: '', monto: '', nota: '' };
+              // const isPagado = restante <= 0;
 
               const nameToShow = resolveClientName(project);
               const emailToShow = resolveClientEmailOrContact(project);
@@ -824,7 +833,7 @@ const ProjectTable = ({
                   {expandedRows?.includes(project?.id) && (
                     <tr className="bg-muted/20">
                       <td colSpan={9} className="p-4">
-                        {/* Detalles + Abonos */}
+                        {/* Detalles + (ANTES ABONOS) */}
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                           <div>
                             <h4 className="font-medium text-foreground mb-2">Detalles del Proyecto</h4>
@@ -895,8 +904,7 @@ const ProjectTable = ({
                             </div>
                           </div>
                         </div>
-
-                        {/* ---- ABONOS ---- */}
+                        {/*
                         <div className="mt-6 border-t border-border pt-4">
                           <div className="flex items-start justify-between mb-3">
                             <div className="flex items-center gap-2">
@@ -929,8 +937,9 @@ const ProjectTable = ({
                             <div className="flex items-start justify-between mb-2">
                               <span className="text-[12px] font-medium text-foreground">Agregar abono (modo prueba)</span>
                               <button
-                                className={`flex items-center gap-1 text-[11px] ${isPagado ? 'text-muted-foreground cursor-not-allowed' : 'text-primary hover:underline'
-                                  }`}
+                                className={`flex items-center gap-1 text-[11px] ${
+                                  isPagado ? 'text-muted-foreground cursor-not-allowed' : 'text-primary hover:underline'
+                                }`}
                                 onClick={() => {
                                   if (!isPagado) handleAddAbono(project);
                                 }}
@@ -996,7 +1005,9 @@ const ProjectTable = ({
 
                             <div className="relative w-full h-3 bg-muted rounded overflow-hidden border border-border">
                               <div
-                                className={`h-full transition-all duration-500 ${percent >= 100 ? 'bg-green-600' : 'bg-green-500'}`}
+                                className={`h-full transition-all duration-500 ${
+                                  percent >= 100 ? 'bg-green-600' : 'bg-green-500'
+                                }`}
                                 style={{ width: `${percent}%` }}
                               />
                               <span className="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-white">
@@ -1005,6 +1016,7 @@ const ProjectTable = ({
                             </div>
                           </div>
                         </div>
+                        */}
                       </td>
                     </tr>
                   )}

@@ -11,80 +11,80 @@ export const AUTH_ROLES = {
 export const ROLE_PERMISSIONS = {
   [AUTH_ROLES?.SALES_REPRESENTATIVE]: {
     allowedPaths: [
-      '/client-management',
-      '/sales-opportunity-management',
-      '/quotation-development-center',
-      '/sales-execution-monitoring'
+      '/clientes',
+      '/oportunidades',
+      '/cotizaciones',
+      '/monitoreo-ventas'
     ],
-    defaultPath: '/client-management'
+    defaultPath: '/clientes'
   },
   [AUTH_ROLES?.ADMIN]: {
     allowedPaths: [
-      '/main-dashboard',
-      '/sales-opportunity-management',
-      '/quotation-development-center',
-      '/project-management',
-      '/project-abonos-management',
-      '/work-order-processing',
-      '/personnel-management',
-      '/inventory-management',
-      '/client-management',
-      '/financial-management',
-      '/user-management',
-      '/project-gallery-viewer',
-      '/project-detail-gallery',
-      '/project-documentation-center',
-      '/project-workflow-management',
-      '/quotation-builder',
-      '/workshop-operations-management',
-      '/workshop-operations-center',
-      '/sales-execution-monitoring'
+      '/dashboard',
+      '/oportunidades',
+      '/cotizaciones',
+      '/proyectos',
+      '/abonos',
+      '/operaciones',
+      '/personal',
+      '/inventario',
+      '/clientes',
+      '/finanzas',
+      '/usuarios',
+      '/visor-galeria',
+      '/galeria-proyecto',
+      '/documentacion-proyectos',
+      '/flujo-proyecto',
+      '/constructor-cotizaciones',
+      '/operaciones-taller',
+      '/centro-operaciones-taller',
+      '/monitoreo-ventas'
     ],
-    defaultPath: '/main-dashboard'
+    defaultPath: '/dashboard'
   },
   [AUTH_ROLES?.PROJECT_MANAGER]: {
     allowedPaths: [
-      '/project-management',
-      '/project-gallery-viewer',
-      '/project-detail-gallery',
-      '/project-documentation-center',
-      '/project-workflow-management',
-      '/quotation-builder'
+      '/proyectos',
+      '/visor-galeria',
+      '/galeria-proyecto',
+      '/documentacion-proyectos',
+      '/flujo-proyecto',
+      '/constructor-cotizaciones'
     ],
-    defaultPath: '/project-management'
+    defaultPath: '/proyectos'
   },
   'proyect manager': {
     allowedPaths: [
-      '/project-management',
-      '/project-gallery-viewer',
-      '/project-detail-gallery',
-      '/project-documentation-center',
-      '/project-workflow-management',
-      '/quotation-builder'
+      '/proyectos',
+      '/visor-galeria',
+      '/galeria-proyecto',
+      '/documentacion-proyectos',
+      '/flujo-proyecto',
+      '/constructor-cotizaciones'
     ],
-    defaultPath: '/project-management'
+    defaultPath: '/proyectos'
   },
   [AUTH_ROLES?.WORKSHOP_SUPERVISOR]: {
     allowedPaths: [
-      '/inventory-management',
-      '/work-order-processing',
-      '/workshop-operations-management',
-      '/workshop-operations-center'
+      '/inventario',
+      '/operaciones',
+      '/operaciones-taller',
+      '/centro-operaciones-taller'
     ],
-    defaultPath: '/inventory-management'
+    defaultPath: '/inventario'
   },
   [AUTH_ROLES?.FINANCIAL_CONTROLLER]: {
     allowedPaths: [
-      '/financial-management',
-      '/quotation-development-center'
+      '/finanzas',
+      '/cotizaciones'
     ],
-    defaultPath: '/financial-management'
+    defaultPath: '/finanzas'
   },
   [AUTH_ROLES?.HR_MANAGER]: {
     allowedPaths: [
-      '/personnel-management'
+      '/personal'
     ],
-    defaultPath: '/personnel-management'
+    defaultPath: '/personal'
   }
 };
 
@@ -156,7 +156,7 @@ export const getAllowedNavigationItems = (userRole) => {
   const allNavigationItems = [
     {
       label: 'Dashboard',
-      path: '/main-dashboard',
+      path: '/dashboard',
       icon: 'LayoutDashboard',
       tooltip: 'Resumen operacional y KPIs',
       badge: null,
@@ -164,7 +164,7 @@ export const getAllowedNavigationItems = (userRole) => {
     },
     {
       label: 'Oportunidades',
-      path: '/sales-opportunity-management',
+      path: '/oportunidades',
       icon: 'Target',
       tooltip: 'Gestión de oportunidades de venta',
       badge: 8,
@@ -172,7 +172,7 @@ export const getAllowedNavigationItems = (userRole) => {
     },
     {
       label: 'Cotizaciones',
-      path: '/quotation-development-center',
+      path: '/cotizaciones',
       icon: 'FileText',
       tooltip: 'Desarrollo y gestión de cotizaciones',
       badge: null,
@@ -180,7 +180,7 @@ export const getAllowedNavigationItems = (userRole) => {
     },
     {
       label: 'Proyectos',
-      path: '/project-management',
+      path: '/proyectos',
       icon: 'FolderOpen',
       tooltip: 'Gestión del ciclo de vida de proyectos',
       badge: 5,
@@ -188,14 +188,14 @@ export const getAllowedNavigationItems = (userRole) => {
     },
     {
       label: 'Abonos',
-      path: '/project-abonos-management',
+      path: '/abonos',
       icon: 'CreditCard',
       tooltip: 'Gestión de abonos de proyectos',
       roles: [AUTH_ROLES?.ADMIN]
     },
     {
       label: 'Operaciones',
-      path: '/work-order-processing',
+      path: '/operaciones',
       icon: 'ClipboardList',
       tooltip: 'Procesamiento y seguimiento de órdenes de trabajo',
       badge: 12,
@@ -203,18 +203,18 @@ export const getAllowedNavigationItems = (userRole) => {
     },
     {
       label: 'Operaciones de Taller',
-      path: '/workshop-operations-management',
+      path: '/operaciones-taller',
       icon: 'Tool',
       tooltip: 'Gestión de operaciones de taller',
       roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.WORKSHOP_SUPERVISOR]
     },
-    {
-      label: 'Centro de Operaciones de Taller',
-      path: '/workshop-operations-center',
-      icon: 'Home',
-      tooltip: 'Centro de operaciones de taller',
-      roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.WORKSHOP_SUPERVISOR]
-    },
+    // {
+    //   label: 'Centro de Operaciones de Taller',
+    //   path: '/workshop-operations-center',
+    //   icon: 'Home',
+    //   tooltip: 'Centro de operaciones de taller',
+    //   roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.WORKSHOP_SUPERVISOR]
+    // },
     {
       label: 'Recursos',
       icon: 'Users',
@@ -222,14 +222,14 @@ export const getAllowedNavigationItems = (userRole) => {
       children: [
         {
           label: 'Personal',
-          path: '/personnel-management',
+          path: '/personal',
           icon: 'UserCheck',
           tooltip: 'Gestión de personal y horarios',
           roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.HR_MANAGER]
         },
         {
           label: 'Inventario',
-          path: '/inventory-management',
+          path: '/inventario',
           icon: 'Package',
           tooltip: 'Seguimiento de equipos y repuestos',
           roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.WORKSHOP_SUPERVISOR]
@@ -244,14 +244,14 @@ export const getAllowedNavigationItems = (userRole) => {
       children: [
         {
           label: 'Clientes',
-          path: '/client-management',
+          path: '/clientes',
           icon: 'Users',
           tooltip: 'Gestión de relaciones con clientes',
           roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.SALES_REPRESENTATIVE]
         },
         {
           label: 'Finanzas',
-          path: '/financial-management',
+          path: '/finanzas',
           icon: 'DollarSign',
           tooltip: 'Supervisión y reportes financieros',
           badge: 3,
@@ -261,7 +261,7 @@ export const getAllowedNavigationItems = (userRole) => {
     },
     {
       label: 'Usuarios',
-      path: '/user-management',
+      path: '/usuarios',
       icon: 'UserCog',
       tooltip: 'Gestión de usuarios del sistema',
       badge: null,

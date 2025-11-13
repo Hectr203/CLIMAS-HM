@@ -8,6 +8,8 @@ import { useNotifications } from "../../../context/NotificationContext";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
+const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
+
 const WorkOrderTable = ({
   workOrders,
   requisitions,
@@ -25,8 +27,8 @@ const { oportunities, getOportunities, deleteWorkOrder } = useOperac();
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [sortConfig, setSortConfig] = useState({ key: "prioridad", direction: "asc" });
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
   const [localRequisitions, setLocalRequisitions] = useState([]);
-  const itemsPerPage = 5;
 
   // Modal
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -73,11 +75,29 @@ const sortedOrders = useMemo(() => {
 }, [dataSource, sortConfig, deletedOrderIds]);
 
 
-  const totalPages = Math.ceil(sortedOrders.length / itemsPerPage);
-  const paginatedData = sortedOrders.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  // Paginación
+  const totalItems = sortedOrders.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+  const paginatedData = sortedOrders.slice(startIndex, endIndex);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+    if (currentPage < 1) setCurrentPage(1);
+  }, [currentPage, totalPages]);
+
+  const handleChangePageSize = (e) => {
+    const v = Number(e?.target?.value) || PAGE_SIZE_OPTIONS[0];
+    setPageSize(v);
+    setCurrentPage(1);
+  };
+
+  const goToPage = (n) => setCurrentPage(Math.min(Math.max(1, n), totalPages));
+  const prevPage = () => goToPage(currentPage - 1);
+  const nextPage = () => goToPage(currentPage + 1);
+  
+
 const handleDelete = (order) => {
   showConfirm(`¿Seguro que deseas eliminar la orden "${order.ordenTrabajo}"?`, {
     onConfirm: () => {
@@ -95,6 +115,7 @@ const handleDelete = (order) => {
       key,
       direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
     }));
+    setCurrentPage(1);
   };
 
   const handlePageChange = (newPage) => {
@@ -499,30 +520,32 @@ const handleDelete = (order) => {
         )}
       </div>
 
-      {/*  Paginación */}
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-2 p-4 border-t border-border">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={currentPage === 1}
-            onClick={() => handlePageChange(currentPage - 1)}
+      {/* Paginación */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-t border-border px-4 py-3 gap-3">
+        <div className="flex items-center gap-3">
+          <label className="text-xs text-muted-foreground">Mostrar</label>
+          <select
+            value={pageSize}
+            onChange={handleChangePageSize}
+            className="text-sm px-2 py-1 border border-border rounded bg-background text-foreground"
           >
-            <Icon name="ChevronLeft" size={14} />
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            Página {currentPage} de {totalPages}
+            {PAGE_SIZE_OPTIONS.map((opt) => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+          <span className="text-xs text-muted-foreground">por página</span>
+          <span className="text-xs text-muted-foreground ml-3">
+            Mostrando <span className="font-medium">{totalItems === 0 ? 0 : startIndex + 1}</span>-<span className="font-medium">{endIndex}</span> de <span className="font-medium">{totalItems}</span>
           </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={currentPage === totalPages}
-            onClick={() => handlePageChange(currentPage + 1)}
-          >
-            <Icon name="ChevronRight" size={14} />
-          </Button>
         </div>
-      )}
+        <div className="flex items-center gap-1">
+          <Button variant="outline" size="sm" onClick={() => goToPage(1)} disabled={currentPage === 1} iconName="ChevronsLeft" />
+          <Button variant="outline" size="sm" onClick={prevPage} disabled={currentPage === 1} iconName="ChevronLeft" />
+          <span className="px-2 text-sm text-foreground">{currentPage} / {totalPages}</span>
+          <Button variant="outline" size="sm" onClick={nextPage} disabled={currentPage === totalPages} iconName="ChevronRight" />
+          <Button variant="outline" size="sm" onClick={() => goToPage(totalPages)} disabled={currentPage === totalPages} iconName="ChevronsRight" />
+        </div>
+      </div>
     </div>
   );
 };

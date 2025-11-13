@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Icon from '../../components/AppIcon';
 import Sidebar from '../../components/ui/Sidebar';
 import Header from '../../components/ui/Header';
+import Breadcrumb from '../../components/ui/Breadcrumb';
 import ProjectFilters from './components/ProjectFilters';
 import ProjectTable from './components/ProjectTable';
 import ProjectStats from './components/AbonosStats';
@@ -479,7 +480,7 @@ const ProjectManagement = () => {
     return (
       <div className="min-h-screen bg-background flex">
         <Sidebar isCollapsed={barraLateralColapsada} onToggle={() => setBarraLateralColapsada(!barraLateralColapsada)} />
-        <div className={`flex-1 transition-all duration-300 ${barraLateralColapsada ? 'ml-16' : 'ml-60'}`}>
+        <div className={`flex-1 transition-all duration-300 ${barraLateralColapsada ? 'lg:ml-16' : 'lg:ml-60'}`}>
           <Header onMenuToggle={() => setMenuEncabezadoAbierto(!menuEncabezadoAbierto)} isMenuOpen={menuEncabezadoAbierto} />
           <div className="pt-16 flex items-center justify-center h-96">
             <div className="text-center">
@@ -501,11 +502,16 @@ const ProjectManagement = () => {
     <div className="min-h-screen bg-background flex">
       <Sidebar isCollapsed={barraLateralColapsada} onToggle={() => setBarraLateralColapsada(!barraLateralColapsada)} />
 
-      <div className={`flex-1 transition-all duration-300 ${barraLateralColapsada ? 'ml-16' : 'ml-60'}`}>
+      <div className={`flex-1 transition-all duration-300 ${barraLateralColapsada ? 'lg:ml-16' : 'lg:ml-60'}`}>
         <Header onMenuToggle={() => setMenuEncabezadoAbierto(!menuEncabezadoAbierto)} isMenuOpen={menuEncabezadoAbierto} />
 
-        <div className="pt-16">
+        <div className="">
           <div className="container mx-auto px-4 py-8">
+            {/* Breadcrumb */}
+            <div className="mb-6">
+              <Breadcrumb />
+            </div>
+
             {/* Encabezado de la página */}
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
               <div>
