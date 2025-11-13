@@ -7,6 +7,8 @@ import PaymentAuthorizationModal from './PaymentAuthorizationModal';
 import useProyect from '../../../hooks/useProyect';
 import useFinanzas from '../../../hooks/useFinanzas';
 
+const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
+
 /* ===================== Utils ===================== */
 // Parser tolerante (ISO, timestamp, dd/mm/yyyy [opcional hora])
 const parseISODate = (value) => {
@@ -159,6 +161,8 @@ const ExpenseTable = ({ filters: externalFilters }) => {
   const [errorMsg, setErrorMsg] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
   const [selectedIds, setSelectedIds] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
 
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState(null);
@@ -331,6 +335,7 @@ const ExpenseTable = ({ filters: externalFilters }) => {
       key,
       direction: prev?.key === key && prev?.direction === 'asc' ? 'desc' : 'asc',
     }));
+    setCurrentPage(1);
   };
 
   const sortedRows = useMemo(() => {
@@ -352,13 +357,40 @@ const ExpenseTable = ({ filters: externalFilters }) => {
     });
   }, [filteredRows, sortConfig]);
 
+  // Paginación
+  const totalItems = sortedRows.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+  const paginatedRows = sortedRows.slice(startIndex, endIndex);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+    if (currentPage < 1) setCurrentPage(1);
+  }, [currentPage, totalPages]);
+
+  const handleChangePageSize = (e) => {
+    const v = Number(e?.target?.value) || PAGE_SIZE_OPTIONS[0];
+    setPageSize(v);
+    setCurrentPage(1);
+  };
+
+  const goToPage = (n) => setCurrentPage(Math.min(Math.max(1, n), totalPages));
+  const prevPage = () => goToPage(currentPage - 1);
+  const nextPage = () => goToPage(currentPage + 1);
+
   /* ================= Selección ================= */
   const toggleOne = (id) => {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
   const toggleAll = () => {
-    if (selectedIds.length === sortedRows.length) setSelectedIds([]);
-    else setSelectedIds(sortedRows.map((r) => r.id));
+    const pageIds = paginatedRows.map((r) => r.id);
+    const allSelected = pageIds.every((id) => selectedIds.includes(id));
+    if (allSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !pageIds.includes(id)));
+    } else {
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...pageIds])));
+    }
   };
 
   /* ======= Ver / Autorizar / Eliminar ======= */
@@ -432,7 +464,7 @@ const ExpenseTable = ({ filters: externalFilters }) => {
               <th className="w-12 p-4">
                 <input
                   type="checkbox"
-                  checked={selectedIds.length === sortedRows.length && sortedRows.length > 0}
+                  checked={paginatedRows.length > 0 && paginatedRows.every((r) => selectedIds.includes(r.id))}
                   onChange={toggleAll}
                   className="rounded border-border"
                 />
@@ -455,7 +487,7 @@ const ExpenseTable = ({ filters: externalFilters }) => {
             </tr>
           </thead>
           <tbody>
-            {sortedRows.map((r) => (
+            {paginatedRows.map((r) => (
               <tr key={r.id} className="border-b border-border hover:bg-muted/30 transition-smooth">
                 <td className="p-4">
                   <input
@@ -491,16 +523,43 @@ const ExpenseTable = ({ filters: externalFilters }) => {
                 </td>
               </tr>
             ))}
-            {sortedRows.length === 0 && !loading && (
+            {paginatedRows.length === 0 && !loading && (
               <tr><td colSpan={8} className="p-8 text-center text-muted-foreground">No hay gastos para mostrar.</td></tr>
             )}
           </tbody>
         </table>
+
+        {/* Paginación Desktop */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-t border-border px-4 py-3 gap-3">
+          <div className="flex items-center gap-3">
+            <label className="text-xs text-muted-foreground">Mostrar</label>
+            <select
+              value={pageSize}
+              onChange={handleChangePageSize}
+              className="text-sm px-2 py-1 border border-border rounded bg-background text-foreground"
+            >
+              {PAGE_SIZE_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+            <span className="text-xs text-muted-foreground">por página</span>
+            <span className="text-xs text-muted-foreground ml-3">
+              Mostrando <span className="font-medium">{totalItems === 0 ? 0 : startIndex + 1}</span>-<span className="font-medium">{endIndex}</span> de <span className="font-medium">{totalItems}</span>
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" onClick={() => goToPage(1)} disabled={currentPage === 1} iconName="ChevronsLeft" />
+            <Button variant="outline" size="sm" onClick={prevPage} disabled={currentPage === 1} iconName="ChevronLeft" />
+            <span className="px-2 text-sm text-foreground">{currentPage} / {totalPages}</span>
+            <Button variant="outline" size="sm" onClick={nextPage} disabled={currentPage === totalPages} iconName="ChevronRight" />
+            <Button variant="outline" size="sm" onClick={() => goToPage(totalPages)} disabled={currentPage === totalPages} iconName="ChevronsRight" />
+          </div>
+        </div>
       </div>
 
       {/* Móvil */}
       <div className="lg:hidden">
-        {sortedRows.map((r) => (
+        {paginatedRows.map((r) => (
           <div key={r.id} className="border-b border-border p-4">
             <div className="flex items-start justify-between mb-2">
               <div className="flex items-center gap-2">
@@ -536,6 +595,35 @@ const ExpenseTable = ({ filters: externalFilters }) => {
             </div>
           </div>
         ))}
+
+        {/* Paginación Mobile */}
+        <div className="flex flex-col gap-3 p-4 border-t border-border">
+          <div className="flex items-center gap-3">
+            <label className="text-xs text-muted-foreground">Mostrar</label>
+            <select
+              value={pageSize}
+              onChange={handleChangePageSize}
+              className="text-sm px-2 py-1 border border-border rounded bg-background text-foreground"
+            >
+              {PAGE_SIZE_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+            <span className="text-xs text-muted-foreground">por página</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-muted-foreground">
+              {totalItems === 0 ? '0 de 0' : `${startIndex + 1}-${endIndex} de ${totalItems}`}
+            </div>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" onClick={() => goToPage(1)} disabled={currentPage === 1} iconName="ChevronsLeft" />
+              <Button variant="outline" size="sm" onClick={prevPage} disabled={currentPage === 1} iconName="ChevronLeft" />
+              <span className="px-2 text-sm text-foreground">{currentPage}/{totalPages}</span>
+              <Button variant="outline" size="sm" onClick={nextPage} disabled={currentPage === totalPages} iconName="ChevronRight" />
+              <Button variant="outline" size="sm" onClick={() => goToPage(totalPages)} disabled={currentPage === totalPages} iconName="ChevronsRight" />
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Modal */}

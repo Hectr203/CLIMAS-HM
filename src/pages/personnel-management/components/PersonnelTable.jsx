@@ -4,12 +4,14 @@ import Button from '../../../components/ui/Button';
 import Image from '../../../components/AppImage';
 import usePerson from '../../../hooks/usePerson';
 
+const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
+
 const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE }) => {
   const { persons, loading, error, getPersons } = usePerson();
 
   const [sortConfig, setSortConfig] = useState({ key: 'nombreCompleto', direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
 
   // 🔹 Cargar empleados al montar
   useEffect(() => {
@@ -39,21 +41,33 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
   }, [dataSource, sortConfig]);
 
   // 🔹 Paginación
-  const totalPages = Math.ceil(sortedPersonnel.length / itemsPerPage);
-  const paginatedPersonnel = sortedPersonnel.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const totalItems = sortedPersonnel.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+  const paginatedPersonnel = sortedPersonnel.slice(startIndex, endIndex);
 
-  const handlePageChange = (page) => {
-    if (page >= 1 && page <= totalPages) setCurrentPage(page);
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+    if (currentPage < 1) setCurrentPage(1);
+  }, [currentPage, totalPages]);
+
+  const handleChangePageSize = (e) => {
+    const v = Number(e?.target?.value) || PAGE_SIZE_OPTIONS[0];
+    setPageSize(v);
+    setCurrentPage(1);
   };
+
+  const goToPage = (n) => setCurrentPage(Math.min(Math.max(1, n), totalPages));
+  const prevPage = () => goToPage(currentPage - 1);
+  const nextPage = () => goToPage(currentPage + 1);
 
   const handleSort = (key) => {
     setSortConfig((prev) => ({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
     }));
+    setCurrentPage(1);
   };
 
   // 🔹 Badges de estado
@@ -229,35 +243,36 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
           </tbody>
         </table>
 
-        {/* 🔹 Paginación */}
-        {totalPages > 1 && (
-          <div className="flex justify-center items-center gap-2 p-4 border-t border-border">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={currentPage === 1}
-              onClick={() => handlePageChange(currentPage - 1)}
+        {/* 🔹 Paginación Desktop */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-t border-border px-4 py-3 gap-3">
+          <div className="flex items-center gap-3">
+            <label className="text-xs text-muted-foreground">Mostrar</label>
+            <select
+              value={pageSize}
+              onChange={handleChangePageSize}
+              className="text-sm px-2 py-1 border border-border rounded bg-background text-foreground"
             >
-              <Icon name="ChevronLeft" size={14} />
-            </Button>
-            <span className="text-sm text-muted-foreground">
-              Página {currentPage} de {totalPages}
+              {PAGE_SIZE_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+            <span className="text-xs text-muted-foreground">por página</span>
+            <span className="text-xs text-muted-foreground ml-3">
+              Mostrando <span className="font-medium">{totalItems === 0 ? 0 : startIndex + 1}</span>-<span className="font-medium">{endIndex}</span> de <span className="font-medium">{totalItems}</span>
             </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={currentPage === totalPages}
-              onClick={() => handlePageChange(currentPage + 1)}
-            >
-              <Icon name="ChevronRight" size={14} />
-            </Button>
           </div>
-        )}
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" onClick={() => goToPage(1)} disabled={currentPage === 1} iconName="ChevronsLeft" />
+            <Button variant="outline" size="sm" onClick={prevPage} disabled={currentPage === 1} iconName="ChevronLeft" />
+            <span className="px-2 text-sm text-foreground">{currentPage} / {totalPages}</span>
+            <Button variant="outline" size="sm" onClick={nextPage} disabled={currentPage === totalPages} iconName="ChevronRight" />
+            <Button variant="outline" size="sm" onClick={() => goToPage(totalPages)} disabled={currentPage === totalPages} iconName="ChevronsRight" />
+          </div>
+        </div>
       </div>
 
       {/* Vista Móvil */}
-      <div className="lg:hidden space-y-4 p-4">
-        {paginatedPersonnel.map((emp) => (
+      <div className="lg:hidden space-y-4 p-4">{paginatedPersonnel.map((emp) => (
           <div key={emp.id} className="bg-card border border-border rounded-lg p-4">
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center space-x-3">
@@ -329,29 +344,33 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
         ))}
 
         {/* 🔹 Paginación móvil */}
-        {totalPages > 1 && (
-          <div className="flex justify-center items-center gap-2 pt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={currentPage === 1}
-              onClick={() => handlePageChange(currentPage - 1)}
+        <div className="flex flex-col gap-3 pt-4">
+          <div className="flex items-center gap-3">
+            <label className="text-xs text-muted-foreground">Mostrar</label>
+            <select
+              value={pageSize}
+              onChange={handleChangePageSize}
+              className="text-sm px-2 py-1 border border-border rounded bg-background text-foreground"
             >
-              <Icon name="ChevronLeft" size={14} />
-            </Button>
-            <span className="text-sm text-muted-foreground">
-              Página {currentPage} de {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={currentPage === totalPages}
-              onClick={() => handlePageChange(currentPage + 1)}
-            >
-              <Icon name="ChevronRight" size={14} />
-            </Button>
+              {PAGE_SIZE_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+            <span className="text-xs text-muted-foreground">por página</span>
           </div>
-        )}
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-muted-foreground">
+              {totalItems === 0 ? '0 de 0' : `${startIndex + 1}-${endIndex} de ${totalItems}`}
+            </div>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" onClick={() => goToPage(1)} disabled={currentPage === 1} iconName="ChevronsLeft" />
+              <Button variant="outline" size="sm" onClick={prevPage} disabled={currentPage === 1} iconName="ChevronLeft" />
+              <span className="px-2 text-sm text-foreground">{currentPage}/{totalPages}</span>
+              <Button variant="outline" size="sm" onClick={nextPage} disabled={currentPage === totalPages} iconName="ChevronRight" />
+              <Button variant="outline" size="sm" onClick={() => goToPage(totalPages)} disabled={currentPage === totalPages} iconName="ChevronsRight" />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -39,9 +39,9 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
       )?.filter(Boolean);
 
       const mockResults = [
-        { type: 'project', title: 'Instalación Aire Acondicionado - Edificio A', path: '/project-management' },
-        { type: 'client', title: 'ABC Corporation', path: '/client-management' },
-        { type: 'work-order', title: 'WO-2024-001', path: '/work-order-processing' }
+        { type: 'project', title: 'Instalación Aire Acondicionado - Edificio A', path: '/proyectos' },
+        { type: 'client', title: 'ABC Corporation', path: '/clientes' },
+        { type: 'work-order', title: 'WO-2024-001', path: '/operaciones' }
       ]?.filter(item => 
         item?.title?.toLowerCase()?.includes(query?.toLowerCase()) &&
         allowedPaths?.includes(item?.path)

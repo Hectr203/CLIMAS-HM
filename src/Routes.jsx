@@ -38,153 +38,153 @@ const Routes = () => {
           {/* Redirigir la raíz a login si no está autenticado */}
           <Route path="/" element={<LoginPage />} />
             <Route 
-              path="/main-dashboard" 
+              path="/dashboard" 
               element={
-                <ProtectedRoute requiredPath="/main-dashboard">
+                <ProtectedRoute requiredPath="/dashboard">
                   <MainDashboard />
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/project-management" 
+              path="/proyectos" 
               element={
-                <ProtectedRoute requiredPath="/project-management">
+                <ProtectedRoute requiredPath="/proyectos">
                   <ProjectManagement />
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/project-detail-gallery/:projectId" 
+              path="/galeria-proyecto/:projectId" 
               element={
-                <ProtectedRoute requiredPath="/project-detail-gallery">
+                <ProtectedRoute requiredPath="/galeria-proyecto">
                   <ProjectDetailGallery />
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/project-gallery-viewer/:projectId" 
+              path="/visor-galeria/:projectId" 
               element={
-                <ProtectedRoute requiredPath="/project-gallery-viewer">
+                <ProtectedRoute requiredPath="/visor-galeria">
                   <ProjectGalleryViewer />
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/project-documentation-center" 
+              path="/documentacion-proyectos" 
               element={
-                <ProtectedRoute requiredPath="/project-documentation-center">
+                <ProtectedRoute requiredPath="/documentacion-proyectos">
                   <ProjectDocumentationCenter />
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/project-workflow-management" 
+              path="/flujo-proyecto" 
               element={
-                <ProtectedRoute requiredPath="/project-workflow-management">
+                <ProtectedRoute requiredPath="/flujo-proyecto">
                   <ProjectWorkflowManagement />
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/quotation-builder" 
+              path="/constructor-cotizaciones" 
               element={
-                <ProtectedRoute requiredPath="/quotation-builder">
+                <ProtectedRoute requiredPath="/constructor-cotizaciones">
                   <QuotationBuilder />
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/inventory-management" 
+              path="/inventario" 
               element={
-                <ProtectedRoute requiredPath="/inventory-management">
+                <ProtectedRoute requiredPath="/inventario">
                   <InventoryManagement />
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/financial-management" 
+              path="/finanzas" 
               element={
-                <ProtectedRoute requiredPath="/financial-management">
+                <ProtectedRoute requiredPath="/finanzas">
                   <FinancialManagement />
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/personnel-management" 
+              path="/personal" 
               element={
-                <ProtectedRoute requiredPath="/personnel-management">
+                <ProtectedRoute requiredPath="/personal">
                   <PersonnelManagement />
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/client-management" 
+              path="/clientes" 
               element={
-                <ProtectedRoute requiredPath="/client-management">
+                <ProtectedRoute requiredPath="/clientes">
                   <ClientManagement />
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/work-order-processing" 
+              path="/operaciones" 
               element={
-                <ProtectedRoute requiredPath="/work-order-processing">
+                <ProtectedRoute requiredPath="/operaciones">
                   <WorkOrderProcessing />
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/workshop-operations-management" 
+              path="/operaciones-taller" 
               element={
-                <ProtectedRoute requiredPath="/workshop-operations-management">
+                <ProtectedRoute requiredPath="/operaciones-taller">
                   <WorkshopOperationsManagement />
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/workshop-operations-center" 
+              path="/centro-operaciones-taller" 
               element={
-                <ProtectedRoute requiredPath="/workshop-operations-center">
+                <ProtectedRoute requiredPath="/centro-operaciones-taller">
                   <WorkshopOperationsCenter />
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/sales-opportunity-management" 
+              path="/oportunidades" 
               element={
-                <ProtectedRoute requiredPath="/sales-opportunity-management">
+                <ProtectedRoute requiredPath="/oportunidades">
                   <SalesOpportunityManagement />
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/user-management" 
+              path="/usuarios" 
               element={
-                <ProtectedRoute requiredPath="/user-management">
+                <ProtectedRoute requiredPath="/usuarios">
                   <UserManagement />
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/quotation-development-center" 
+              path="/cotizaciones" 
               element={
-                <ProtectedRoute requiredPath="/quotation-development-center">
+                <ProtectedRoute requiredPath="/cotizaciones">
                   <QuotationDevelopmentCenter />
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/project-abonos-management" 
+              path="/abonos" 
               element={
-                <ProtectedRoute requiredPath="/project-abonos-management">
+                <ProtectedRoute requiredPath="/abonos">
                   <ProjectAbonosManagement />
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/sales-execution-monitoring" 
+              path="/monitoreo-ventas" 
               element={
-                <ProtectedRoute requiredPath="/sales-execution-monitoring">
+                <ProtectedRoute requiredPath="/monitoreo-ventas">
                   <SalesExecutionMonitoring />
                 </ProtectedRoute>
               } 
