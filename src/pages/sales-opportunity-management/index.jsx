@@ -594,7 +594,6 @@ const SalesOpportunityManagement = () => {
                                     {opportunity.stageDuration} días
                                   </span>
                                 </div>
-                                <div className="text-xs font-medium text-gray-600">ID: {opportunity.id}</div>
                               </div>
 
                               {opportunity.workOrderGenerated && (
@@ -661,19 +660,19 @@ const SalesOpportunityManagement = () => {
                         <div className="space-y-4">
                           <div>
                             <h4 className="font-medium mb-2 text-sm sm:text-base">{selectedOpportunity?.clientName}</h4>
-                            <p className="text-xs text-muted-foreground">{selectedOpportunity?.id}</p>
                           </div>
 
-                          {/* Paneles según etapa */}
-                          {(selectedOpportunity?.stage === 'initial-contact' || !selectedOpportunity?.stage) && (
+                          {/* OCULTO TEMPORALMENTE - Paneles según etapa */}
+                          {/* {(selectedOpportunity?.stage === 'initial-contact' || !selectedOpportunity?.stage) && (
                             <ClientRegistrationPanel
                               opportunity={selectedOpportunity}
                               onRegister={(clientData) =>
                                 handleClientRegistration(selectedOpportunity?.id, clientData)
                               }
                             />
-                          )}
+                          )} */}
 
+                          {/* Panel de Comunicación - VISIBLE */}
                           <CommunicationPanel
                             opportunity={selectedOpportunity}
                             onAddCommunication={(communication) =>
@@ -681,7 +680,8 @@ const SalesOpportunityManagement = () => {
                             }
                           />
 
-                          {(selectedOpportunity?.stage === 'quotation-development' ||
+                          {/* OCULTO TEMPORALMENTE - QuotationRequestPanel */}
+                          {/* {(selectedOpportunity?.stage === 'quotation-development' ||
                             selectedOpportunity?.stage === 'client-review' ||
                             selectedOpportunity?.stage === 'closure') && (
                             <QuotationRequestPanel
@@ -703,10 +703,10 @@ const SalesOpportunityManagement = () => {
                                 handleQuotationUpdate(selectedOpportunity?.id, quotationData)
                               }
                             />
-                          )}
+                          )} */}
 
-                          {/* Panel de revisión del cliente */}
-                          {selectedOpportunity?.stage === 'client-review' && selectedOpportunity?.quotationStatus && (
+                          {/* OCULTO TEMPORALMENTE - Panel de revisión del cliente */}
+                          {/* {selectedOpportunity?.stage === 'client-review' && selectedOpportunity?.quotationStatus && (
                             <div className="border rounded-lg p-4 bg-muted/10">
                               <h4 className="font-medium mb-2 flex items-center">
                                 <Icon name="Eye" size={16} className="mr-2 text-yellow-600" />
@@ -720,34 +720,32 @@ const SalesOpportunityManagement = () => {
                                 <strong>Feedback del cliente:</strong> {selectedOpportunity.quotationStatus.clientFeedback || 'Sin comentarios'}
                               </div>
                             </div>
-                          )}
+                          )} */}
 
-
-                          {/* Panel de orden de trabajo en cierre */}
-
-                          {selectedOpportunity?.stage === 'closure' && (
+                          {/* OCULTO TEMPORALMENTE - Panel de orden de trabajo en cierre */}
+                          {/* {selectedOpportunity?.stage === 'closure' && (
                             <WorkOrderPanel
                               opportunity={selectedOpportunity}
                               onGenerateWorkOrder={(workOrderData) =>
                                 handleWorkOrderGeneration(selectedOpportunity?.id, workOrderData)
                               }
                             />
-                          )}
+                          )} */}
 
-                          {selectedOpportunity?.stage !== 'initial-contact' && (
+                          {/* OCULTO TEMPORALMENTE - ChangeManagementPanel */}
+                          {/* {selectedOpportunity?.stage !== 'initial-contact' && (
                             <ChangeManagementPanel
                               opportunity={selectedOpportunity}
                               onRequestChange={(changeData) =>
                                 console.log('Change requested:', changeData)
                               }
                             />
-                          )}
+                          )} */}
 
-                          {/* Botones para cambiar etapa */}
+                          {/* Botones para cambiar etapa - VISIBLE */}
                           <div className="space-y-2">
                             <label className="text-sm font-medium">Avanzar Etapa</label>
-                            <div className="grid grid-cols-1 gap-2">
-                              {salesStages?.map((stage) => (
+                            <div className="grid grid-cols-1 gap-2">{salesStages?.map((stage) => (
                                 <Button
                                   key={stage?.id}
                                   variant={selectedOpportunity?.stage === stage?.id ? 'default' : 'outline'}

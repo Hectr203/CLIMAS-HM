@@ -52,28 +52,39 @@ const ClientTable = ({ clients, onViewDetails, onEditClient, onViewProjects, onV
   const prevPage = () => goToPage(currentPage - 1);
   const nextPage = () => goToPage(currentPage + 1);
 
+  // Función para capitalizar la primera letra
+  const capitalize = (text) => {
+    if (!text) return '';
+    const str = String(text);
+    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+  };
+
   const getStatusColor = (status) => {
-    switch (status) {
-      case 'Activo':
+    const normalizedStatus = (status || '').toString().toLowerCase();
+    switch (normalizedStatus) {
+      case 'activo':
         return 'bg-success text-success-foreground';
-      case 'Inactivo':
+      case 'inactivo':
         return 'bg-error text-error-foreground';
-      case 'Pendiente':
+      case 'pendiente':
         return 'bg-warning text-warning-foreground';
+      case 'prospecto':
+        return 'bg-info text-info-foreground';
       default:
         return 'bg-secondary text-secondary-foreground';
     }
   };
 
   const getHealthColor = (health) => {
-    switch (health) {
-      case 'Excelente':
+    const normalizedHealth = (health || '').toString().toLowerCase();
+    switch (normalizedHealth) {
+      case 'excelente':
         return 'text-success';
-      case 'Buena':
+      case 'buena':
         return 'text-primary';
-      case 'Regular':
+      case 'regular':
         return 'text-warning';
-      case 'Mala':
+      case 'mala':
         return 'text-error';
       default:
         return 'text-muted-foreground';
@@ -140,19 +151,23 @@ const ClientTable = ({ clients, onViewDetails, onEditClient, onViewProjects, onV
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">{String(client?.industria || '')}</td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <div className="text-sm text-foreground">{String(client?.ubicacionEmpre || client?.ubicacion?.direccion || '')}</div>
-                <div className="text-xs text-muted-foreground">
-                  {String(client?.ubicacion?.ciudad || '')}, {String(client?.ubicacion?.estado || '')}
+                <div className="text-sm text-foreground">
+                  {client?.ubicacionEmpre?.municipio || ''}{client?.ubicacionEmpre?.municipio && client?.ubicacionEmpre?.estado ? ', ' : ''}{client?.ubicacionEmpre?.estado || ''}
                 </div>
+                {client?.ubicacion?.direccion && (
+                  <div className="text-xs text-muted-foreground max-w-[200px] truncate" title={client.ubicacion.direccion}>
+                    {String(client.ubicacion.direccion)}
+                  </div>
+                )}
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(client?.estado)}`}>
-                  {String(client?.estado || '')}
+                  {capitalize(client?.estado || '')}
                 </span>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <span className={`text-sm font-medium ${getHealthColor(client?.relacion)}`}>
-                  {String(client?.relacion || '')}
+                  {capitalize(client?.relacion || '')}
                 </span>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
