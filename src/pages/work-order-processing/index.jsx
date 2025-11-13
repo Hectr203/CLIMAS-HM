@@ -252,7 +252,7 @@ const WorkOrderProcessing = () => {
     }
   };
 
-  const handleExportData = () => {
+const handleExportData = () => {
   if (!filteredOrders || filteredOrders.length === 0) {
     alert("No hay datos disponibles para exportar.");
     return;
@@ -264,64 +264,107 @@ const WorkOrderProcessing = () => {
     format: "A4",
   });
 
-  // Título
-  doc.setFontSize(16);
-  doc.text("Reporte de Órdenes de Trabajo", 40, 40);
+  const gray = "#333333";
 
-  // Fecha de generación
+  //ENCABEZADO AZUL
+  doc.setFillColor(10, 74, 138);
+  doc.rect(0, 0, doc.internal.pageSize.getWidth(), 40, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text("REPORTE DE ÓRDENES DE TRABAJO", doc.internal.pageSize.getWidth() / 2, 25, {
+    align: "center",
+  });
+
+  //FECHA DE GENERACIÓN
   const fechaActual = new Date().toLocaleDateString("es-MX", {
     year: "numeric",
-    month: "long",
-    day: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   });
-  doc.setFontSize(10);
-  doc.text(`Generado el ${fechaActual}`, 40, 60);
 
-  //Columnas del PDF
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(255, 255, 255);
+  doc.text(`Generado el ${fechaActual}`, doc.internal.pageSize.getWidth() - 120, 25);
+
+  //SECCIÓN DATOS GENERALES
+  let startY = 60;
+  doc.setTextColor(gray);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("Resumen General", doc.internal.pageSize.getWidth() / 2, startY, { align: "center" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+
+  //Totales de resumen
+  const totalOrdenes = filteredOrders.length;
+  const completadas = filteredOrders.filter((o) => o.estado === "Completada" || o.status === "Completada").length;
+  const pendientes = filteredOrders.filter((o) => o.estado === "Pendiente" || o.status === "Pendiente").length;
+  const enProceso = filteredOrders.filter((o) => o.estado === "En Proceso" || o.status === "En Proceso").length;
+
+startY += 20;
+
+// Construimos el texto completo
+const resumenTexto = `Total de Órdenes: ${totalOrdenes}   |   Completadas: ${completadas}   |   Pendientes: ${pendientes}   |   En Proceso: ${enProceso}`;
+doc.text(resumenTexto, doc.internal.pageSize.getWidth() / 2, startY, { align: "center" });
+
+
+  //ORDENAR POR PRIORIDAD (Alta → Media → Baja → Crítico)
+  const prioridadOrden = ["Alta", "Media", "Baja", "Crítico"];
+  const sortedOrders = [...filteredOrders].sort((a, b) => {
+    const prioridadA = prioridadOrden.indexOf((a.prioridad || a.priority || "").trim());
+    const prioridadB = prioridadOrden.indexOf((b.prioridad || b.priority || "").trim());
+    return (prioridadA === -1 ? 99 : prioridadA) - (prioridadB === -1 ? 99 : prioridadB);
+  });
+
+  //TABLA DETALLADA
   const tableColumn = [
     "N° Orden",
-    "Proyecto / Tipo",
-    "Cliente",
     "Técnico Asignado",
     "Prioridad",
     "Estado",
     "Fecha Límite",
-    "Progreso",
+    "Cliente",
+    "Tipo Proyecto",
+    "Notas",
   ];
 
-  // Filas de la tabla
-  const tableRows = filteredOrders.map((order) => [
-    order?.orderNumber || order?.ordenTrabajo || "—",
-    order?.projectName || order?.tipo || "—",
-    order?.clientName || order?.cliente?.empresa || order?.cliente?.nombre || "—",
-    order?.assignedTechnician || order?.tecnicoAsignado?.nombre || "Sin técnico",
-    order?.priority || order?.prioridad || "—",
-    order?.status || order?.estado || "—",
-    order?.dueDate || order?.fechaLimite || "—",
-    `${order?.progress || order?.progreso || 0}%`,
+  const tableRows = sortedOrders.map((order) => [
+    order?.ordenTrabajo || order?.orderNumber || "—",
+    order?.tecnicoAsignado?.nombre || order?.assignedTechnician || "Sin técnico",
+    order?.prioridad || order?.priority || "—",
+    order?.estado || order?.status || "—",
+    order?.fechaLimite || order?.dueDate || "—",
+    order?.cliente?.empresa || order?.cliente?.nombre || order?.clientName || "Sin cliente",
+    order?.tipo || order?.projectName || "—",
+    order?.notasAdicionales || order?.notes || "—",
   ]);
 
-  // 🔹 Crear la tabla
   doc.autoTable({
+    startY: startY + 25,
     head: [tableColumn],
     body: tableRows,
-    startY: 80,
-    styles: {
-      fontSize: 9,
-      cellPadding: 5,
-    },
+    theme: "grid",
+    styles: { fontSize: 9, cellPadding: 5 },
     headStyles: {
-      fillColor: [25, 118, 210],
+      fillColor: [10, 74, 138],
       textColor: 255,
+      halign: "center",
       fontStyle: "bold",
     },
+    bodyStyles: { textColor: [50, 50, 50] },
     alternateRowStyles: { fillColor: [245, 245, 245] },
-    margin: { top: 80 },
+    margin: { left: 30, right: 30 },
   });
 
-  // 🔹 Guardar PDF
-  doc.save(`ordenes_trabajo_${new Date().toISOString().split("T")[0]}.pdf`);
+  //GUARDAR PDF
+  doc.save(`reporte_ordenes_trabajo_${new Date().toISOString().split("T")[0]}.pdf`);
 };
+
+
+
 
 
   return (

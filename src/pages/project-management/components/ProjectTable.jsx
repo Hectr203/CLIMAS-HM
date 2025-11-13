@@ -137,7 +137,7 @@ const resolveProjectStatus = (project) => {
   return { key: 'planning', label: 'Planificación' };
 };
 
-/* 🔵 Convierte objeto ubicación en string legible */
+/*Convierte objeto ubicación en string legible */
 const formatLocation = (loc) => {
   if (!loc) return '—';
   if (typeof loc === 'string') return loc;
@@ -280,10 +280,10 @@ const ProjectTable = ({
 }) => {
   const navigate = useNavigate();
 
-  // 🔔 Notificaciones
+  //Notificaciones
   const { showConfirm, showSuccess, showError } = useNotifications();
 
-  // ✅ Shadow list para props y lista remota para fetch
+  //Shadow list para props y lista remota para fetch
   const [localDocs, setLocalDocs] = useState(null);
   const [remoteDocs, setRemoteDocs] = useState([]);
 
@@ -497,6 +497,7 @@ const ProjectTable = ({
 
   const usingLocalShadow = Array.isArray(localDocs);
 
+  //Eliminar (optimista, sin refresh) —>>> MENSAJE EDITADO
   // 🔴 Eliminar (optimista, sin refresh)
   const handleDelete = (project) => {
     if (!project?.id) return;
@@ -538,7 +539,7 @@ const ProjectTable = ({
     });
   };
 
-  // 🔴 Eliminación masiva (optimista)
+  //Eliminación masiva (optimista)
   const handleBulkDelete = () => {
     if (!selectedProjects?.length) return;
 
