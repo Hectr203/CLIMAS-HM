@@ -244,6 +244,7 @@ const WorkshopOperationsManagement = () => {
                       status: receptionData?.status,
                       issues: receptionData?.issues
                     },
+                    recepcionMateriales: receptionData?.recepcionMateriales || null,
                     status: receptionData?.status === 'complete' ? 'safety-checklist' : 'material-reception'
                   }
                 : order
