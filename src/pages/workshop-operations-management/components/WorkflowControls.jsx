@@ -537,14 +537,14 @@ import useGastos from '../../../hooks/useGastos';
                       </span>
                     </div>
 
-                    <div className="truncate">
+                    <div className="col-span-2">
                       <strong className="block">Cliente</strong>
-                      <span className="block mt-1">{selectedOrder?.clientName || selectedOrder?.clientLabel || (selectedOrder?.cliente && (selectedOrder.cliente.nombre || selectedOrder.cliente)) || ''}</span>
+                      <span className="block mt-1 break-words">{selectedOrder?.clientName || selectedOrder?.clientLabel || (selectedOrder?.cliente && (selectedOrder.cliente.nombre || selectedOrder.cliente)) || ''}</span>
                     </div>
 
-                    <div className="truncate">
+                    <div className="col-span-2">
                       <strong className="block">Proyecto</strong>
-                      <span className="block mt-1">
+                      <span className="block mt-1 break-words">
                         {(
                           selectedOrder?.projectRef ||
                           selectedOrder?.proyectoNombre ||
