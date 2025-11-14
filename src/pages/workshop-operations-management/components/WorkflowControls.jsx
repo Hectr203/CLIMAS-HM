@@ -3,6 +3,7 @@ import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import requisiService from '../../../services/requisiService';
 
         
 
@@ -101,7 +102,27 @@ import 'jspdf-autotable';
           };
 
           // Generate a PDF report for the selected order.
-          const generateReport = () => {
+          const extractApprovedFromArray = (arr) => {
+            if (!Array.isArray(arr)) return [];
+            return arr
+              .filter(item => {
+                if (!item) return false;
+                const s = String(item?.status || item?.estado || item?.approved || item?.aprobado || '').toLowerCase();
+                if (s.includes('aprob')) return true;
+                if (item?.approved === true) return true;
+                if (item?.approvedAt || item?.approvedBy) return true;
+                return false;
+              })
+              .map(it => ({
+                name: it?.name || it?.nombre || it?.item || it?.producto || 'Material',
+                required: Number(it?.required ?? it?.cantidad ?? it?.total ?? it?.qty ?? 0) || 0,
+                received: Number(it?.received ?? it?.recibido ?? it?.have ?? 0) || 0,
+                raw: it
+              }));
+          };
+
+          // async because we may fetch requisitions as a fallback source for approved materials
+          const generateReport = async () => {
             if (!selectedOrder) return;
 
             // Helper: try to determine daily progress delta from multiple possible aliases.
@@ -262,6 +283,60 @@ import 'jspdf-autotable';
                 theme: 'grid',
                 styles: { fontSize: 10 }
               });
+            }
+
+            // Approved materials: try local shapes first, fall back to requisiService
+            try {
+              const approvedCandidates = [];
+              if (Array.isArray(selectedOrder?.materials)) approvedCandidates.push(...selectedOrder.materials);
+              if (Array.isArray(selectedOrder?.raw?.materiales)) approvedCandidates.push(...selectedOrder.raw.materiales);
+              if (Array.isArray(selectedOrder?.raw?.materials)) approvedCandidates.push(...selectedOrder.raw.materials);
+
+              let approvedList = extractApprovedFromArray(approvedCandidates);
+
+              // fallback: query requisitions by several possible order-identifiers
+              if (!approvedList.length) {
+                const candidates = [];
+                if (selectedOrder?.ordenTrabajo) candidates.push({ q: { numeroOrdenTrabajo: selectedOrder.ordenTrabajo } });
+                if (selectedOrder?.id) candidates.push({ q: { id: selectedOrder.id } });
+                if (selectedOrder?.folio) candidates.push({ q: { folio: selectedOrder.folio } });
+                if (selectedOrder?.raw?.id) candidates.push({ q: { id: selectedOrder.raw.id } });
+                if (selectedOrder?.raw?.numeroOrdenTrabajo) candidates.push({ q: { numeroOrdenTrabajo: selectedOrder.raw.numeroOrdenTrabajo } });
+
+                for (const c of candidates) {
+                  try {
+                    const resp = await requisiService.getRequisitions(c.q);
+                    if (resp?.success && Array.isArray(resp.data) && resp.data.length) {
+                      const mats = [];
+                      resp.data.forEach(req => {
+                        const estado = String(req?.estado || req?.status || '').toLowerCase();
+                        if (estado.includes('aprob')) {
+                          const list = Array.isArray(req.materiales) ? req.materiales : (Array.isArray(req.items) ? req.items : []);
+                          list.forEach(it => mats.push(it));
+                        }
+                      });
+                      const fromReq = extractApprovedFromArray(mats);
+                      if (fromReq.length) { approvedList = fromReq; break; }
+                    }
+                  } catch (e) {
+                    // ignore and continue with other candidates
+                  }
+                }
+              }
+
+              if (approvedList && approvedList.length) {
+                const startY2 = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 250;
+                const rowsApproved = approvedList.map(a => [a.name || '', String(a.required || 0), String(a.received || 0), String(Math.max(0, (a.required || 0) - (a.received || 0)))]);
+                doc.autoTable({
+                  startY: startY2 + 8,
+                  head: [['Material Aprobado', 'Req.', 'Recibidos', 'Faltantes']],
+                  body: rowsApproved,
+                  theme: 'grid',
+                  styles: { fontSize: 10 }
+                });
+              }
+            } catch (e) {
+              // ignore approved-materials errors for PDF generation
             }
 
             const selectedKey = selectedOrder ? (selectedOrder?.id || selectedOrder?.ordenTrabajo || selectedOrder?.folio || '') : '';
@@ -466,9 +541,9 @@ import 'jspdf-autotable';
                   variant="outline"
                   className="w-full"
                   iconName="FileText"
-                  onClick={() => {
+                  onClick={async () => {
                     try {
-                      generateReport();
+                      await generateReport();
                     } catch (e) {
                       // fallback: no-op
                     }

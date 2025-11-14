@@ -477,6 +477,7 @@ const WorkshopOperationsManagement = () => {
                     {activePanel === 'materials' && (
                       <MaterialReceptionPanel
                         workOrders={workOrders?.filter(o => o?.status === 'material-reception')}
+                        selectedOrder={selectedOrder}
                         onMaterialReception={handleMaterialReception}
                       />
                     )}
