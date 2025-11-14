@@ -98,7 +98,8 @@ const InventoryStats = ({ stats, items, onAddItem, onUpdateStock, onGenerateRepo
         ))}
       </div>
       {/* Category Distribution */}
-      <div className="bg-card rounded-lg border border-border p-6">
+      {/* TODO: Habilitar más adelante cuando se implemente completamente */}
+      {/* <div className="bg-card rounded-lg border border-border p-6">
         <div className="flex items-center space-x-3 mb-6">
           <Icon name="PieChart" size={20} className="text-primary" />
           <h3 className="text-lg font-semibold text-foreground">Distribución por Categoría</h3>
@@ -134,7 +135,8 @@ const InventoryStats = ({ stats, items, onAddItem, onUpdateStock, onGenerateRepo
             </div>
           ))}
         </div>
-      </div>
+      </div> */}
+      
       {/* Quick Actions */}
       <div className="bg-card rounded-lg border border-border p-6">
         <div className="flex items-center space-x-3 mb-6">

@@ -17,7 +17,7 @@ import "jspdf-autotable";
 
 const WorkOrderProcessing = () => {
   const { oportunities, loading, error, getOportunities } = useOperac();
-  const { requisitions, loading: loadingRequisitions, getRequisitions } = useRequisi();
+  const { requisitions, loading: loadingRequisitions, getRequisitions, updateRequisition, createRequisition, deleteRequisition } = useRequisi();
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);

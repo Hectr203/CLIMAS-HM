@@ -26,8 +26,7 @@ const InventoryFilters = ({
     { value: '', label: 'Todos los Estados' },
     { value: 'in-stock', label: 'En Stock' },
     { value: 'low-stock', label: 'Stock Bajo' },
-    { value: 'out-of-stock', label: 'Agotado' },
-    { value: 'reserved', label: 'Reservado' }
+    { value: 'out-of-stock', label: 'Agotado' }
   ];
 
   // Generar opciones de proveedores dinámicamente desde los datos reales
@@ -232,18 +231,6 @@ const InventoryFilters = ({
           iconSize={16}
         >
           Agotado
-        </Button>
-        
-        <Button
-          variant={filters?.quickFilter === 'reserved' ? 'default' : 'ghost'}
-          size="sm"
-          onClick={() => handleFilterChange('quickFilter', 
-            filters?.quickFilter === 'reserved' ? '' : 'reserved'
-          )}
-          iconName="Lock"
-          iconSize={16}
-        >
-          Reservado
         </Button>
         
         <Button

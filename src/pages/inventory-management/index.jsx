@@ -78,6 +78,7 @@ const InventoryManagement = () => {
   const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showItemSelectorModal, setShowItemSelectorModal] = useState(false); // ✅ Modal de selección
   const loading = inventoryLoading || orderLoading || requisitionsLoading || isUpdating;
   const error = inventoryError || orderError;
   const [filters, setFilters] = useState({
@@ -251,7 +252,22 @@ const InventoryManagement = () => {
 
   const handleUpdateStock = (item) => {
     console.log('Update stock for:', item);
-    setSelectedItem(item);
+    
+    // Si el item viene de una alerta (tiene la propiedad 'type'), 
+    // buscar el artículo completo en el inventario por itemCode
+    if (item.type && (item.type === 'out-of-stock' || item.type === 'low-stock')) {
+      const inventoryItem = inventoryItems.find(invItem => invItem.itemCode === item.itemCode);
+      if (inventoryItem) {
+        setSelectedItem(inventoryItem);
+      } else {
+        console.error('No se encontró el artículo en el inventario:', item.itemCode);
+        setSelectedItem(item); // Fallback al item original
+      }
+    } else {
+      // Es un item directo del inventario
+      setSelectedItem(item);
+    }
+    
     setShowEditItemModal(true);
   };
 
@@ -507,6 +523,16 @@ ${order.notas || 'Sin notas adicionales'}
 
   const handleExport = async () => {
     try {
+      // Función auxiliar para escapar valores CSV correctamente
+      const escapeCSV = (value) => {
+        if (value === null || value === undefined) return '""';
+        const stringValue = String(value);
+        // Escapar comillas dobles duplicándolas
+        const escapedValue = stringValue.replace(/"/g, '""');
+        // SIEMPRE encerrar en comillas para evitar problemas con comas y caracteres especiales
+        return `"${escapedValue}"`;
+      };
+
       // Create CSV content
       const csvHeaders = [
         'Código',
@@ -524,30 +550,35 @@ ${order.notas || 'Sin notas adicionales'}
         'Valor Total',
         'Última Actualización'
       ];
+      
       const csvRows = inventoryItems?.map(item => [
-        item?.itemCode,
-        item?.name,
-        item?.description,
-        item?.category,
-        item?.currentStock,
-        item?.reservedStock || 0,
-        item?.reorderPoint,
-        item?.unit,
-        item?.location,
-        item?.supplier?.name,
-        item?.supplier?.contact,
-        item?.unitCost,
-        (item?.currentStock * item?.unitCost),
-        new Date(item?.lastUpdated).toLocaleDateString('es-MX')
+        escapeCSV(item?.itemCode),
+        escapeCSV(item?.name),
+        escapeCSV(item?.description),
+        escapeCSV(item?.category),
+        escapeCSV(item?.currentStock),
+        escapeCSV(item?.reservedStock || 0),
+        escapeCSV(item?.reorderPoint),
+        escapeCSV(item?.unit),
+        escapeCSV(item?.location),
+        escapeCSV(item?.supplier?.name),
+        escapeCSV(item?.supplier?.contact),
+        escapeCSV(item?.unitCost),
+        escapeCSV(item?.currentStock * item?.unitCost),
+        escapeCSV(new Date(item?.lastUpdated).toLocaleDateString('es-MX'))
       ]);
 
       const csvContent = [
-        csvHeaders?.join(','),
-        ...csvRows?.map(row => row?.join(','))
-      ]?.join('\n');
+        csvHeaders.map(h => escapeCSV(h)).join(','),
+        ...csvRows.map(row => row.join(','))
+      ].join('\n');
 
-      // Download CSV file
-      const blob = new Blob([csvContent], { type: 'text/csv' });
+      // Agregar BOM (Byte Order Mark) UTF-8 para que Excel reconozca la codificación
+      const BOM = '\uFEFF';
+      const csvWithBOM = BOM + csvContent;
+
+      // Download CSV file con codificación UTF-8
+      const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -766,12 +797,20 @@ ${order.notas || 'Sin notas adicionales'}
               items={filteredItems}
               onAddItem={() => setShowNewItemModal(true)}
               onUpdateStock={() => {
-                const firstItem = filteredItems?.[0];
-                if (firstItem) {
-                  handleUpdateStock(firstItem);
-                }
+                // ✅ Abrir modal de selección de artículo
+                setShowItemSelectorModal(true);
               }}
               onGenerateReport={() => {
+                // Función auxiliar para escapar valores CSV correctamente
+                const escapeCSV = (value) => {
+                  if (value === null || value === undefined) return '""';
+                  const stringValue = String(value);
+                  // Escapar comillas dobles duplicándolas
+                  const escapedValue = stringValue.replace(/"/g, '""');
+                  // SIEMPRE encerrar en comillas para evitar problemas con comas y caracteres especiales
+                  return `"${escapedValue}"`;
+                };
+
                 // Crear el contenido del CSV
                 const headers = [
                   'Código',
@@ -789,27 +828,30 @@ ${order.notas || 'Sin notas adicionales'}
                   'Última Actualización'
                 ];
 
-                const csvRows = [
-                  headers.join(','), // Encabezados
-                  ...filteredItems.map(item => [
-                    `"${item.itemCode || ''}"`,
-                    `"${(item.name || '').replace(/"/g, '""')}"`,
-                    `"${(item.description || '').replace(/"/g, '""')}"`,
-                    `"${item.category || ''}"`,
-                    item.currentStock || 0,
-                    item.reservedStock || 0,
-                    item.reorderPoint || 0,
-                    `"${item.unit || ''}"`,
-                    `"${(item.supplier?.name || '').replace(/"/g, '""')}"`,
-                    `"${(item.location || '').replace(/"/g, '""')}"`,
-                    item.unitCost || 0,
-                    (item.currentStock || 0) * (item.unitCost || 0),
-                    `"${item.lastUpdated ? new Date(item.lastUpdated).toLocaleString() : ''}"`,
-                  ].join(','))
+                const csvRows = filteredItems.map(item => [
+                  escapeCSV(item.itemCode || ''),
+                  escapeCSV(item.name || ''),
+                  escapeCSV(item.description || ''),
+                  escapeCSV(item.category || ''),
+                  escapeCSV(item.currentStock || 0),
+                  escapeCSV(item.reservedStock || 0),
+                  escapeCSV(item.reorderPoint || 0),
+                  escapeCSV(item.unit || ''),
+                  escapeCSV(item.supplier?.name || ''),
+                  escapeCSV(item.location || ''),
+                  escapeCSV(item.unitCost || 0),
+                  escapeCSV((item.currentStock || 0) * (item.unitCost || 0)),
+                  escapeCSV(item.lastUpdated ? new Date(item.lastUpdated).toLocaleString('es-MX') : ''),
+                ].join(','));
+
+                const csvContent = [
+                  headers.map(h => escapeCSV(h)).join(','),
+                  ...csvRows
                 ].join('\n');
 
-                // Crear el blob y descargar
-                const blob = new Blob(['\ufeff' + csvRows], { type: 'text/csv;charset=utf-8;' });
+                // Crear el blob con BOM UTF-8 y descargar
+                const BOM = '\uFEFF';
+                const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement('a');
                 const url = URL.createObjectURL(blob);
                 
@@ -818,6 +860,7 @@ ${order.notas || 'Sin notas adicionales'}
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
+                URL.revokeObjectURL(url);
               }}
             />
           )}
@@ -1004,6 +1047,74 @@ ${order.notas || 'Sin notas adicionales'}
             onClose={handleCloseOrderDetails}
             order={selectedOrder}
           />
+
+          {/* Item Selector Modal - Para "Actualizar Stock" */}
+          {showItemSelectorModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[1000] p-4">
+              <div className="bg-card rounded-lg border border-border w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+                <div className="flex items-center justify-between p-6 border-b border-border">
+                  <h2 className="text-xl font-semibold text-foreground">
+                    Seleccionar Artículo para Actualizar
+                  </h2>
+                  <button
+                    onClick={() => setShowItemSelectorModal(false)}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <Icon name="X" size={20} />
+                  </button>
+                </div>
+                
+                <div className="p-6 overflow-y-auto flex-1">
+                  <div className="mb-4">
+                    <input
+                      type="text"
+                      placeholder="Buscar artículo..."
+                      className="w-full px-4 py-2 border border-border rounded-md"
+                      onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    {filteredItems?.slice(0, 50).map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          handleUpdateStock(item);
+                          setShowItemSelectorModal(false);
+                        }}
+                        className="w-full text-left p-4 border border-border rounded-lg hover:bg-muted transition-colors"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium text-foreground">{item.description}</p>
+                            <p className="text-sm text-muted-foreground">Código: {item.itemCode}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-medium">Stock: {item.currentStock} {item.unit}</p>
+                            <p className={`text-xs ${
+                              item.currentStock === 0 ? 'text-red-500' :
+                              item.currentStock <= item.reorderPoint ? 'text-yellow-500' :
+                              'text-green-500'
+                            }`}>
+                              {item.currentStock === 0 ? 'Agotado' :
+                               item.currentStock <= item.reorderPoint ? 'Stock bajo' :
+                               'Disponible'}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  
+                  {filteredItems?.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">
+                      No se encontraron artículos
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </div>

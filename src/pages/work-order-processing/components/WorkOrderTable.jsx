@@ -458,36 +458,139 @@ const handleDelete = (order) => {
                 <h4 className="text-sm font-medium text-foreground mt-4">
                   Materiales Registrados
                 </h4>
-                <ul className="text-sm text-muted-foreground grid grid-cols-2 md:grid-cols-3 gap-2">
+                <div className="text-sm">
   {(() => {
-    const materialsForOrder = requisitions
-      ?.filter((req) => req.numeroOrdenTrabajo === order.ordenTrabajo)
-      ?.flatMap((req) => [
-        ...(req.materiales || req.items || []),
-        ...(req.materialesManuales || req.manualItems || [])
-      ]);
+    const reqForOrder = requisitions?.filter(
+      (req) => req.numeroOrdenTrabajo === order.ordenTrabajo
+    );
 
-    if (!materialsForOrder || materialsForOrder.length === 0) {
+    if (!reqForOrder || reqForOrder.length === 0) {
       return (
-        <li className="text-muted-foreground col-span-3">
+        <p className="text-muted-foreground text-sm">
           No hay materiales registrados para esta orden
-        </li>
+        </p>
       );
     }
 
-    return materialsForOrder.map((item, index) => (
-      <li key={index} className="flex items-center space-x-2">
-        <Icon name="Package" size={14} />
-        <span>
-          {item.nombreMaterial || item.nombre || item.descripcionEspecificaciones || "Material sin nombre"} —{" "}
-          <span className="text-muted-foreground">
-            Cantidad: {item.cantidad || item.quantity || 0} {item.unidad || ""}
+    return reqForOrder.map((req, reqIndex) => {
+      // Debug
+      console.log('Requisición en tabla:', req);
+      console.log('Materiales inventario:', req.materiales);
+      console.log('Materiales manuales:', req.materialesManuales);
+      
+      // Normalizar materiales
+      const materialesInventario = req.materiales || req.items || [];
+      const materialesManuales = req.materialesManuales || req.manualItems || [];
+      
+      return (
+      <div key={reqIndex} className="mb-4 border border-border rounded-lg p-3 bg-card">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-medium text-muted-foreground">
+            Requisición: {req.numeroOrdenTrabajo || req.requestNumber}
+          </p>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+            req.estado === 'Aprobada' ? 'bg-green-100 text-green-700' :
+            req.estado === 'Pendiente' ? 'bg-yellow-100 text-yellow-700' :
+            'bg-red-100 text-red-700'
+          }`}>
+            {req.estado}
           </span>
-        </span>
-      </li>
-    ));
+        </div>
+
+        {/* Materiales del Inventario */}
+        {materialesInventario.length > 0 && (
+          <div className="mb-3">
+            <p className="text-xs font-semibold text-blue-700 mb-1 flex items-center">
+              <Icon name="Package" size={14} className="mr-1" />
+              Del Inventario ({materialesInventario.length})
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 ml-4">
+              {materialesInventario.map((item, idx) => (
+                <div key={idx} className="flex items-start space-x-2 text-xs bg-blue-50 p-2 rounded border border-blue-200">
+                  <span className="text-blue-600 mt-0.5">•</span>
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground">
+                      {item.nombreMaterial || item.nombre || item.name}
+                    </p>
+                    {(item.codigoArticulo || item.codigo) && (
+                      <p className="text-[10px] text-muted-foreground">
+                        Código: {item.codigoArticulo || item.codigo}
+                      </p>
+                    )}
+                    <p className="text-muted-foreground">
+                      Cantidad: {item.cantidad || item.quantity} {item.unidad || item.unit}
+                    </p>
+                    {item.urgencia && item.urgencia !== 'Normal' && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                        item.urgencia === 'Urgente' || item.urgencia === 'Crítica'
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-orange-100 text-orange-700'
+                      }`}>
+                        {item.urgencia}
+                      </span>
+                    )}
+                    {item.descripcionEspecificaciones && (
+                      <p className="text-[10px] text-muted-foreground mt-1 italic">
+                        {item.descripcionEspecificaciones}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Materiales Manuales */}
+        {materialesManuales.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-green-700 mb-1 flex items-center">
+              <Icon name="Edit3" size={14} className="mr-1" />
+              Manuales ({materialesManuales.length})
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 ml-4">
+              {materialesManuales.map((item, idx) => (
+                <div key={idx} className="flex items-start space-x-2 text-xs bg-green-50 p-2 rounded border border-green-200">
+                  <span className="text-green-600 mt-0.5">•</span>
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground">
+                      {item.nombreMaterial || item.nombre || item.name}
+                    </p>
+                    <p className="text-muted-foreground">
+                      Cantidad: {item.cantidad || item.quantity} {item.unidad || item.unit}
+                    </p>
+                    {item.urgencia && item.urgencia !== 'Normal' && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                        item.urgencia === 'Urgente' || item.urgencia === 'Crítica'
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-orange-100 text-orange-700'
+                      }`}>
+                        {item.urgencia}
+                      </span>
+                    )}
+                    {item.descripcionEspecificaciones && (
+                      <p className="text-[10px] text-muted-foreground mt-1 italic">
+                        {item.descripcionEspecificaciones}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Si no hay materiales en esta requisición */}
+        {materialesInventario.length === 0 && materialesManuales.length === 0 && (
+          <p className="text-xs text-muted-foreground ml-4">
+            Esta requisición no tiene materiales registrados
+          </p>
+        )}
+      </div>
+    );
+    });
   })()}
-</ul>
+</div>
 
 
                 <p className="text-sm text-muted-foreground">

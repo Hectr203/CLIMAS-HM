@@ -65,19 +65,19 @@ const EditItemModal = ({ isOpen, onClose, item, onUpdateSuccess }) => {
   useEffect(() => {
     if (isOpen && item) {
       setFormData({
-        itemCode: item.itemCode || '',
-        name: item.name || '',
-        description: item.description || '',
-        specifications: item.specifications || '',
-        category: item.category || '',
-        unit: item.unit || 'pcs',
-        unitCost: item.unitCost?.toString() || '',
-        reorderPoint: item.reorderPoint?.toString() || '',
-        currentStock: item.currentStock?.toString() || '',
-        location: item.location || 'Almacén Principal',
-        supplierName: item.supplier?.name || '',
-        supplierContact: item.supplier?.contact || '',
-        notes: item.notes || ''
+        itemCode: String(item.itemCode || ''),
+        name: String(item.name || ''),
+        description: String(item.description || ''),
+        specifications: String(item.specifications || ''),
+        category: String(item.category || ''),
+        unit: String(item.unit || 'pcs'),
+        unitCost: item.unitCost !== undefined && item.unitCost !== null ? String(item.unitCost) : '',
+        reorderPoint: item.reorderPoint !== undefined && item.reorderPoint !== null ? String(item.reorderPoint) : '',
+        currentStock: item.currentStock !== undefined && item.currentStock !== null ? String(item.currentStock) : '',
+        location: String(item.location || 'Almacén Principal'),
+        supplierName: String(item.supplier?.name || ''),
+        supplierContact: String(item.supplier?.contact || ''),
+        notes: String(item.notes || '')
       });
       setErrors({});
     }
@@ -173,6 +173,7 @@ const EditItemModal = ({ isOpen, onClose, item, onUpdateSuccess }) => {
   const handleClose = () => {
     setFormData({
       itemCode: '',
+      name: '',
       description: '',
       specifications: '',
       category: '',
@@ -189,7 +190,7 @@ const EditItemModal = ({ isOpen, onClose, item, onUpdateSuccess }) => {
     onClose();
   };
 
-  if (!isOpen || !item) return null;
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2 sm:p-4">
@@ -259,7 +260,7 @@ const EditItemModal = ({ isOpen, onClose, item, onUpdateSuccess }) => {
                       Especificaciones
                     </label>
                     <textarea
-                      value={formData.specifications}
+                      value={formData.specifications || ''}
                       onChange={(e) => handleInputChange('specifications', e.target.value)}
                       placeholder="Especificaciones técnicas detalladas..."
                       className="w-full min-h-[80px] px-3 py-2 border border-border rounded-md bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-y"
@@ -275,7 +276,7 @@ const EditItemModal = ({ isOpen, onClose, item, onUpdateSuccess }) => {
                       Categoría {errors.category && <span className="text-error">*</span>}
                     </label>
                     <select
-                      value={formData.category}
+                      value={formData.category || ''}
                       onChange={(e) => handleInputChange('category', e.target.value)}
                       disabled={isSubmitting || loading}
                       className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
@@ -295,7 +296,7 @@ const EditItemModal = ({ isOpen, onClose, item, onUpdateSuccess }) => {
                       Ubicación
                     </label>
                     <select
-                      value={formData.location}
+                      value={formData.location || 'Almacén Principal'}
                       onChange={(e) => handleInputChange('location', e.target.value)}
                       disabled={isSubmitting || loading}
                       className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
@@ -348,7 +349,7 @@ const EditItemModal = ({ isOpen, onClose, item, onUpdateSuccess }) => {
                         Unidad
                       </label>
                       <select
-                        value={formData.unit}
+                        value={formData.unit || 'pcs'}
                         onChange={(e) => handleInputChange('unit', e.target.value)}
                         disabled={isSubmitting || loading}
                         className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
@@ -415,7 +416,7 @@ const EditItemModal = ({ isOpen, onClose, item, onUpdateSuccess }) => {
                   Notas y Observaciones
                 </label>
                 <textarea
-                  value={formData.notes}
+                  value={formData.notes || ''}
                   onChange={(e) => handleInputChange('notes', e.target.value)}
                   placeholder="Notas adicionales, instrucciones de uso, compatibilidad, etc..."
                   className="w-full min-h-[80px] px-3 py-2 border border-border rounded-md bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-y"
