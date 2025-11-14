@@ -26,10 +26,17 @@ const ProjectQuotations = ({ projects = [] }) => {
 
   // === Utilidades ===
   const formatCurrency = (n) =>
-    new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n ?? 0);
+    new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency: 'MXN',
+    }).format(n ?? 0);
 
   const formatDate = (d) =>
-    new Date(d).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    new Date(d).toLocaleDateString('es-MX', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
 
   const getStatusColor = (s) =>
     ({
@@ -58,10 +65,26 @@ const ProjectQuotations = ({ projects = [] }) => {
     const n = norm(raw);
     if (!n) return '';
     const table = [
-      ['planning', ['planificacion', 'planificación', 'planning', 'planeacion', 'planeación']],
-      ['in-progress', ['en progreso', 'in-progress', 'progreso', 'ejecucion', 'ejecución', 'proceso']],
+      [
+        'planning',
+        ['planificacion', 'planificación', 'planning', 'planeacion', 'planeación'],
+      ],
+      [
+        'in-progress',
+        [
+          'en progreso',
+          'in-progress',
+          'progreso',
+          'ejecucion',
+          'ejecución',
+          'proceso',
+        ],
+      ],
       ['on-hold', ['en pausa', 'on-hold', 'pausa', 'pausado', 'detenido', 'hold']],
-      ['review', ['revision', 'revisión', 'review', 'en revision', 'por revisar', 'validacion']],
+      [
+        'review',
+        ['revision', 'revisión', 'review', 'en revision', 'por revisar', 'validacion'],
+      ],
       ['completed', ['completado', 'finalizado', 'done', 'terminado', 'cerrado']],
       ['cancelled', ['cancelado', 'cancelled', 'anulado']],
     ];
@@ -117,7 +140,7 @@ const ProjectQuotations = ({ projects = [] }) => {
     return n;
   };
 
-  // === Cotizaciones simuladas ===
+  // === Cotizaciones simuladas (placeholder) ===
   const generateProjectQuotations = (project) => {
     if (!project) return [];
     const b = Number(project?.budget) || 0;
@@ -148,11 +171,13 @@ const ProjectQuotations = ({ projects = [] }) => {
     ];
   };
 
+  // ⬇️ Ahora manda al módulo de /cotizaciones (que sí tiene dashboard),
+  // pasando el projectId como query param
   const handleCreateQuotation = (project) =>
-    navigate(`/quotation-development-center?projectId=${project?.id}`);
+    navigate(`/cotizaciones?projectId=${project?.id ?? ''}`);
 
   const handleViewQuotation = (project, quotation) =>
-    navigate(`/quotation-development-center/${quotation?.id}`);
+    navigate(`/cotizaciones?quotationId=${quotation?.id ?? ''}`);
 
   // === Normalizar proyectos ===
   const projectsForFilter = useMemo(() => {
@@ -189,7 +214,10 @@ const ProjectQuotations = ({ projects = [] }) => {
   );
 
   const tableKey = useMemo(() => 'tbl-' + JSON.stringify(filters), [filters]);
-  const quotations = useMemo(() => generateProjectQuotations(selectedProject), [selectedProject]);
+  const quotations = useMemo(
+    () => generateProjectQuotations(selectedProject),
+    [selectedProject]
+  );
   const hasResults = filteredProjects?.length > 0;
 
   const handleExportVisible = () => {
@@ -198,22 +226,36 @@ const ProjectQuotations = ({ projects = [] }) => {
       alert('No hay proyectos para exportar con los filtros actuales.');
       return;
     }
-    const headers = ['name', 'code', 'clientName', 'clientType', 'department', 'priority', 'status', 'budget', 'startDate', 'endDate'];
+    const headers = [
+      'name',
+      'code',
+      'clientName',
+      'clientType',
+      'department',
+      'priority',
+      'status',
+      'budget',
+      'startDate',
+      'endDate',
+    ];
     const escape = (v) => `"${(v ?? '').toString().replace(/"/g, '""')}"`;
-    const csv = [headers.join(','), ...rows.map((p) =>
-      [
-        escape(p.name),
-        escape(p.code),
-        escape(p.client.name),
-        escape(p.client.type),
-        escape(p.department),
-        escape(p.priority),
-        escape(p.status),
-        escape(p.budget),
-        escape(p.startDate),
-        escape(p.endDate),
-      ].join(',')
-    )].join('\n');
+    const csv = [
+      headers.join(','),
+      ...rows.map((p) =>
+        [
+          escape(p.name),
+          escape(p.code),
+          escape(p.client.name),
+          escape(p.client.type),
+          escape(p.department),
+          escape(p.priority),
+          escape(p.status),
+          escape(p.budget),
+          escape(p.startDate),
+          escape(p.endDate),
+        ].join(',')
+      ),
+    ].join('\n');
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -229,8 +271,12 @@ const ProjectQuotations = ({ projects = [] }) => {
       {/* Encabezado */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-foreground mb-1">Cotizaciones de Proyectos</h2>
-          <p className="text-muted-foreground">Gestiona las cotizaciones asociadas a cada proyecto.</p>
+          <h2 className="text-2xl font-bold text-foreground mb-1">
+            Cotizaciones de Proyectos
+          </h2>
+          <p className="text-muted-foreground">
+            Gestiona las cotizaciones asociadas a cada proyecto.
+          </p>
         </div>
       </div>
 
@@ -264,7 +310,11 @@ const ProjectQuotations = ({ projects = [] }) => {
           ) : (
             <div className="flex items-center justify-center h-[320px] border border-dashed border-border rounded-lg bg-muted/20">
               <div className="text-center px-6">
-                <Icon name="Filter" size={48} className="text-muted-foreground mx-auto mb-4" />
+                <Icon
+                  name="Filter"
+                  size={48}
+                  className="text-muted-foreground mx-auto mb-4"
+                />
                 <h3 className="text-lg font-medium text-foreground mb-1">
                   No se encontraron proyectos con tus filtros
                 </h3>
@@ -282,7 +332,9 @@ const ProjectQuotations = ({ projects = [] }) => {
             <div className="bg-muted/30 p-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Icon name="FileText" size={18} className="text-primary" />
-                <h3 className="text-base font-semibold text-foreground">Cotizaciones</h3>
+                <h3 className="text-base font-semibold text-foreground">
+                  Cotizaciones
+                </h3>
               </div>
               {selectedProject && (
                 <Button
@@ -296,9 +348,15 @@ const ProjectQuotations = ({ projects = [] }) => {
 
             {!selectedProject ? (
               <div className="p-6 text-center">
-                <Icon name="Info" size={40} className="text-muted-foreground mx-auto mb-3" />
+                <Icon
+                  name="Info"
+                  size={40}
+                  className="text-muted-foreground mx-auto mb-3"
+                />
                 <p className="text-sm text-muted-foreground">
-                  Selecciona <span className="font-medium text-foreground">un proyecto</span> en la tabla para ver sus cotizaciones aquí.
+                  Selecciona{' '}
+                  <span className="font-medium text-foreground">un proyecto</span>{' '}
+                  en la tabla para ver sus cotizaciones aquí.
                 </p>
               </div>
             ) : (
@@ -314,7 +372,10 @@ const ProjectQuotations = ({ projects = [] }) => {
                 </div>
 
                 {quotations.map((q) => (
-                  <div key={q.id} className="bg-background rounded-lg border border-border p-3">
+                  <div
+                    key={q.id}
+                    className="bg-background rounded-lg border border-border p-3"
+                  >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
@@ -325,44 +386,55 @@ const ProjectQuotations = ({ projects = [] }) => {
                             v{q.version}
                           </span>
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${getStatusColor(q.status)}`}
+                            className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${getStatusColor(
+                              q.status
+                            )}`}
                           >
                             {q.statusLabel}
                           </span>
                         </div>
-                        <p className="text-xs text-muted-foreground mb-2">{q.description}</p>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          {q.description}
+                        </p>
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <div className="text-[11px] text-muted-foreground">Monto</div>
+                            <div className="text-[11px] text-muted-foreground">
+                              Monto
+                            </div>
                             <div className="text-sm font-semibold text-foreground">
                               {formatCurrency(q.amount)}
                             </div>
                           </div>
                           <div>
-                            <div className="text-[11px] text-muted-foreground">Vence</div>
-                            <div className="text-sm text-foreground">{formatDate(q.expiryDate)}</div>
+                            <div className="text-[11px] text-muted-foreground">
+                              Vence
+                            </div>
+                            <div className="text-sm text-foreground">
+                              {formatDate(q.expiryDate)}
+                            </div>
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
-                        {/*   <Button
+                        {/*
+                        <Button
                           variant="ghost"
                           size="icon"
                           title="Ver"
                           onClick={() => handleViewQuotation(selectedProject, q)}
                         >
                           <Icon name="Eye" size={16} />
-                        </Button> */}
-                       
-                        {/*  <Button
+                        </Button>
+
+                        <Button
                           variant="ghost"
                           size="icon"
                           title="Descargar PDF"
                           onClick={() => alert(`Descargando PDF de ${q.code}`)}
                         >
                           <Icon name="Download" size={16} />
-                        </Button> */}
-                      
+                        </Button>
+                        */}
                       </div>
                     </div>
                   </div>
