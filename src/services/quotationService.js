@@ -88,6 +88,28 @@ const quotationService = {
         throw error;
       }
     },
+
+    // Agregar/actualizar materiales en una cotización
+    async updateMateriales(idCotizacion, materiales) {
+      try {
+        const response = await httpService.patch(`cotizacion/${idCotizacion}/materiales`, { materiales });
+        return response.data;
+      } catch (error) {
+        console.error('Error actualizando materiales:', error);
+        throw error;
+      }
+    },
+
+    // Actualizar materiales y evaluación de riesgos
+    async updateMaterialesYRiesgos(idCotizacion, data) {
+      try {
+        const response = await httpService.patch(`cotizacion/${idCotizacion}/materiales`, data);
+        return response.data;
+      } catch (error) {
+        console.error('Error actualizando materiales y riesgos:', error);
+        throw error;
+      }
+    },
 };
 
 export default quotationService;

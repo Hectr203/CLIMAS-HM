@@ -268,9 +268,20 @@ const InventoryPanel = ({
                   <p className="text-sm text-muted-foreground">No hay requisiciones disponibles.</p>
                 ) : (
                   displayedRequisitions.map((request) => {
+                    // Debug - ver estructura de datos
+                    console.log('Requisición completa:', request);
+                    console.log('Materiales inventario:', request.materiales);
+                    console.log('Materiales manuales:', request.materialesManuales);
+                    
+                    // Normalizar materiales de inventario
+                    const materialesInventario = request.materiales || request.items || [];
+                    
+                    // Normalizar materiales manuales
+                    const materialesManuales = request.materialesManuales || request.manualItems || [];
+                    
                     const allMaterials = [
-                      ...(request.materiales || []),
-                      ...(request.materialesManuales || [])
+                      ...materialesInventario,
+                      ...materialesManuales
                     ];
 
                     return (
@@ -286,19 +297,70 @@ const InventoryPanel = ({
                         <div className="mb-3">
                           <p className="text-xs text-muted-foreground mb-2">Materiales Solicitados:</p>
                           {allMaterials.length > 0 ? (
-                            <ul className="space-y-1">
-                              {allMaterials.map((item, index) => (
-                                <li key={index} className="text-xs text-foreground flex items-center space-x-2">
-                                  <Icon name="Package" size={12} />
-                                  <span>
-                                    {item.nombreMaterial || item.nombre || item.name || "Sin nombre"} - {item.cantidad} {item.unidad}
-                                    {request.materialesManuales?.includes(item) && (
-                                      <span className="text-[10px] text-muted-foreground ml-1">(Manual)</span>
-                                    )}
-                                  </span>
-                                </li>
-                              ))}
-                            </ul>
+                            <div className="space-y-2">
+                              {/* Materiales del Inventario */}
+                              {materialesInventario.length > 0 && (
+                                <div>
+                                  <p className="text-xs font-medium text-blue-700 mb-1 flex items-center">
+                                    <Icon name="Package" size={12} className="mr-1" />
+                                    Del Inventario ({materialesInventario.length})
+                                  </p>
+                                  <ul className="space-y-1 ml-4">
+                                    {materialesInventario.map((item, index) => (
+                                      <li key={index} className="text-xs text-foreground flex items-start space-x-2">
+                                        <span className="text-blue-600 mt-0.5">•</span>
+                                        <span>
+                                          <span className="font-medium">{item.nombreMaterial || item.nombre || item.name}</span>
+                                          {item.codigoArticulo && (
+                                            <span className="text-muted-foreground text-[10px]"> ({item.codigoArticulo})</span>
+                                          )}
+                                          <span className="text-muted-foreground"> - {item.cantidad || item.quantity} {item.unidad || item.unit}</span>
+                                          {item.urgencia && item.urgencia !== 'Normal' && (
+                                            <span className={`ml-1 text-[10px] px-1 py-0.5 rounded ${
+                                              item.urgencia === 'Urgente' || item.urgencia === 'Crítica' 
+                                                ? 'bg-red-100 text-red-700' 
+                                                : 'bg-orange-100 text-orange-700'
+                                            }`}>
+                                              {item.urgencia}
+                                            </span>
+                                          )}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              
+                              {/* Materiales Manuales */}
+                              {materialesManuales.length > 0 && (
+                                <div>
+                                  <p className="text-xs font-medium text-green-700 mb-1 flex items-center">
+                                    <Icon name="Edit3" size={12} className="mr-1" />
+                                    Manuales ({materialesManuales.length})
+                                  </p>
+                                  <ul className="space-y-1 ml-4">
+                                    {materialesManuales.map((item, index) => (
+                                      <li key={index} className="text-xs text-foreground flex items-start space-x-2">
+                                        <span className="text-green-600 mt-0.5">•</span>
+                                        <span>
+                                          <span className="font-medium">{item.nombreMaterial || item.nombre || item.name}</span>
+                                          <span className="text-muted-foreground"> - {item.cantidad || item.quantity} {item.unidad || item.unit}</span>
+                                          {item.urgencia && item.urgencia !== 'Normal' && (
+                                            <span className={`ml-1 text-[10px] px-1 py-0.5 rounded ${
+                                              item.urgencia === 'Urgente' || item.urgencia === 'Crítica' 
+                                                ? 'bg-red-100 text-red-700' 
+                                                : 'bg-orange-100 text-orange-700'
+                                            }`}>
+                                              {item.urgencia}
+                                            </span>
+                                          )}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
                           ) : (
                             <p className="text-xs text-muted-foreground">No se han agregado materiales aún.</p>
                           )}

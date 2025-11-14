@@ -73,8 +73,10 @@ const useRequisi = () => {
       const response = await requisiService.updateRequisition(id, payload);
       if (response.success) {
         showOperationSuccess(response.message || "Requisición actualizada");
-        setRequisitions(prev => prev.map(r => r.id === id ? { ...r, ...payload } : r));
-        return { ...payload, id };
+        // ✅ Usar la data de la respuesta del backend, no el payload
+        const updatedRequisition = response.data || { ...payload, id };
+        setRequisitions(prev => prev.map(r => r.id === id ? updatedRequisition : r));
+        return updatedRequisition;
       } else {
         showHttpError(response.message || "Error desconocido al actualizar requisición");
         return null;
@@ -112,9 +114,25 @@ const deleteRequisition = async (id) => {
   }
 };
 
+  const getRequisitionById = async (id) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await requisiService.getRequisitionById(id);
+      setLoading(false);
+      return data;
+    } catch (err) {
+      console.error('Error en getRequisitionById:', err);
+      setError(err);
+      showHttpError("Error al cargar la requisición");
+      setLoading(false);
+      return null;
+    }
+  };
 
 
-  return { requisitions, loading, error, getRequisitions, createRequisition, updateRequisition, deleteRequisition };
+
+  return { requisitions, loading, error, getRequisitions, createRequisition, updateRequisition, deleteRequisition, getRequisitionById };
 };
 
 export default useRequisi;

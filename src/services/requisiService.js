@@ -37,7 +37,8 @@ const requisiService = {
             estado: item.estado || item.status,
             prioridad: item.prioridad || item.priority,
             descripcionSolicitud: item.descripcionSolicitud || item.description,
-            materiales: item.materiales || item.items,
+            materiales: item.materiales || item.items || [],
+            materialesManuales: item.materialesManuales || item.manualItems || [], // ✅ AGREGAR ESTO
             justificacionSolicitud: item.justificacionSolicitud || item.justification,
             notasAdicionales: item.notasAdicionales || item.notes
           })),
@@ -58,7 +59,8 @@ const requisiService = {
             estado: item.estado || item.status,
             prioridad: item.prioridad || item.priority,
             descripcionSolicitud: item.descripcionSolicitud || item.description,
-            materiales: item.materiales || item.items,
+            materiales: item.materiales || item.items || [],
+            materialesManuales: item.materialesManuales || item.manualItems || [], // ✅ AGREGAR ESTO
             justificacionSolicitud: item.justificacionSolicitud || item.justification,
             notasAdicionales: item.notasAdicionales || item.notes
           })),
@@ -120,6 +122,16 @@ const requisiService = {
       return response;
     } catch (error) {
       console.error("Error al eliminar requisición:", error);
+      throw error;
+    }
+  },
+
+  async getRequisitionById(id) {
+    try {
+      const response = await httpService.get(`/requisiciones/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error("Error al obtener requisición por ID:", error);
       throw error;
     }
   }
