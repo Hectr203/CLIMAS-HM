@@ -394,21 +394,45 @@ import useOperacAlt from '../../../hooks/useOperacAlt';
                                 </div>
 
                                   <div className="mb-3">
-                                  <div className="flex items-center justify-between text-xs mb-1">
-                                    <span className="text-muted-foreground">Materiales:</span>
-                                    <span className="font-medium">{order?.materials?.received}/{order?.materials?.total}</span>
-                                  </div>
-                                  <div className="w-full bg-gray-200 rounded-full h-1">
-                                    <div
-                                      className={`h-1 rounded-full ${
-                                        order?.materials?.status === 'complete' ? 'bg-green-500' : order?.materials?.status === 'partial' ? 'bg-yellow-500' : 'bg-red-500'
-                                      }`}
-                                      style={{ width: `${(order?.materials?.received / (order?.materials?.total || 1)) * 100}%` }}
-                                    />
-                                  </div>
-                                  {order?.materials?.issues?.length > 0 && (
-                                    <div className="text-xs text-red-600 mt-1">{order?.materials?.issues?.length} problema(s)</div>
-                                  )}
+                                  {(() => {
+                                    const reception = order?.recepcionMateriales || order?.raw?.recepcionMateriales || { materials: [] };
+                                    const materials = order?.materials;
+                                    
+                                    // Calcular totales desde recepcionMateriales si existen
+                                    const totalReceived = reception?.materials?.reduce((sum, m) => sum + (Number(m.received) || 0), 0) || reception?.cantidadRecibida || reception?.received || materials?.received || 0;
+                                    const totalRequired = reception?.materials?.reduce((sum, m) => sum + (Number(m.required) || 0), 0) || materials?.total || 0;
+                                    const totalPending = Math.max(0, totalRequired - totalReceived);
+                                    
+                                    return (
+                                      <>
+                                        <div className="flex items-center justify-between text-xs mb-1">
+                                          <span className="text-muted-foreground">Materiales:</span>
+                                          <div className="flex items-center gap-1">
+                                            <span className="text-green-600 font-semibold">{totalReceived}</span>
+                                            <span className="text-muted-foreground">/</span>
+                                            <span className="font-semibold">{totalRequired}</span>
+                                            {totalPending > 0 && (
+                                              <>
+                                                <span className="text-muted-foreground mx-1">•</span>
+                                                <span className="text-orange-600 font-medium">{totalPending} faltantes</span>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div className="w-full bg-gray-200 rounded-full h-1">
+                                          <div
+                                            className={`h-1 rounded-full ${
+                                              totalPending === 0 ? 'bg-green-500' : totalReceived > 0 ? 'bg-yellow-500' : 'bg-red-500'
+                                            }`}
+                                            style={{ width: `${totalRequired > 0 ? (totalReceived / totalRequired * 100) : 0}%` }}
+                                          />
+                                        </div>
+                                        {order?.materials?.issues?.length > 0 && (
+                                          <div className="text-xs text-red-600 mt-1">{order?.materials?.issues?.length} problema(s)</div>
+                                        )}
+                                      </>
+                                    );
+                                  })()}
                                 </div>
 
                                 <div className="mb-3">

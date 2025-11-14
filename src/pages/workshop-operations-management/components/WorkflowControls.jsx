@@ -4,11 +4,13 @@ import Button from '../../../components/ui/Button';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import requisiService from '../../../services/requisiService';
+import useGastos from '../../../hooks/useGastos';
 
         
 
   const WorkflowControls = ({ selectedOrder, currentShift, totalOrders, workOrdersIds = [], workOrders = [], onForceRemove, onRevertStatus, localMissingByOrder = {} }) => {
           const isWorkingHours = currentShift === 'morning';
+    const { getGastos } = useGastos();
           const selectedMissingPPE = Array.isArray(selectedOrder?.safetyChecklistMissing)
             ? selectedOrder.safetyChecklistMissing
             : (Array.isArray(selectedOrder?.raw?.safetyChecklistMissing) ? selectedOrder.raw.safetyChecklistMissing : []);
@@ -124,6 +126,10 @@ import requisiService from '../../../services/requisiService';
           // async because we may fetch requisitions as a fallback source for approved materials
           const generateReport = async () => {
             if (!selectedOrder) return;
+
+            // Normalization helpers (shared with MaterialReceptionPanel) to improve matching
+            const normalizeKey = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const onlyDigits = (v) => (String(v || '').match(/\d+/g) || []).join('');
 
             // Helper: try to determine daily progress delta from multiple possible aliases.
             const computeDailyProgressDelta = () => {
@@ -307,16 +313,25 @@ import requisiService from '../../../services/requisiService';
                   try {
                     const resp = await requisiService.getRequisitions(c.q);
                     if (resp?.success && Array.isArray(resp.data) && resp.data.length) {
+                      // Collect all materials (don't require estado 'aprob')
                       const mats = [];
                       resp.data.forEach(req => {
-                        const estado = String(req?.estado || req?.status || '').toLowerCase();
-                        if (estado.includes('aprob')) {
-                          const list = Array.isArray(req.materiales) ? req.materiales : (Array.isArray(req.items) ? req.items : []);
-                          list.forEach(it => mats.push(it));
-                        }
+                        const list = Array.isArray(req.materiales) ? req.materiales : (Array.isArray(req.items) ? req.items : []);
+                        list.forEach(it => mats.push(it));
                       });
-                      const fromReq = extractApprovedFromArray(mats);
-                      if (fromReq.length) { approvedList = fromReq; break; }
+
+                      console.debug('[WorkflowControls] requisitions materials count', mats.length);
+                      if (mats.length) {
+                        // If items look like articulos (codigo/descripcion), map to article-like rows for PDF
+                        const first = mats[0];
+                        if (first && (first.codigo || first.descripcion || first.costoUnitario || first.cantidadConUnidad)) {
+                          approvedList = mats.map(a => ({ codigo: a.codigo, descripcion: a.descripcion || a.nombre || a.producto, cantidadConUnidad: a.cantidadConUnidad ?? a.cantidad ?? a.qty, costoUnitario: a.costoUnitario ?? a.precio ?? a.price, subtotal: a.subtotal ?? a.total ?? 0 }));
+                          break;
+                        }
+
+                        const fromReq = extractApprovedFromArray(mats);
+                        if (fromReq.length) { approvedList = fromReq; break; }
+                      }
                     }
                   } catch (e) {
                     // ignore and continue with other candidates
@@ -324,16 +339,77 @@ import requisiService from '../../../services/requisiService';
                 }
               }
 
+              // if still empty, try gastos (ordenes de compra) via hook
+              if (!approvedList.length) {
+                try {
+                  console.debug('[WorkflowControls] generateReport: trying getGastos fallback for selectedOrder', { ordenTrabajo: selectedOrder?.ordenTrabajo, id: selectedOrder?.id, folio: selectedOrder?.folio });
+                  const gresp = await getGastos();
+                  console.debug('[WorkflowControls] getGastos returned', Array.isArray(gresp) ? gresp.length : (gresp?.items?.length || gresp?.data?.length || 0));
+                  const list = Array.isArray(gresp) ? gresp : (gresp?.items || gresp?.data || []);
+                  if (Array.isArray(list) && list.length) {
+                    const candidates = [];
+                    if (selectedOrder?.ordenTrabajo) candidates.push(String(selectedOrder.ordenTrabajo));
+                    if (selectedOrder?.id) candidates.push(String(selectedOrder.id));
+                    if (selectedOrder?.folio) candidates.push(String(selectedOrder.folio));
+                    if (selectedOrder?.raw?.id) candidates.push(String(selectedOrder.raw.id));
+
+                    for (const po of list) {
+                      try {
+                        const poKeys = [po?.numeroOrdenTrabajo, po?.orderNumber, po?.numero, po?.folio, po?.id, po?.ordenTrabajo, po?.numeroOrdenCompra].filter(Boolean).map(String);
+                        const nor = normalizeKey(selectedOrder?.ordenTrabajo || selectedOrder?.id || selectedOrder?.folio || selectedOrder?.raw?.id || '');
+                        const nd = onlyDigits(selectedOrder?.ordenTrabajo || selectedOrder?.id || selectedOrder?.folio || selectedOrder?.raw?.id || '');
+                        const matched = poKeys.some(k => {
+                          const nk = normalizeKey(k);
+                          const kd = onlyDigits(k);
+                          if (nk && nor && (nk.includes(nor) || nor.includes(nk))) return true;
+                          if (kd && nd && kd === nd) return true;
+                          if (String(selectedOrder?.ordenTrabajo || '').toLowerCase().includes(String(k).toLowerCase()) || String(k).toLowerCase().includes(String(selectedOrder?.ordenTrabajo || '').toLowerCase())) return true;
+                          return false;
+                        });
+                        if (matched) {
+                          // prefer articulos if present
+                          const articles = Array.isArray(po.articulos) ? po.articulos : (Array.isArray(po.materiales) ? po.materiales : (Array.isArray(po.items) ? po.items : []));
+                          if (articles.length) {
+                            approvedList = articles.map(a => ({ codigo: a.codigo, descripcion: a.descripcion || a.nombre || a.producto, cantidadConUnidad: a.cantidadConUnidad ?? a.cantidad ?? a.qty, costoUnitario: a.costoUnitario ?? a.precio ?? a.price, subtotal: a.subtotal ?? a.total ?? 0 }));
+                            console.debug('[WorkflowControls] matched PO, articles count', approvedList.length);
+                            break;
+                          }
+                        }
+                      } catch (e) { console.warn('[WorkflowControls] error checking PO', e?.message || e); }
+                    }
+                  }
+                } catch (e) {
+                  console.warn('[WorkflowControls] getGastos failed', e?.message || e);
+                }
+              }
+
               if (approvedList && approvedList.length) {
                 const startY2 = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 250;
-                const rowsApproved = approvedList.map(a => [a.name || '', String(a.required || 0), String(a.received || 0), String(Math.max(0, (a.required || 0) - (a.received || 0)))]);
-                doc.autoTable({
-                  startY: startY2 + 8,
-                  head: [['Material Aprobado', 'Req.', 'Recibidos', 'Faltantes']],
-                  body: rowsApproved,
-                  theme: 'grid',
-                  styles: { fontSize: 10 }
-                });
+                const formatCurrency = (v) => {
+                  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(Number(v || 0)); } catch (e) { return String(v); }
+                };
+
+                // If articles shape (codigo) use the requested columns, otherwise use generic approved shape
+                let rowsApproved = [];
+                if (approvedList[0] && approvedList[0].codigo) {
+                  rowsApproved = approvedList.map(a => [String(a.codigo || ''), String(a.descripcion || ''), String(a.cantidadConUnidad ?? a.cantidad ?? a.qty ?? ''), String(formatCurrency(a.costoUnitario)), String(formatCurrency(a.subtotal))]);
+                  doc.autoTable({
+                    startY: startY2 + 8,
+                    head: [['Código', 'Descripción', 'Cantidad', 'Costo Unitario', 'Subtotal']],
+                    body: rowsApproved,
+                    theme: 'grid',
+                    styles: { fontSize: 10 }
+                  });
+                } else {
+                  rowsApproved = approvedList.map(a => [a.name || '', String(a.required || 0), String(a.received || 0), String(Math.max(0, (a.required || 0) - (a.received || 0)))]);
+                  doc.autoTable({
+                    startY: startY2 + 8,
+                    head: [['Material Aprobado', 'Req.', 'Recibidos', 'Faltantes']],
+                    body: rowsApproved,
+                    theme: 'grid',
+                    styles: { fontSize: 10 }
+                  });
+                }
               }
             } catch (e) {
               // ignore approved-materials errors for PDF generation
@@ -499,6 +575,37 @@ import requisiService from '../../../services/requisiService';
                           }
                         })()}
                       </span>
+                    </div>
+
+                    {/* Materiales - recibidos y faltantes */}
+                    <div className="col-span-2 mt-1">
+                      <strong className="block mb-1">Materiales</strong>
+                      {(() => {
+                        const reception = selectedOrder?.recepcionMateriales || selectedOrder?.raw?.recepcionMateriales || { materials: [] };
+                        const materials = selectedOrder?.materials;
+                        
+                        // Calcular totales desde recepcionMateriales si existen
+                        const totalReceived = reception?.materials?.reduce((sum, m) => sum + (Number(m.received) || 0), 0) || reception?.cantidadRecibida || reception?.received || materials?.received || 0;
+                        const totalRequired = reception?.materials?.reduce((sum, m) => sum + (Number(m.required) || 0), 0) || materials?.total || 0;
+                        const totalPending = Math.max(0, totalRequired - totalReceived);
+                        
+                        return (
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="text-green-600 font-semibold">{totalReceived}</span>
+                            <span className="text-muted-foreground">/</span>
+                            <span className="font-semibold">{totalRequired}</span>
+                            {totalPending > 0 && (
+                              <>
+                                <span className="text-muted-foreground">•</span>
+                                <span className="text-orange-600 font-medium flex items-center gap-1">
+                                  <Icon name="AlertCircle" size={14} />
+                                  {totalPending} faltantes
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Técnicos ocupa toda la fila en caso de necesitar más espacio */}

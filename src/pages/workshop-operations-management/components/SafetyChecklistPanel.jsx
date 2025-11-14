@@ -58,17 +58,6 @@ import React, { useState, useEffect } from 'react';
               ]
             },
             {
-              id: 'workspace',
-              title: 'Área de Trabajo',
-              items: [
-                'Área limpia y ordenada',
-                'Iluminación adecuada',
-                'Ventilación apropiada',
-                'Salidas de emergencia libres',
-                'Extintores accesibles'
-              ]
-            },
-            {
               id: 'procedures',
               title: 'Procedimientos',
               items: [
