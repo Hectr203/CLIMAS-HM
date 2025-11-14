@@ -12,10 +12,12 @@ import WorkOrderPanel from './components/WorkOrderPanel';
 import ChangeManagementPanel from './components/ChangeManagementPanel';
 import NewOpportunityModal from './components/NewOpportunityModal';
 import { useOpportunity } from '../../hooks/useOpportunity';
+import { useNotifications } from '../../context/NotificationContext';
 
 
 const SalesOpportunityManagement = () => {
   const { oportunidades, loading, error, crearOportunidad, fetchOportunidades, actualizarOportunidad } = useOpportunity();
+  const { showOperationSuccess } = useNotifications();
   // Estado local de oportunidades para el mock y handlers
   const [opportunities, setOpportunities] = useState([]);
   const [selectedOpportunity, setSelectedOpportunity] = useState(null);
@@ -24,6 +26,18 @@ const SalesOpportunityManagement = () => {
   const [showNewOpportunityModal, setShowNewOpportunityModal] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+
+  // Verificar si viene de crear cotización
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('cotizacionCreada') === 'true') {
+      showOperationSuccess('Cotización creada exitosamente. La oportunidad permanece en Desarrollo de Cotización.');
+      // Limpiar el parámetro de la URL
+      window.history.replaceState({}, '', '/oportunidades');
+      // Recargar oportunidades para ver los datos actualizados
+      fetchOportunidades();
+    }
+  }, []);
 
   // Etapas del flujo de ventas
   const salesStages = useMemo(() => [
@@ -338,8 +352,8 @@ const SalesOpportunityManagement = () => {
       if (newStage === 'quotation-development') {
         // Actualiza primero el estado
         await actualizarOportunidad(opportunityId, { etapa: newStage });
-        // Redirige a quotation-development-center con los parámetros necesarios
-        window.location.href = `/quotation-development-center?opportunityId=${opportunityId}&newQuotation=true`;
+        // Redirige a cotizaciones con los parámetros necesarios
+        window.location.href = `/cotizaciones?opportunityId=${opportunityId}&newQuotation=true`;
         return;
       }
 

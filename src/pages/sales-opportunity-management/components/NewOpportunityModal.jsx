@@ -74,12 +74,23 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity, error }) =>
     if (!formData.projectId) return;
     const proyecto = proyectosCliente.find(p => (p.id || p._id) === formData.projectId);
     if (proyecto) {
+      // Formatear ubicación correctamente
+      let ubicacionTexto = '';
+      if (proyecto.ubicacion) {
+        if (typeof proyecto.ubicacion === 'string') {
+          ubicacionTexto = proyecto.ubicacion;
+        } else if (typeof proyecto.ubicacion === 'object') {
+          const { direccion = '', municipio = '', estado = '' } = proyecto.ubicacion;
+          ubicacionTexto = `${direccion}${municipio ? ', ' + municipio : ''}${estado ? ', ' + estado : ''}`.trim();
+        }
+      }
+      
       setFormData(prev => ({
         ...prev,
         projectType: proyecto.tipoProyecto || proyecto.type || 'project',
         projectDescription: proyecto.descripcion || proyecto.description || proyecto.descripcionProyecto || '',
-        location: proyecto.ubicacion || proyecto.location || '',
-        estimatedBudget: String(proyecto.presupuesto?.equipos || proyecto.presupuesto?.total || proyecto.presupuesto || ''),
+        location: ubicacionTexto || proyecto.location || '',
+        estimatedBudget: String(proyecto.presupuesto?.total || proyecto.presupuesto || ''),
         timeline: proyecto.cronograma?.fechaFin
           ? `${proyecto.cronograma?.fechaInicio || ''} - ${proyecto.cronograma?.fechaFin}`
           : (typeof proyecto.cronograma === 'string' ? proyecto.cronograma : '')
@@ -428,28 +439,26 @@ const NewOpportunityModal = ({ isOpen, onClose, onCreateOpportunity, error }) =>
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input
-                    label="Ubicación"
-                    required
-                    value={formData?.location}
-                    onChange={(e) => handleInputChange('location', e?.target?.value)}
-                    error={errors?.location}
-                    placeholder="Ciudad, Estado"
-                  />
+                <Input
+                  label="Ubicación"
+                  required
+                  value={formData?.location}
+                  onChange={(e) => handleInputChange('location', e?.target?.value)}
+                  error={errors?.location}
+                  placeholder="Ciudad, Estado"
+                />
 
-                  <Input
-                    label="Presupuesto Estimado (MXN)"
-                    type="number"
-                    required
-                    value={formData?.estimatedBudget}
-                    onChange={(e) => handleInputChange('estimatedBudget', e?.target?.value)}
-                    error={errors?.estimatedBudget}
-                    placeholder="0"
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
+                <Input
+                  label="Presupuesto Estimado (MXN)"
+                  type="number"
+                  required
+                  value={formData?.estimatedBudget}
+                  onChange={(e) => handleInputChange('estimatedBudget', e?.target?.value)}
+                  error={errors?.estimatedBudget}
+                  placeholder="0"
+                  min="0"
+                  step="0.01"
+                />
 
                 <Input
                   label="Cronograma Esperado"
