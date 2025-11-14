@@ -569,7 +569,20 @@ const PersonnelModal = ({ isOpen, onClose, employee, mode, onSave, error, opened
                   label="Teléfono de Contacto"
                   type="tel"
                   value={mode === 'view' ? (employee?.emergencyContact?.phone ?? '') : formData.emergencyContact.phone}
-                  onChange={(e) => handleInputChange('emergencyContact.phone', e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Solo permitir números y limitar a 10 dígitos
+                    const numericValue = value.replace(/\D/g, '').slice(0, 10);
+                    handleInputChange('emergencyContact.phone', numericValue);
+                  }}
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder="Ingresa 10 dígitos"
+                  description={
+                    mode !== 'view' 
+                      ? `${(formData.emergencyContact.phone || '').length}/10 dígitos`
+                      : undefined
+                  }
                   disabled={mode === 'view'}
                 />
                 <Select
