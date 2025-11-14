@@ -13,12 +13,22 @@ const formatearMoneda = (cantidad) => {
 // Limitar un valor dentro de un rango
 const limitarRango = (valor, minimo, maximo) => Math.min(Math.max(valor, minimo), maximo);
 
-// Convierte fecha a formato dd/mm/yyyy requerido por la API
+// Convierte fecha a formato dd/mm/yyyy para mostrar en UI
 const formatearFechaParaApi = (fechaLocalStr) => {
   if (!fechaLocalStr) return '';
   const d = new Date(fechaLocalStr);
   const rellenar = (n) => String(n).padStart(2, '0');
   return `${rellenar(d.getDate())}/${rellenar(d.getMonth() + 1)}/${d.getFullYear()}`;
+};
+
+// Convierte fecha del input (YYYY-MM-DD) a formato ISO UTC
+const formatearFechaISOUTC = (fechaLocalStr) => {
+  if (!fechaLocalStr) return '';
+  // La fecha viene en formato YYYY-MM-DD del input type="date"
+  // Crear un objeto Date en UTC a medianoche
+  const fecha = new Date(fechaLocalStr + 'T00:00:00.000Z');
+  // Devolver en formato ISO UTC
+  return fecha.toISOString();
 };
 
 // Convierte fecha ISO o string a formato compatible con input date
@@ -87,6 +97,7 @@ const EditAbonoModal = ({ isOpen, onClose, abono, project, onSave }) => {
   const [metodoPago, setMetodoPago] = useState('Transferencia');
   const [descripcion, setDescripcion] = useState('');
   const [descripcionMetodo, setDescripcionMetodo] = useState('');
+  const [referenciaPago, setReferenciaPago] = useState('');
   const [notas, setNotas] = useState('');
 
   // Información del proyecto obtenida de la API
@@ -111,14 +122,19 @@ const EditAbonoModal = ({ isOpen, onClose, abono, project, onSave }) => {
       const metodoPagoAbono = abono?.metodoPago ?? 'Transferencia';
       const descripcionAbono = abono?.descripcion ?? '';
       const descripcionMetodoAbono = abono?.descripcionMetodo ?? '';
+      const referenciaPagoAbono = abono?.referenciaPago ?? abono?.referencia ?? '';
       const notasAbono = abono?.notas ?? '';
 
-      setMonto(montoAbono.toString());
-      setMontoOriginal(montoAbono);
+      // Asegurar que el monto siempre tenga un valor (mínimo 0)
+      const montoFinal = montoAbono > 0 ? montoAbono : 0;
+      setMonto(montoFinal.toString());
+      setMontoFormateado(formatearNumeroConSeparadores(montoFinal.toString()));
+      setMontoOriginal(montoAbono); // Guardar el valor original del abono para cálculos
       setFechaLocal(deFechaALocalInput(fechaAbono));
       setMetodoPago(metodoPagoAbono);
       setDescripcion(descripcionAbono);
       setDescripcionMetodo(descripcionMetodoAbono);
+      setReferenciaPago(referenciaPagoAbono);
       setNotas(notasAbono);
 
       // Obtener información del proyecto de la API si tenemos un ID
@@ -191,18 +207,53 @@ const EditAbonoModal = ({ isOpen, onClose, abono, project, onSave }) => {
     // Limpiar el valor ingresado (remover comas y caracteres no numéricos excepto punto decimal)
     const valorLimpio = limpiarNumeroFormateado(valor);
     
+    // Si el campo está vacío, usar "0"
+    let valorFinal = valorLimpio === '' ? '0' : valorLimpio;
+    
+    // Si el valor actual es "0" y el usuario está escribiendo algo nuevo
+    if (monto === '0' && valorLimpio !== '' && valorLimpio !== '0') {
+      // Si el usuario escribe un punto decimal, permitir "0."
+      if (valorLimpio === '.' || valorLimpio === '0.') {
+        valorFinal = '0.';
+      }
+      // Si el usuario escribe un dígito, reemplazar el "0" con ese dígito
+      // Ejemplo: "0" + "1" = "1", "0" + "12" = "12"
+      else if (/^\d+\.?\d*$/.test(valorLimpio)) {
+        // Si empieza con "0" seguido de dígitos (no decimal), quitar el "0" inicial
+        // Ejemplo: "05" -> "5", "012" -> "12"
+        if (valorLimpio.match(/^0+[1-9]/)) {
+          valorFinal = valorLimpio.replace(/^0+/, '');
+        } else {
+          valorFinal = valorLimpio;
+        }
+      }
+    }
+    
+    // Permitir solo un punto decimal: si hay múltiples, mantener solo el primero
+    const partes = valorFinal.split('.');
+    if (partes.length > 2) {
+      valorFinal = partes[0] + '.' + partes.slice(1).join('');
+    }
+    
     // Actualizar el valor numérico limpio para cálculos
-    setMonto(valorLimpio);
+    setMonto(valorFinal);
     
     // Actualizar el valor formateado para mostrar
-    setMontoFormateado(formatearNumeroConSeparadores(valorLimpio));
+    setMontoFormateado(formatearNumeroConSeparadores(valorFinal));
     
     // Calcular saldo si el valor es numérico válido
-    const num = Number(valorLimpio);
-    if (!isNaN(num) && valorLimpio !== '') {
+    const num = Number(valorFinal);
+    if (!isNaN(num)) {
       const diferencia = num - montoOriginal;
-      const nuevoSaldo = Math.max(infoProyecto.presupuesto - (Number(totalAbonado || 0) + diferencia), 0);
+      const totalPagadoAcumulado = Number(totalAbonado || 0) + diferencia;
+      const importeTotal = Number(infoProyecto.presupuesto || 0);
+      const nuevoSaldo = Math.max(importeTotal - totalPagadoAcumulado, 0);
       setSaldo(nuevoSaldo);
+      
+      // Limpiar error si el monto es válido
+      if (totalPagadoAcumulado <= importeTotal) {
+        setError('');
+      }
     }
   };
 
@@ -235,22 +286,33 @@ const EditAbonoModal = ({ isOpen, onClose, abono, project, onSave }) => {
       setError('La descripción del método de pago es obligatoria cuando se selecciona "Otro".');
       return;
     }
+    if (['Transferencia', 'Tarjeta', 'Cheque'].includes(metodoPago) && !referenciaPago?.trim()) {
+      setError('La referencia de pago es obligatoria para este método de pago.');
+      return;
+    }
     if (!['Efectivo', 'Transferencia', 'Tarjeta', 'Cheque', 'Otro'].includes(metodoPago)) {
       setError('Método de pago no válido.');
       return;
     }
-    if (totalPagadoPrevio > infoProyecto.presupuesto) {
-      setError('El total pagado excede el importe total del proyecto.');
+    // Validar que el total pagado acumulado no exceda el importe total del proyecto
+    const importeTotal = Number(infoProyecto.presupuesto || 0);
+    
+    if (totalPagadoPrevio > importeTotal) {
+      const excedente = totalPagadoPrevio - importeTotal;
+      setError(
+        `No se puede actualizar el abono. El total pagado acumulado (${formatearMoneda(totalPagadoPrevio)}) excede el importe total del proyecto (${formatearMoneda(importeTotal)}). Excedente: ${formatearMoneda(excedente)}.`
+      );
       return;
     }
 
     const datos = {
       idProyecto: idProyecto.trim(),
       montoAbono: Number(monto),
-      fecha: formatearFechaParaApi(fechaLocal),
+      fecha: formatearFechaISOUTC(fechaLocal),
       metodoPago,
       descripcion: descripcion.trim(),
       descripcionMetodo: metodoPago === 'Otro' ? descripcionMetodo.trim() : undefined,
+      referenciaPago: ['Transferencia', 'Tarjeta', 'Cheque'].includes(metodoPago) ? referenciaPago.trim() : undefined,
       notas: notas?.trim() || undefined
     };
 
@@ -365,11 +427,20 @@ const EditAbonoModal = ({ isOpen, onClose, abono, project, onSave }) => {
                   inputMode="decimal"
                   placeholder="0.00"
                   value={montoFormateado}
-                  onChange={(e) => manejarCambioMonto(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  onChange={(e) => manejarCambioMonto(e.target.value) }
+                  className={`flex h-10 w-full rounded-md border px-3 py-2 text-sm bg-background ${
+                    Number(monto) > 0 && totalPagadoPrevio > Number(infoProyecto.presupuesto || 0)
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                      : 'border-input'
+                  }`}
                   required
                   disabled={loading}
                 />
+                {Number(monto) > 0 && totalPagadoPrevio > Number(infoProyecto.presupuesto || 0) && (
+                  <p className="text-xs text-red-600 mt-1">
+                    ⚠️ El monto excede el límite disponible. Saldo disponible: {formatearMoneda(saldo)}
+                  </p>
+                )}
               </div>
 
               {/* Saldo */}
@@ -388,6 +459,7 @@ const EditAbonoModal = ({ isOpen, onClose, abono, project, onSave }) => {
                   onChange={(e) => {
                     setMetodoPago(e.target.value);
                     if (e.target.value !== 'Otro') setDescripcionMetodo('');
+                    if (!['Transferencia', 'Tarjeta', 'Cheque'].includes(e.target.value)) setReferenciaPago('');
                   }}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   disabled={loading}
@@ -400,9 +472,33 @@ const EditAbonoModal = ({ isOpen, onClose, abono, project, onSave }) => {
                 </select>
               </div>
 
+              {/* Referencia de pago (si es Transferencia, Tarjeta o Cheque) */}
+              {['Transferencia', 'Tarjeta', 'Cheque'].includes(metodoPago) && (
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Referencia de pago <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={referenciaPago}
+                    onChange={(e) => setReferenciaPago(e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    placeholder={
+                      metodoPago === 'Transferencia' 
+                        ? 'Número de transferencia o CLABE'
+                        : metodoPago === 'Tarjeta'
+                        ? 'Últimos 4 dígitos o número de autorización'
+                        : 'Número de cheque'
+                    }
+                    required
+                    disabled={loading}
+                  />
+                </div>
+              )}
+
               {/* Descripción método (si es Otro) */}
               {metodoPago === 'Otro' && (
-                <div>
+                <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-foreground mb-2">
                     Descripción del método de pago
                   </label>

@@ -8,38 +8,93 @@ import useQuotation from '../../../hooks/useQuotation';
         const InternalReview = ({ quotation, onSubmitReview }) => {
           const { showSuccess, showError } = useNotifications();
           const { upsertRevision } = useQuotation();
+          
+          // ✅ Función para verificar si un área tiene datos válidos
+          const areaTieneDatos = (area) => {
+            if (!area || typeof area !== 'object') return false;
+            
+            // Tiene comentarios con contenido
+            const tieneComentarios = area.comentarios && 
+                                    typeof area.comentarios === 'string' && 
+                                    area.comentarios.trim().length > 0;
+            
+            // Está marcado como revisado
+            const estaRevisado = area.revisado === true;
+            
+            // Tiene revisor asignado
+            const tieneRevisor = area.revisor && 
+                                typeof area.revisor === 'string' && 
+                                area.revisor.trim().length > 0;
+            
+            // Es válida si tiene comentarios O está revisado O tiene revisor
+            return tieneComentarios || estaRevisado || tieneRevisor;
+          };
+          
+          // ✅ Función para filtrar solo áreas con datos reales
+          const filtrarAreasConDatos = (areasRevision) => {
+            const areasFiltradas = {};
+            
+            Object.entries(areasRevision || {}).forEach(([key, value]) => {
+              if (areaTieneDatos(value)) {
+                areasFiltradas[key] = value;
+              }
+            });
+            
+            return areasFiltradas;
+          };
+          
           // Función para enviar la revisión al backend
           const sendRevisionToBackend = async (reviewData) => {
             try {
               const fechaHoy = new Date().toISOString().split('T')[0];
-              // Construir el objeto de revisión para el backend con todas las áreas
+              
+              // Mapeo de nombres de áreas
               const areaMap = {
                 preciosYCostos: 'Precios y Costos',
                 alcanceYSupuestos: 'Alcance y Supuestos',
                 cronograma: 'Cronograma',
                 aspectosTecnicos: 'Aspectos Técnicos'
               };
+              
+              // ✅ FILTRAR áreas antes de construir el payload
+              const areasFiltradas = filtrarAreasConDatos(reviewData?.areasRevision);
+              
+              // Verificar si hay comentarios generales con contenido
+              const tieneComentariosGenerales = overallComments && 
+                                               typeof overallComments === 'string' && 
+                                               overallComments.trim().length > 0;
+              
+              // ✅ Si no hay datos válidos para enviar, mostrar error
+              if (Object.keys(areasFiltradas).length === 0 && !tieneComentariosGenerales) {
+                showError('Debes completar al menos un área de revisión o agregar comentarios generales');
+                return;
+              }
+              
+              // Construir el objeto de revisión solo con áreas que tienen datos
               const areasRevision = {};
-              Object.entries(reviewData?.areasRevision || {}).forEach(([key, value]) => {
+              Object.entries(areasFiltradas).forEach(([key, value]) => {
                 const areaName = areaMap[key] || key;
                 areasRevision[areaName] = {
                   [fechaHoy]: {
-                    revisor: value?.revisor || '',
+                    revisor: value?.revisor?.trim() || '',
                     revisado: value?.revisado || false,
-                    descripcion: value?.comentarios || '',
+                    comentarios: value?.comentarios?.trim() || '',
                     fecha: fechaHoy
                   }
                 };
               });
+              
               const revisionPayload = {
                 idCotizacion: quotation?.id,
                 areasRevision,
-                comentariosGenerales: overallComments
+                comentariosGenerales: tieneComentariosGenerales ? overallComments.trim() : undefined
               };
+              
               await upsertRevision(revisionPayload);
-              showSuccess('Revisión enviada');
+              showSuccess('Revisión enviada correctamente');
             } catch (err) {
               showError('Error al enviar la revisión');
+              console.error('Error:', err);
             }
           };
           const [reviewData, setReviewData] = useState(quotation?.internalReview || {

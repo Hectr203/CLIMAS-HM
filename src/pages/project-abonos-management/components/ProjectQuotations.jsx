@@ -83,19 +83,19 @@ const ProjectQuotations = ({ projects }) => {
   const handleCreateQuotation = (project) => {
     alert(`Creando nueva cotización para el proyecto: ${project?.name}\n\nSe abrirá el formulario de cotización.`);
     // Navigate to quotation creation
-    navigate(`/quotation-development-center?projectId=${project?.id}`);
+    navigate(`/cotizaciones?projectId=${project?.id}`);
   };
 
   const handleViewQuotation = (project, quotation) => {
     alert(`Ver detalles de la cotización: ${quotation?.code}\n\nProyecto: ${project?.name}\nMonto: ${formatCurrency(quotation?.amount)}\nEstado: ${quotation?.statusLabel}`);
     // Navigate to quotation details
-    navigate(`/quotation-development-center/${quotation?.id}`);
+    navigate(`/cotizaciones/${quotation?.id}`);
   };
 
   const handleEditQuotation = (project, quotation) => {
     alert(`Editando cotización: ${quotation?.code}\n\nProyecto: ${project?.name}\nVersión: ${quotation?.version}`);
     // Navigate to quotation edit
-    navigate(`/quotation-development-center/${quotation?.id}/edit`);
+    navigate(`/cotizaciones/${quotation?.id}/edit`);
   };
 
   return (

@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import useCommunication from '../../../hooks/useCommunication';
-  import useClient from '../../../hooks/useClient';
-        import Icon from '../../../components/AppIcon';
-        import Button from '../../../components/ui/Button';
-        import Input from '../../../components/ui/Input';
+import useClient from '../../../hooks/useClient';
+import Icon from '../../../components/AppIcon';
+import Button from '../../../components/ui/Button';
+import Input from '../../../components/ui/Input';
 
         const ClientCommunication = ({ quotation, onAddCommunication }) => {
           const [newCommunication, setNewCommunication] = useState({
@@ -16,6 +16,7 @@ import useCommunication from '../../../hooks/useCommunication';
 
           const [showHistory, setShowHistory] = useState(true);
           const [clientHistory, setClientHistory] = useState([]);
+          const historyRef = useRef(null);
           // Mostrar historial de comunicación por cotización
           useEffect(() => {
             if (quotation?.id) {
@@ -59,6 +60,30 @@ import useCommunication from '../../../hooks/useCommunication';
                   content: '',
                   urgency: 'normal',
                 });
+                // Recargar únicamente el historial desde el backend
+                if (quotation?.id) {
+                  getComunicacionByCotizacionId(quotation.id).then((res) => {
+                    if (res && res.data && Array.isArray(res.data)) {
+                      setClientHistory(res.data);
+                      setShowHistory(true);
+                      // Hacer scroll al tope para mostrar el último mensaje (suponiendo orden descendente)
+                      setTimeout(() => {
+                        if (historyRef.current) {
+                          historyRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+                        }
+                      }, 120);
+                    }
+                  }).catch(() => {
+                    // Fallback: insertar la comunicación si la recarga falla
+                    setClientHistory(prev => [data, ...(prev || [])]);
+                    setShowHistory(true);
+                  });
+                } else {
+                  // Si no hay id de cotización, insertar localmente
+                  setClientHistory(prev => [data, ...(prev || [])]);
+                  setShowHistory(true);
+                }
+                // Callback externo si existe
                 onAddCommunication?.(data);
               }
             });
@@ -100,6 +125,7 @@ import useCommunication from '../../../hooks/useCommunication';
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-semibold">Comunicación con Cliente</h3>
                 <div className="flex space-x-2">
+                  {/* Botón comentado: Enviar Cotización (se dejó comentado para posible uso futuro)
                   <Button
                     variant="outline"
                     onClick={handleQuotationSend}
@@ -108,6 +134,7 @@ import useCommunication from '../../../hooks/useCommunication';
                   >
                     Enviar Cotización
                   </Button>
+                  */}
                   <Button
                     variant="outline"
                     onClick={() => setShowHistory(!showHistory)}
@@ -127,7 +154,7 @@ import useCommunication from '../../../hooks/useCommunication';
                     <span>Historial de Comunicaciones</span>
                   </h4>
                   
-                  <div className="max-h-96 overflow-y-auto space-y-3 bg-muted/20 rounded-lg p-4">
+                  <div ref={historyRef} className="max-h-96 overflow-y-auto space-y-3 bg-muted/20 rounded-lg p-4">
                     {clientHistory.length > 0 ? (
                       clientHistory.map((comm) => (
                         <div key={comm.id} className="bg-white rounded-lg p-4 border">

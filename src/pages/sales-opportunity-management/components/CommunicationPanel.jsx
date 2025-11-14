@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import useCommunication from '../../../hooks/useCommunication';
+import { useAuth } from '../../../hooks/useAuth';
         import Icon from '../../../components/AppIcon';
         import Button from '../../../components/ui/Button';
         
 
         const CommunicationPanel = ({ opportunity, onAddCommunication }) => {
-          const { createCommunication, loading, error, success } = useCommunication();
+          const { createCommunication, getComunicacionesByOportunidad, loading, error, success } = useCommunication();
+          const { user } = useAuth();
           const [newCommunication, setNewCommunication] = useState({
             type: 'whatsapp',
             content: '',
@@ -14,7 +16,29 @@ import useCommunication from '../../../hooks/useCommunication';
           });
 
           const [showHistory, setShowHistory] = useState(false);
-          const [localHistory, setLocalHistory] = useState(opportunity?.communications || []);
+          const [localHistory, setLocalHistory] = useState([]);
+
+          // Cargar comunicaciones de la oportunidad al montar el componente
+          useEffect(() => {
+            if (opportunity?.id) {
+              loadCommunications();
+            }
+          }, [opportunity?.id]);
+
+          const loadCommunications = async () => {
+            const response = await getComunicacionesByOportunidad(opportunity.id);
+            if (response?.data?.comunicaciones) {
+              const formattedComms = response.data.comunicaciones.map(comm => ({
+                id: comm.id,
+                type: comm.tipoComunicacion,
+                date: new Date(parseInt(comm.id)).toLocaleDateString('es-MX'),
+                content: comm.mensaje,
+                urgency: comm.nivelUrgencia,
+                createdBy: comm.creadoPor,
+              }));
+              setLocalHistory(formattedComms);
+            }
+          };
 
           const handleInputChange = (field, value) => {
             setNewCommunication(prev => ({ ...prev, [field]: value }));
@@ -25,37 +49,28 @@ import useCommunication from '../../../hooks/useCommunication';
 
             // Mapea los datos al formato del backend
             const commData = {
-              id: `${Date.now()}`,
               tipoComunicacion: newCommunication?.type || 'whatsapp',
-              nivelUrgencia: newCommunication?.urgency === 'urgent' ? 'alta' : 'normal',
-              asunto: 'Comunicación automática',
+              nivelUrgencia: newCommunication?.urgency || 'normal',
+              asunto: `Comunicación desde Oportunidad`,
               mensaje: newCommunication?.content,
-              destinatario: opportunity?.clientId || opportunity?.clienteId || 'cliente777',
-              medioDifusion: newCommunication?.type || 'whatsapp',
-              estado: 'pendiente',
-              fechaCreacion: new Date()?.toISOString(),
-              creadoPor: 'test-user',
-              indicadorUrgencia: newCommunication?.urgency === 'urgent' ? 'Alta🟡' : 'Normal🟢',
+              idCliente: opportunity?.clientId || opportunity?.clienteId,
+              idOportunidad: opportunity?.id,
+              creadoPor: user?.rol ? `${user.rol} (${user.email})` : user?.email || 'Usuario',
             };
 
-            await createCommunication(commData);
-            // Actualiza el historial local
-            setLocalHistory(prev => [
-              {
-                id: commData.id,
-                type: commData.tipoComunicacion,
-                date: commData.fechaCreacion.split('T')[0],
-                content: commData.mensaje,
-                urgency: commData.nivelUrgencia === 'alta' ? 'urgent' : 'normal',
-              },
-              ...prev
-            ]);
+            const result = await createCommunication(commData);
+            if (!result) return;
+            
+            // Recargar las comunicaciones desde el backend
+            await loadCommunications();
+            
             setNewCommunication({ type: 'whatsapp', content: '', urgency: 'normal', hasAttachments: false });
           };
 
           const getUrgencyColor = (urgency) => {
             switch (urgency) {
-              case 'urgent': return 'text-red-600 bg-red-50';
+              case 'urgente': return 'text-red-600 bg-red-50';
+              case 'alta': return 'text-orange-600 bg-orange-50';
               case 'normal': return 'text-blue-600 bg-blue-50';
               default: return 'text-gray-600 bg-gray-50';
             }
@@ -84,7 +99,7 @@ import useCommunication from '../../../hooks/useCommunication';
                   {localHistory.map((comm) => (
                     <div key={comm?.id} className="flex items-start space-x-2 text-sm">
                       <Icon 
-                        name={comm?.type === 'whatsapp' ? 'MessageCircle' : 'Mail'} 
+                        name={comm?.type === 'whatsapp' ? 'MessageCircle' : comm?.type === 'email' ? 'Mail' : 'Phone'} 
                         size={14} 
                         className="text-muted-foreground mt-0.5" 
                       />
@@ -92,7 +107,7 @@ import useCommunication from '../../../hooks/useCommunication';
                         <div className="flex items-center space-x-2">
                           <span className="text-xs text-muted-foreground">{comm?.date}</span>
                           <span className={`px-2 py-1 text-xs rounded ${getUrgencyColor(comm?.urgency)}`}>
-                            {comm?.urgency === 'urgent' ? 'Urgente' : 'Normal'}
+                            {comm?.urgency === 'urgente' ? 'Urgente' : comm?.urgency === 'alta' ? 'Alta' : 'Normal'}
                           </span>
                         </div>
                         <p className="text-foreground mt-1">{comm?.content}</p>
@@ -116,7 +131,8 @@ import useCommunication from '../../../hooks/useCommunication';
                       className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background"
                     >
                       <option value="whatsapp">WhatsApp</option>
-                      <option value="email">Correo</option>
+                      <option value="email">Email</option>
+                      <option value="llamada">Llamada</option>
                     </select>
                   </div>
                   <div>
@@ -127,7 +143,8 @@ import useCommunication from '../../../hooks/useCommunication';
                       className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background"
                     >
                       <option value="normal">Normal</option>
-                      <option value="urgent">Urgente</option>
+                      <option value="alta">Alta</option>
+                      <option value="urgente">Urgente</option>
                     </select>
                   </div>
                 </div>

@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
+
+const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
 
 const InventoryTable = ({ 
   items, 
@@ -12,6 +14,8 @@ const InventoryTable = ({
 }) => {
   const [sortField, setSortField] = useState('itemCode');
   const [sortDirection, setSortDirection] = useState('asc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -20,6 +24,7 @@ const InventoryTable = ({
       setSortField(field);
       setSortDirection('asc');
     }
+    setCurrentPage(1);
   };
 
   const sortedItems = [...items]?.sort((a, b) => {
@@ -34,6 +39,28 @@ const InventoryTable = ({
     
     return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
   });
+
+  // Paginación
+  const totalItems = sortedItems.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+  const paginatedItems = sortedItems.slice(startIndex, endIndex);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+    if (currentPage < 1) setCurrentPage(1);
+  }, [currentPage, totalPages]);
+
+  const handleChangePageSize = (e) => {
+    const v = Number(e?.target?.value) || PAGE_SIZE_OPTIONS[0];
+    setPageSize(v);
+    setCurrentPage(1);
+  };
+
+  const goToPage = (n) => setCurrentPage(Math.min(Math.max(1, n), totalPages));
+  const prevPage = () => goToPage(currentPage - 1);
+  const nextPage = () => goToPage(currentPage + 1);
 
   const getStockStatus = (current, reorderPoint) => {
     if (current === 0) return { status: 'out-of-stock', label: 'Agotado', color: 'text-error' };
@@ -114,7 +141,7 @@ const InventoryTable = ({
             </tr>
           </thead>
           <tbody>
-            {sortedItems?.length === 0 ? (
+            {paginatedItems?.length === 0 ? (
               <tr>
                 <td colSpan="7" className="p-8 text-center text-muted-foreground">
                   <div className="flex flex-col items-center space-y-2">
@@ -125,7 +152,7 @@ const InventoryTable = ({
                 </td>
               </tr>
             ) : (
-              sortedItems?.map((item) => {
+              paginatedItems?.map((item) => {
               const stockStatus = getStockStatus(item?.currentStock, item?.reorderPoint);
               return (
                 <tr key={item?.id} className="border-b border-border hover:bg-muted/50 transition-smooth">
@@ -203,10 +230,38 @@ const InventoryTable = ({
             )}
           </tbody>
         </table>
+
+        {/* Paginación Desktop */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-t border-border px-4 py-3 gap-3">
+          <div className="flex items-center gap-3">
+            <label className="text-xs text-muted-foreground">Mostrar</label>
+            <select
+              value={pageSize}
+              onChange={handleChangePageSize}
+              className="text-sm px-2 py-1 border border-border rounded bg-background text-foreground"
+            >
+              {PAGE_SIZE_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+            <span className="text-xs text-muted-foreground">por página</span>
+            <span className="text-xs text-muted-foreground ml-3">
+              Mostrando <span className="font-medium">{totalItems === 0 ? 0 : startIndex + 1}</span>-<span className="font-medium">{endIndex}</span> de <span className="font-medium">{totalItems}</span>
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" onClick={() => goToPage(1)} disabled={currentPage === 1} iconName="ChevronsLeft" />
+            <Button variant="outline" size="sm" onClick={prevPage} disabled={currentPage === 1} iconName="ChevronLeft" />
+            <span className="px-2 text-sm text-foreground">{currentPage} / {totalPages}</span>
+            <Button variant="outline" size="sm" onClick={nextPage} disabled={currentPage === totalPages} iconName="ChevronRight" />
+            <Button variant="outline" size="sm" onClick={() => goToPage(totalPages)} disabled={currentPage === totalPages} iconName="ChevronsRight" />
+          </div>
+        </div>
       </div>
+
       {/* Mobile Cards */}
       <div className="lg:hidden space-y-3 p-3 sm:p-4 sm:space-y-4">
-        {sortedItems?.length === 0 ? (
+        {paginatedItems?.length === 0 ? (
           <div className="flex flex-col items-center space-y-4 py-8">
             <Icon name="Package" size={48} className="text-muted-foreground/50" />
             <div className="text-center">
@@ -215,7 +270,7 @@ const InventoryTable = ({
             </div>
           </div>
         ) : (
-          sortedItems?.map((item) => {
+          paginatedItems?.map((item) => {
           const stockStatus = getStockStatus(item?.currentStock, item?.reorderPoint);
           return (
             <div key={item?.id} className="bg-background border border-border rounded-lg p-3 sm:p-4">
@@ -289,6 +344,35 @@ const InventoryTable = ({
           );
         })
         )}
+
+        {/* Paginación Mobile */}
+        <div className="flex flex-col gap-3 pt-4">
+          <div className="flex items-center gap-3">
+            <label className="text-xs text-muted-foreground">Mostrar</label>
+            <select
+              value={pageSize}
+              onChange={handleChangePageSize}
+              className="text-sm px-2 py-1 border border-border rounded bg-background text-foreground"
+            >
+              {PAGE_SIZE_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+            <span className="text-xs text-muted-foreground">por página</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-muted-foreground">
+              {totalItems === 0 ? '0 de 0' : `${startIndex + 1}-${endIndex} de ${totalItems}`}
+            </div>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" onClick={() => goToPage(1)} disabled={currentPage === 1} iconName="ChevronsLeft" />
+              <Button variant="outline" size="sm" onClick={prevPage} disabled={currentPage === 1} iconName="ChevronLeft" />
+              <span className="px-2 text-sm text-foreground">{currentPage}/{totalPages}</span>
+              <Button variant="outline" size="sm" onClick={nextPage} disabled={currentPage === totalPages} iconName="ChevronRight" />
+              <Button variant="outline" size="sm" onClick={() => goToPage(totalPages)} disabled={currentPage === totalPages} iconName="ChevronsRight" />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     </div>

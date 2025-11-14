@@ -8,6 +8,7 @@ import useClient from '../../../hooks/useClient';
 
 /* === Config === */
 const DEFAULT_USD_RATE = 18;
+const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
 
 /* === Utils === */
 const parseISODate = (value) => {
@@ -227,6 +228,8 @@ const ProjectTable = ({
   const [sortConfig, setSortConfig] = useState({ key: 'startDate', direction: 'desc' });
   const [selectedProjects, setSelectedProjects] = useState([]);
   const [expandedRows, setExpandedRows] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
 
   // Cargar clientes al montar
   useEffect(() => {
@@ -279,6 +282,7 @@ const ProjectTable = ({
       const direction = (prev?.key === key && prev?.direction === 'asc') ? 'desc' : 'asc';
       return { key, direction };
     });
+    setCurrentPage(1);
   }, []);
 
   const sortedProjects = useMemo(() => {
@@ -324,6 +328,28 @@ const ProjectTable = ({
     });
   }, [normalizedProjects, sortConfig]);
 
+  // Paginación
+  const totalItems = sortedProjects.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+  const pageProjects = sortedProjects.slice(startIndex, endIndex);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+    if (currentPage < 1) setCurrentPage(1);
+  }, [currentPage, totalPages]);
+
+  const handleChangePageSize = (e) => {
+    const v = Number(e?.target?.value) || PAGE_SIZE_OPTIONS[0];
+    setPageSize(v);
+    setCurrentPage(1);
+  };
+
+  const goToPage = (n) => setCurrentPage(Math.min(Math.max(1, n), totalPages));
+  const prevPage = () => goToPage(currentPage - 1);
+  const nextPage = () => goToPage(currentPage + 1);
+
   const handleSelectProject = useCallback((projectId) => {
     setSelectedProjects((prev) =>
       prev?.includes(projectId) ? prev?.filter((id) => id !== projectId) : [...prev, projectId]
@@ -331,9 +357,14 @@ const ProjectTable = ({
   }, []);
 
   const handleSelectAll = useCallback(() => {
-    if (selectedProjects?.length === sortedProjects?.length) setSelectedProjects([]);
-    else setSelectedProjects(sortedProjects?.map((p) => p?.id));
-  }, [selectedProjects?.length, sortedProjects]);
+    const pageIds = pageProjects.map((p) => p?.id);
+    const allSelected = pageIds.every((id) => selectedProjects.includes(id));
+    if (allSelected) {
+      setSelectedProjects((prev) => prev.filter((id) => !pageIds.includes(id)));
+    } else {
+      setSelectedProjects((prev) => Array.from(new Set([...prev, ...pageIds])));
+    }
+  }, [selectedProjects, pageProjects]);
 
   const toggleRowExpansion = useCallback((projectId) => {
     setExpandedRows((prev) =>
@@ -438,7 +469,7 @@ const ProjectTable = ({
               <th className="w-12 p-4">
                 <input
                   type="checkbox"
-                  checked={selectedProjects?.length === sortedProjects?.length && sortedProjects?.length > 0}
+                  checked={pageProjects.length > 0 && pageProjects.every((p) => selectedProjects.includes(p.id))}
                   onChange={handleSelectAll}
                   className="rounded border-border"
                   aria-label="Seleccionar todos"
@@ -475,7 +506,7 @@ const ProjectTable = ({
             </tr>
           </thead>
           <tbody>
-            {sortedProjects?.map((project) => (
+            {pageProjects?.map((project) => (
               <React.Fragment key={project?.id}>
                 <tr className="border-b border-border hover:bg-muted/30 transition-smooth">
                   <td className="p-4">
@@ -570,16 +601,43 @@ const ProjectTable = ({
 
               </React.Fragment>
             ))}
-            {sortedProjects?.length === 0 && !loading && (
+            {pageProjects?.length === 0 && !loading && (
               <tr><td colSpan={9} className="p-8 text-center text-muted-foreground">No hay proyectos para mostrar.</td></tr>
             )}
           </tbody>
         </table>
+
+        {/* Paginación Desktop */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-t border-border px-4 py-3 gap-3">
+          <div className="flex items-center gap-3">
+            <label className="text-xs text-muted-foreground">Mostrar</label>
+            <select
+              value={pageSize}
+              onChange={handleChangePageSize}
+              className="text-sm px-2 py-1 border border-border rounded bg-background text-foreground"
+            >
+              {PAGE_SIZE_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+            <span className="text-xs text-muted-foreground">por página</span>
+            <span className="text-xs text-muted-foreground ml-3">
+              Mostrando <span className="font-medium">{totalItems === 0 ? 0 : startIndex + 1}</span>-<span className="font-medium">{endIndex}</span> de <span className="font-medium">{totalItems}</span>
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" onClick={() => goToPage(1)} disabled={currentPage === 1} iconName="ChevronsLeft" />
+            <Button variant="outline" size="sm" onClick={prevPage} disabled={currentPage === 1} iconName="ChevronLeft" />
+            <span className="px-2 text-sm text-foreground">{currentPage} / {totalPages}</span>
+            <Button variant="outline" size="sm" onClick={nextPage} disabled={currentPage === totalPages} iconName="ChevronRight" />
+            <Button variant="outline" size="sm" onClick={() => goToPage(totalPages)} disabled={currentPage === totalPages} iconName="ChevronsRight" />
+          </div>
+        </div>
       </div>
 
       {/* Móvil */}
       <div className="lg:hidden">
-        {sortedProjects?.map((project) => (
+        {pageProjects?.map((project) => (
           <div key={project?.id} className="border-b border-border p-4">
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center space-x-3">
@@ -714,9 +772,38 @@ const ProjectTable = ({
             )}
           </div>
         ))}
-        {sortedProjects?.length === 0 && !loading && (
+        {pageProjects?.length === 0 && !loading && (
           <div className="p-8 text-center text-muted-foreground">No hay proyectos para mostrar.</div>
         )}
+
+        {/* Paginación Mobile */}
+        <div className="flex flex-col gap-3 p-4 border-t border-border">
+          <div className="flex items-center gap-3">
+            <label className="text-xs text-muted-foreground">Mostrar</label>
+            <select
+              value={pageSize}
+              onChange={handleChangePageSize}
+              className="text-sm px-2 py-1 border border-border rounded bg-background text-foreground"
+            >
+              {PAGE_SIZE_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+            <span className="text-xs text-muted-foreground">por página</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-muted-foreground">
+              {totalItems === 0 ? '0 de 0' : `${startIndex + 1}-${endIndex} de ${totalItems}`}
+            </div>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" onClick={() => goToPage(1)} disabled={currentPage === 1} iconName="ChevronsLeft" />
+              <Button variant="outline" size="sm" onClick={prevPage} disabled={currentPage === 1} iconName="ChevronLeft" />
+              <span className="px-2 text-sm text-foreground">{currentPage}/{totalPages}</span>
+              <Button variant="outline" size="sm" onClick={nextPage} disabled={currentPage === totalPages} iconName="ChevronRight" />
+              <Button variant="outline" size="sm" onClick={() => goToPage(totalPages)} disabled={currentPage === totalPages} iconName="ChevronsRight" />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

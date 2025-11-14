@@ -118,6 +118,36 @@ const useQuotation = () => {
     }
   };
 
+  // Nueva función para actualizar materiales
+  const updateMateriales = async (idCotizacion, materiales) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await quotationService.updateMateriales(idCotizacion, materiales);
+      return response;
+    } catch (err) {
+      setError(err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Nueva función para actualizar materiales y evaluación de riesgos
+  const updateMaterialesYRiesgos = async (idCotizacion, data) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await quotationService.updateMaterialesYRiesgos(idCotizacion, data);
+      return response;
+    } catch (err) {
+      setError(err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     createQuotation,
     getCotizaciones,
@@ -127,6 +157,8 @@ const useQuotation = () => {
     getConstructorByCotizacionId,
     upsertRevision,
     getRevision,
+    updateMateriales,
+    updateMaterialesYRiesgos,
     loading,
     error,
   };

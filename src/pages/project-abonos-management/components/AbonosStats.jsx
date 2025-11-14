@@ -1,7 +1,32 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import Icon from '../../../components/AppIcon';
+import abonoService from '../../../services/abonoService';
 
-const AbonosStats = ({ projects = [], getTotalPagado }) => {
+const AbonosStats = ({ projects = [], getTotalPagado, refreshTrigger }) => {
+  const [totalAbonosDesdeAPI, setTotalAbonosDesdeAPI] = useState(0);
+  const [cargandoTotalAbonos, setCargandoTotalAbonos] = useState(false);
+
+  // Obtener el total de abonos desde la API
+  // Se ejecuta al montar, cuando cambian los proyectos, o cuando se actualiza refreshTrigger
+  useEffect(() => {
+    const obtenerTotalAbonos = async () => {
+      setCargandoTotalAbonos(true);
+      try {
+        const respuesta = await abonoService.obtenersumadortotaldeabonos();
+        // La API puede devolver el total en diferentes formatos
+        const total = respuesta?.data?.total ?? respuesta?.data?.suma ?? respuesta?.total ?? respuesta?.suma ?? 0;
+        setTotalAbonosDesdeAPI(Number(total) || 0);
+      } catch (error) {
+        console.error('Error al obtener el total de abonos:', error);
+        setTotalAbonosDesdeAPI(0);
+      } finally {
+        setCargandoTotalAbonos(false);
+      }
+    };
+
+    obtenerTotalAbonos();
+  }, [refreshTrigger]); // Se ejecuta cuando cambia refreshTrigger o al montar
+
   const stats = useMemo(() => {
     if (!Array.isArray(projects) || projects.length === 0) {
       return {
@@ -48,6 +73,7 @@ const AbonosStats = ({ projects = [], getTotalPagado }) => {
       const totalRestante = obtenerTotalRestante(project);
       
       totalBudget += budget;
+      // Calcular total recaudado localmente como respaldo (se usará si la API no devuelve datos)
       totalRecaudado += paid;
 
       // Determinar estado de pago usando la misma lógica que el filtro
@@ -68,9 +94,13 @@ const AbonosStats = ({ projects = [], getTotalPagado }) => {
       }
     });
 
+    // Usar el total de abonos desde la API si está disponible, sino calcular desde proyectos
+    const totalRecaudadoFinal = totalAbonosDesdeAPI > 0 ? totalAbonosDesdeAPI : totalRecaudado;
+
     // Calcular progreso general: (Total recaudado / Total presupuesto) * 100
+    // Sin redondear para mostrar el valor exacto
     const progresoGeneral = totalBudget > 0 
-      ? Math.round((totalRecaudado / totalBudget) * 100) 
+      ? (totalRecaudadoFinal / totalBudget) * 100 
       : 0;
 
     return {
@@ -79,10 +109,11 @@ const AbonosStats = ({ projects = [], getTotalPagado }) => {
       enProceso,
       enPausa,
       totalBudget,
-      totalRecaudado,
-      progresoGeneral: Math.min(progresoGeneral, 100), // Cap at 100%
+      totalRecaudado: totalRecaudadoFinal,
+      progresoGeneral: Math.min(progresoGeneral, 100), // Cap at 100% pero sin redondear
+      cargandoTotalAbonos,
     };
-  }, [projects, getTotalPagado]);
+  }, [projects, getTotalPagado, totalAbonosDesdeAPI]);
 
   const formatCurrency = (amount) => {
     if (amount == null || isNaN(amount)) return '$0';
@@ -182,7 +213,9 @@ const AbonosStats = ({ projects = [], getTotalPagado }) => {
             </p>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-bold text-primary">{stats.progresoGeneral}%</p>
+            <p className="text-2xl font-bold text-primary">
+              {stats.progresoGeneral.toFixed(2)}%
+            </p>
             <p className="text-xs text-muted-foreground">Completado</p>
           </div>
         </div>

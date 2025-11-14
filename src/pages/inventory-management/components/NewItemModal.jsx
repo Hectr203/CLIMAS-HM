@@ -18,7 +18,6 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
     unitCost: '',
     reorderPoint: '',
     currentStock: '',
-    location: 'Almacén Principal',
     supplierName: '',
     supplierContact: '',
     notes: ''
@@ -49,16 +48,6 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
     'caja',
     'rollo',
     'juego'
-  ];
-
-  const locations = [
-    'Almacén Principal',
-    'Almacén Secundario',
-    'Taller',
-    'Oficina',
-    'Vehículo 1',
-    'Vehículo 2',
-    'Bodega Externa'
   ];
 
   const handleInputChange = (field, value) => {
@@ -128,7 +117,7 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
         costoUnitario: parseFloat(formData?.unitCost),
         puntoReorden: parseInt(formData?.reorderPoint),
         stockActual: parseInt(formData?.currentStock),
-        ubicacion: formData?.location,
+        ubicacion: 'Almacén Principal', // Siempre será Almacén Principal
         nombreProveedor: formData?.supplierName?.trim(),
         contactoProveedor: formData?.supplierContact?.trim() || '',
         notas: formData?.notes?.trim() || ''
@@ -186,7 +175,6 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
       unitCost: '',
       reorderPoint: '',
       currentStock: '',
-      location: 'Almacén Principal',
       supplierName: '',
       supplierContact: '',
       notes: ''
@@ -203,9 +191,9 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-background rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+      <div className="bg-background rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
         {/* Modal Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border">
+        <div className="flex items-center justify-between p-6 border-b border-border flex-shrink-0">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
               <Icon name="Package" size={20} className="text-primary" />
@@ -229,7 +217,7 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+        <div className="p-6 overflow-y-auto flex-1 min-h-0">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Basic Information */}
             <div className="space-y-4">
@@ -408,16 +396,12 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
                   <label className="block text-sm font-medium text-foreground mb-2">
                     Ubicación
                   </label>
-                  <select
-                    value={formData?.location}
-                    onChange={(e) => handleInputChange('location', e.target.value)}
-                    disabled={isSubmitting}
-                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                  >
-                    {locations?.map(loc => (
-                      <option key={loc} value={loc}>{loc}</option>
-                    ))}
-                  </select>
+                  <Input
+                    type="text"
+                    value="Almacén Principal"
+                    disabled={true}
+                    className="bg-muted cursor-not-allowed"
+                  />
                 </div>
               </div>
             </div>
@@ -497,7 +481,7 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
         </div>
 
         {/* Modal Footer */}
-        <div className="flex items-center justify-end space-x-3 p-6 border-t border-border">
+        <div className="flex items-center justify-end space-x-3 p-6 border-t border-border flex-shrink-0 bg-background">
           <Button
             type="button"
             variant="outline"

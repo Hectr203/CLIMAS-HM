@@ -21,7 +21,6 @@ import useInventory from '../../hooks/useInventory';
 import useOrder from '../../hooks/useOrder';
 import useRequisi from '../../hooks/useRequisi';
 import { useNotifications } from '../../context/NotificationContext';
-
 // Función auxiliar para formatear fechas
 const formatDate = (dateString) => {
   if (!dateString) return '';
@@ -78,6 +77,7 @@ const InventoryManagement = () => {
   const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showItemSelectorModal, setShowItemSelectorModal] = useState(false); // ✅ Modal de selección
   const loading = inventoryLoading || orderLoading || requisitionsLoading || isUpdating;
   const error = inventoryError || orderError;
   const [filters, setFilters] = useState({
@@ -251,7 +251,22 @@ const InventoryManagement = () => {
 
   const handleUpdateStock = (item) => {
     console.log('Update stock for:', item);
-    setSelectedItem(item);
+    
+    // Si el item viene de una alerta (tiene la propiedad 'type'), 
+    // buscar el artículo completo en el inventario por itemCode
+    if (item.type && (item.type === 'out-of-stock' || item.type === 'low-stock')) {
+      const inventoryItem = inventoryItems.find(invItem => invItem.itemCode === item.itemCode);
+      if (inventoryItem) {
+        setSelectedItem(inventoryItem);
+      } else {
+        console.error('No se encontró el artículo en el inventario:', item.itemCode);
+        setSelectedItem(item); // Fallback al item original
+      }
+    } else {
+      // Es un item directo del inventario
+      setSelectedItem(item);
+    }
+    
     setShowEditItemModal(true);
   };
 
@@ -337,6 +352,46 @@ const InventoryManagement = () => {
   const [selectedRequisition, setSelectedRequisition] = useState(null);
   const [showRequisitionModal, setShowRequisitionModal] = useState(false);
 
+
+const handleViewRequisition = (req) => {
+  const reqForView = {
+    id: req.id,
+    orderNumber: req.numeroOrdenTrabajo,
+    projectName: req.nombreProyecto,
+    requestedBy: req.solicitadoPor,
+    requestDate: req.fechaSolicitud,
+    status: req.estado || 'Pendiente',
+    priority: req.prioridad || 'Normal',
+    description: req.descripcionSolicitud,
+    items: req.materiales?.map(m => ({
+      id: m.id || Date.now(),
+      name: m.nombreMaterial,
+      quantity: m.cantidad,
+      unit: m.unidad,
+      description: m.descripcionEspecificaciones,
+      urgency: m.urgencia,
+    })) || [],
+    manualItems: req.materialesManuales?.map(m => ({
+      id: m.id || Date.now(),
+      name: m.nombreMaterial,
+      quantity: m.cantidad,
+      unit: m.unidad,
+      description: m.descripcionEspecificaciones,
+      urgency: m.urgencia,
+    })) || [],
+    justification: req.justificacionSolicitud,
+    notes: req.notasAdicionales
+  };
+
+  setSelectedRequisition(reqForView);
+  setViewOnly(true);   // 👈 MUY IMPORTANTE
+  setShowRequisitionModal(true);
+};
+
+
+
+
+
   const handleEditRequisition = (req) => {
     const reqForEdit = {
       id: req.id,
@@ -360,7 +415,10 @@ const InventoryManagement = () => {
 
     setSelectedRequisition(reqForEdit);
     setShowRequisitionModal(true);
+    setViewOnly(false); 
   };
+
+  
 
   const handleSaveRequisition = async (editedReq) => {
     try {
@@ -507,6 +565,16 @@ ${order.notas || 'Sin notas adicionales'}
 
   const handleExport = async () => {
     try {
+      // Función auxiliar para escapar valores CSV correctamente
+      const escapeCSV = (value) => {
+        if (value === null || value === undefined) return '""';
+        const stringValue = String(value);
+        // Escapar comillas dobles duplicándolas
+        const escapedValue = stringValue.replace(/"/g, '""');
+        // SIEMPRE encerrar en comillas para evitar problemas con comas y caracteres especiales
+        return `"${escapedValue}"`;
+      };
+
       // Create CSV content
       const csvHeaders = [
         'Código',
@@ -524,30 +592,35 @@ ${order.notas || 'Sin notas adicionales'}
         'Valor Total',
         'Última Actualización'
       ];
+      
       const csvRows = inventoryItems?.map(item => [
-        item?.itemCode,
-        item?.name,
-        item?.description,
-        item?.category,
-        item?.currentStock,
-        item?.reservedStock || 0,
-        item?.reorderPoint,
-        item?.unit,
-        item?.location,
-        item?.supplier?.name,
-        item?.supplier?.contact,
-        item?.unitCost,
-        (item?.currentStock * item?.unitCost),
-        new Date(item?.lastUpdated).toLocaleDateString('es-MX')
+        escapeCSV(item?.itemCode),
+        escapeCSV(item?.name),
+        escapeCSV(item?.description),
+        escapeCSV(item?.category),
+        escapeCSV(item?.currentStock),
+        escapeCSV(item?.reservedStock || 0),
+        escapeCSV(item?.reorderPoint),
+        escapeCSV(item?.unit),
+        escapeCSV(item?.location),
+        escapeCSV(item?.supplier?.name),
+        escapeCSV(item?.supplier?.contact),
+        escapeCSV(item?.unitCost),
+        escapeCSV(item?.currentStock * item?.unitCost),
+        escapeCSV(new Date(item?.lastUpdated).toLocaleDateString('es-MX'))
       ]);
 
       const csvContent = [
-        csvHeaders?.join(','),
-        ...csvRows?.map(row => row?.join(','))
-      ]?.join('\n');
+        csvHeaders.map(h => escapeCSV(h)).join(','),
+        ...csvRows.map(row => row.join(','))
+      ].join('\n');
 
-      // Download CSV file
-      const blob = new Blob([csvContent], { type: 'text/csv' });
+      // Agregar BOM (Byte Order Mark) UTF-8 para que Excel reconozca la codificación
+      const BOM = '\uFEFF';
+      const csvWithBOM = BOM + csvContent;
+
+      // Download CSV file con codificación UTF-8
+      const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -766,12 +839,20 @@ ${order.notas || 'Sin notas adicionales'}
               items={filteredItems}
               onAddItem={() => setShowNewItemModal(true)}
               onUpdateStock={() => {
-                const firstItem = filteredItems?.[0];
-                if (firstItem) {
-                  handleUpdateStock(firstItem);
-                }
+                // ✅ Abrir modal de selección de artículo
+                setShowItemSelectorModal(true);
               }}
               onGenerateReport={() => {
+                // Función auxiliar para escapar valores CSV correctamente
+                const escapeCSV = (value) => {
+                  if (value === null || value === undefined) return '""';
+                  const stringValue = String(value);
+                  // Escapar comillas dobles duplicándolas
+                  const escapedValue = stringValue.replace(/"/g, '""');
+                  // SIEMPRE encerrar en comillas para evitar problemas con comas y caracteres especiales
+                  return `"${escapedValue}"`;
+                };
+
                 // Crear el contenido del CSV
                 const headers = [
                   'Código',
@@ -789,27 +870,30 @@ ${order.notas || 'Sin notas adicionales'}
                   'Última Actualización'
                 ];
 
-                const csvRows = [
-                  headers.join(','), // Encabezados
-                  ...filteredItems.map(item => [
-                    `"${item.itemCode || ''}"`,
-                    `"${(item.name || '').replace(/"/g, '""')}"`,
-                    `"${(item.description || '').replace(/"/g, '""')}"`,
-                    `"${item.category || ''}"`,
-                    item.currentStock || 0,
-                    item.reservedStock || 0,
-                    item.reorderPoint || 0,
-                    `"${item.unit || ''}"`,
-                    `"${(item.supplier?.name || '').replace(/"/g, '""')}"`,
-                    `"${(item.location || '').replace(/"/g, '""')}"`,
-                    item.unitCost || 0,
-                    (item.currentStock || 0) * (item.unitCost || 0),
-                    `"${item.lastUpdated ? new Date(item.lastUpdated).toLocaleString() : ''}"`,
-                  ].join(','))
+                const csvRows = filteredItems.map(item => [
+                  escapeCSV(item.itemCode || ''),
+                  escapeCSV(item.name || ''),
+                  escapeCSV(item.description || ''),
+                  escapeCSV(item.category || ''),
+                  escapeCSV(item.currentStock || 0),
+                  escapeCSV(item.reservedStock || 0),
+                  escapeCSV(item.reorderPoint || 0),
+                  escapeCSV(item.unit || ''),
+                  escapeCSV(item.supplier?.name || ''),
+                  escapeCSV(item.location || ''),
+                  escapeCSV(item.unitCost || 0),
+                  escapeCSV((item.currentStock || 0) * (item.unitCost || 0)),
+                  escapeCSV(item.lastUpdated ? new Date(item.lastUpdated).toLocaleString('es-MX') : ''),
+                ].join(','));
+
+                const csvContent = [
+                  headers.map(h => escapeCSV(h)).join(','),
+                  ...csvRows
                 ].join('\n');
 
-                // Crear el blob y descargar
-                const blob = new Blob(['\ufeff' + csvRows], { type: 'text/csv;charset=utf-8;' });
+                // Crear el blob con BOM UTF-8 y descargar
+                const BOM = '\uFEFF';
+                const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement('a');
                 const url = URL.createObjectURL(blob);
                 
@@ -818,6 +902,7 @@ ${order.notas || 'Sin notas adicionales'}
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
+                URL.revokeObjectURL(url);
               }}
             />
           )}
@@ -865,96 +950,156 @@ ${order.notas || 'Sin notas adicionales'}
               onDeleteOrder={handleDeleteOrder}
             />
           )}
+{activeView === 'requirements' && (
+  <div className="bg-card rounded-lg border border-border shadow-sm">
 
-          {activeView === 'requirements' && (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold">Requisiciones de Material</h2>
-                <Button
-                  variant="default"
-                  iconName="Plus"
-                  onClick={() => setShowCreatePOModal(true)}
-                >
-                  Nueva Requisición
-                </Button>
-              </div>
-              
-              {requisitionsLoading ? (
-                <p className="text-muted-foreground">Cargando requisiciones...</p>
-              ) : requisitions && requisitions.length > 0 ? (
-                <div className="space-y-4">
-                  {requisitions.map((req) => (
-                    <div
-                      key={req.id}
-                      className="bg-card border border-border rounded-lg p-4 space-y-3"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="font-medium">{req.numeroOrdenTrabajo || 'Sin número'}</h3>
-                          <p className="text-sm text-muted-foreground">{req.nombreProyecto || 'Sin proyecto'}</p>
-                        </div>
-                        <div className="flex space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            iconName="Edit"
-                            onClick={() => handleEditRequisition(req)}
-                          />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            iconName="Trash"
-                            onClick={() => handleDelete(req)}
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-muted-foreground">Solicitado por</p>
-                          <p>{req.solicitadoPor || 'No especificado'}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Estado</p>
-                          <p>{req.estado || 'Pendiente'}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Fecha</p>
-                          <p>{req.fechaSolicitud ? new Date(req.fechaSolicitud).toLocaleDateString('es-MX') : 'No especificada'}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Prioridad</p>
-                          <p>{req.prioridad || 'Normal'}</p>
-                        </div>
-                      </div>
-                      
-                      {req.descripcionSolicitud && (
-                        <div>
-                          <p className="text-muted-foreground">Descripción</p>
-                          <p className="text-sm">{req.descripcionSolicitud}</p>
-                        </div>
-                      )}
-                      
-                      {req.materiales && req.materiales.length > 0 && (
-                        <div>
-                          <p className="font-medium mb-2">Materiales solicitados</p>
-                          <ul className="space-y-1">
-                            {req.materiales.map((item, index) => (
-                              <li key={index} className="text-sm">
-                                {item.cantidad || item.quantity} {item.unidad || item.unit || 'unidades'} - {item.nombreMaterial || item.name}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+    {/* Header */}
+    <div className="flex items-center justify-between p-6 border-b border-border">
+      <div className="flex items-center space-x-3">
+        <Icon name="ClipboardList" size={20} className="text-primary" />
+        <h3 className="text-lg font-semibold text-foreground">
+          Requisiciones de Material
+        </h3>
+      </div>
+
+      <Button
+        variant="default"
+        iconName="Plus"
+        onClick={() => setShowCreatePOModal(true)}
+      >
+        Nueva Requisición
+      </Button>
+    </div>
+
+    {/* Contenido */}
+    <div className="divide-y divide-border max-h-96 overflow-y-auto">
+
+      {requisitionsLoading ? (
+        <div className="text-center py-8 text-muted-foreground">
+          Cargando requisiciones...
+        </div>
+      ) : requisitions?.length > 0 ? (
+        requisitions.map((req) => (
+          <div
+            key={req.id}
+            className="p-5 hover:bg-muted/50 transition-colors"
+          >
+            <div className="flex items-start justify-between">
+
+              {/* Info principal */}
+              <div className="flex-1">
+
+                {/* Encabezado */}
+                <div className="flex items-center space-x-3 mb-2">
+                  <h4 className="text-base font-semibold text-foreground">
+                    {req.numeroOrdenTrabajo || 'Sin número'}
+                  </h4>
+
+                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                    {req.estado || 'Pendiente'}
+                  </span>
                 </div>
-              ) : (
-                <p className="text-muted-foreground">No hay requisiciones disponibles.</p>
-              )}
+
+                {/* Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground mb-3">
+
+                  <div>
+                    <span className="font-medium">Proyecto:</span>
+                    <div className="text-foreground">{req.nombreProyecto || 'Sin proyecto'}</div>
+                  </div>
+
+                  <div>
+                    <span className="font-medium">Solicitado por:</span>
+                    <div className="text-foreground">{req.solicitadoPor || 'No especificado'}</div>
+                  </div>
+
+                  <div>
+                    <span className="font-medium">Fecha:</span>
+                    <div className="text-foreground">
+                      {req.fechaSolicitud
+                        ? new Date(req.fechaSolicitud).toLocaleDateString('es-MX')
+                        : 'No especificada'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="font-medium">Prioridad:</span>
+                    <div className="text-foreground">{req.prioridad || 'Normal'}</div>
+                  </div>
+                </div>
+
+                {/* Descripción */}
+                {req.descripcionSolicitud && (
+                  <div className="text-sm text-muted-foreground mb-3">
+                    <span className="font-medium text-foreground">Descripción:</span>
+                    <p className="text-foreground">{req.descripcionSolicitud}</p>
+                  </div>
+                )}
+
+                {/* Materiales */}
+                {req.materiales?.length > 0 && (
+                  <div className="mb-3">
+                    <span className="font-medium">Materiales solicitados:</span>
+                    <ul className="mt-2 space-y-1 text-sm">
+                      {req.materiales.map((item, index) => (
+                        <li key={index} className="text-foreground">
+                          {item.cantidad || item.quantity} {item.unidad || item.unit || 'unidades'} - {item.nombreMaterial || item.name}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Acciones */}
+                <div className="flex items-center space-x-3 mt-3">
+
+                  {/* VER DETALLES */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    iconName="Eye"
+                    onClick={() => handleViewRequisition(req)}
+                  >
+                    Ver detalles
+                  </Button>
+
+                  {/* EDITAR */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconName="Edit"
+                    onClick={() => handleEditRequisition(req)}
+                  >
+                    Editar
+                  </Button>
+
+                  {/* ELIMINAR */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-error hover:text-error"
+                    iconName="Trash2"
+                    onClick={() => handleDelete(req)}
+                  >
+                    Eliminar
+                  </Button>
+
+                </div>
+
+              </div>
             </div>
-          )}
+          </div>
+        ))
+      ) : (
+        <div className="text-center py-8 text-muted-foreground">
+          No hay requisiciones disponibles.
+        </div>
+      )}
+
+    </div>
+  </div>
+)}
+
 
           {/* New Item Modal */}
           <NewItemModal
@@ -1004,6 +1149,74 @@ ${order.notas || 'Sin notas adicionales'}
             onClose={handleCloseOrderDetails}
             order={selectedOrder}
           />
+
+          {/* Item Selector Modal - Para "Actualizar Stock" */}
+          {showItemSelectorModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[1000] p-4">
+              <div className="bg-card rounded-lg border border-border w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+                <div className="flex items-center justify-between p-6 border-b border-border">
+                  <h2 className="text-xl font-semibold text-foreground">
+                    Seleccionar Artículo para Actualizar
+                  </h2>
+                  <button
+                    onClick={() => setShowItemSelectorModal(false)}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <Icon name="X" size={20} />
+                  </button>
+                </div>
+                
+                <div className="p-6 overflow-y-auto flex-1">
+                  <div className="mb-4">
+                    <input
+                      type="text"
+                      placeholder="Buscar artículo..."
+                      className="w-full px-4 py-2 border border-border rounded-md"
+                      onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    {filteredItems?.slice(0, 50).map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          handleUpdateStock(item);
+                          setShowItemSelectorModal(false);
+                        }}
+                        className="w-full text-left p-4 border border-border rounded-lg hover:bg-muted transition-colors"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium text-foreground">{item.description}</p>
+                            <p className="text-sm text-muted-foreground">Código: {item.itemCode}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-medium">Stock: {item.currentStock} {item.unit}</p>
+                            <p className={`text-xs ${
+                              item.currentStock === 0 ? 'text-red-500' :
+                              item.currentStock <= item.reorderPoint ? 'text-yellow-500' :
+                              'text-green-500'
+                            }`}>
+                              {item.currentStock === 0 ? 'Agotado' :
+                               item.currentStock <= item.reorderPoint ? 'Stock bajo' :
+                               'Disponible'}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  
+                  {filteredItems?.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">
+                      No se encontraron artículos
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </div>

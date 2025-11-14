@@ -5,6 +5,7 @@ import Button from '../../../components/ui/Button';
 import Image from '../../../components/AppImage';
 import proyectoService from 'services/proyectoService';
 import clientService from 'services/clientService';
+import { useNotifications } from 'context/NotificationContext';
 
 /* === Config === */
 const DEFAULT_USD_RATE = 18;
@@ -136,6 +137,18 @@ const resolveProjectStatus = (project) => {
   return { key: 'planning', label: 'Planificación' };
 };
 
+/*Convierte objeto ubicación en string legible */
+const formatLocation = (loc) => {
+  if (!loc) return '—';
+  if (typeof loc === 'string') return loc;
+  if (typeof loc === 'object') {
+    const { direccion, municipio, estado, address, city, state } = loc || {};
+    const parts = [direccion ?? address, municipio ?? city, estado ?? state].filter(Boolean);
+    return parts.length ? parts.join(', ') : JSON.stringify(loc);
+  }
+  return String(loc);
+};
+
 /* Normalizador Proyecto */
 const mapProjectDocStrict = (doc) => {
   const id = doc.id ?? doc._id ?? safeUUID();
@@ -154,7 +167,9 @@ const mapProjectDocStrict = (doc) => {
       doc.customerId ||
       null,
     name:
-      (clienteNode && typeof clienteNode === 'object' && (clienteNode.nombre || clienteNode.name || clienteNode.empresa || clienteNode.razonSocial)) ||
+      (clienteNode &&
+        typeof clienteNode === 'object' &&
+        (clienteNode.nombre || clienteNode.name || clienteNode.empresa || clienteNode.razonSocial)) ||
       (typeof clienteNode === 'string' ? clienteNode : null) ||
       doc.clienteNombre ||
       doc.clientName ||
@@ -165,7 +180,9 @@ const mapProjectDocStrict = (doc) => {
       doc.emailCliente ||
       null,
     contact:
-      (clienteNode && typeof clienteNode === 'object' && (clienteNode.contacto?.nombre || clienteNode.telefono || clienteNode.phone)) ||
+      (clienteNode &&
+        typeof clienteNode === 'object' &&
+        (clienteNode.contacto?.nombre || clienteNode.telefono || clienteNode.phone)) ||
       doc.contacto ||
       doc.telefono ||
       null,
@@ -187,6 +204,8 @@ const mapProjectDocStrict = (doc) => {
     return mxn / divisor;
   })();
 
+  const location = formatLocation(doc.ubicacion ?? doc.location ?? null);
+
   return {
     id,
     code,
@@ -202,19 +221,20 @@ const mapProjectDocStrict = (doc) => {
     startDate: doc.cronograma?.fechaInicio ?? doc.startDate ?? null,
     endDate: doc.cronograma?.fechaFin ?? doc.endDate ?? null,
     department: doc.departamento ?? doc.department ?? null,
-    location: doc.ubicacion ?? doc.location ?? null,
+    location,
     description: doc.descripcion ?? doc.description ?? null,
     assignedPersonnel: Array.isArray(doc.assignedPersonnel)
       ? doc.assignedPersonnel
       : Array.isArray(doc.personalAsignado)
         ? doc.personalAsignado.map((s) => {
-          if (typeof s !== 'string') return { name: String(s ?? '—'), role: '' };
-          const [n, r] = s.split(' - ');
-          return { name: n || '—', role: r || '' };
-        })
+            if (typeof s !== 'string') return { name: String(s ?? '—'), role: '' };
+            const [n, r] = s.split(' - ');
+            return { name: n || '—', role: r || '' };
+          })
         : null,
     workOrders: Array.isArray(doc.workOrders) ? doc.workOrders : undefined,
     equiposUSD,
+    // 🔵 Abonos originales quedan en raw (el cálculo se comenta más abajo)
     abonos: Array.isArray(doc.abonos) ? doc.abonos : [],
     createdAt: doc.createdAt ?? null,
     updatedAt: doc.updatedAt ?? null,
@@ -260,25 +280,41 @@ const ProjectTable = ({
 }) => {
   const navigate = useNavigate();
 
+  //Notificaciones
+  const { showConfirm, showSuccess, showError } = useNotifications();
+
+  //Shadow list para props y lista remota para fetch
+  const [localDocs, setLocalDocs] = useState(null);
   const [remoteDocs, setRemoteDocs] = useState([]);
+
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'startDate', direction: 'desc' });
   const [selectedProjects, setSelectedProjects] = useState([]);
   const [expandedRows, setExpandedRows] = useState([]);
-  const [newAbonoDraft, setNewAbonoDraft] = useState({});
+  // 🔵 Estado de borrador de abonos (COMENTADO)
+  // const [newAbonoDraft, setNewAbonoDraft] = useState({});
   const [clientCache, setClientCache] = useState({});
   const [clientsLoaded, setClientsLoaded] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]); 
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
 
-  /* Cargar proyectos si no vienen por props */
+  /* Sincronizar shadow con props */
+  useEffect(() => {
+    if (Array.isArray(projects) && projects.length >= 0) {
+      setLocalDocs(projects);
+    } else {
+      setLocalDocs(null);
+    }
+  }, [projects]);
+
+  /* Cargar proyectos si NO vienen por props */
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        if (projects && projects.length > 0) return;
+        if (Array.isArray(projects)) return;
         setLoading(true);
         setErrorMsg('');
         const res = await proyectoService.getProyectos().catch(() => []);
@@ -292,12 +328,10 @@ const ProjectTable = ({
         if (mounted) setLoading(false);
       }
     })();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [projects]);
 
-  //Cargar TODOS los clientes una vez y mapear por id 
+  //Cargar TODOS los clientes
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -318,22 +352,20 @@ const ProjectTable = ({
         if (mounted) setClientsLoaded(true);
       }
     })();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
-  //Base docs
   const baseSourceDocs = useMemo(() => {
-    return Array.isArray(projects) && projects.length > 0 ? projects : remoteDocs;
-  }, [projects, remoteDocs]);
+    return Array.isArray(localDocs) ? localDocs : remoteDocs;
+  }, [localDocs, remoteDocs]);
 
   const normalizedProjects = useMemo(() => {
     if (!Array.isArray(baseSourceDocs)) return [];
     return baseSourceDocs.map(mapProjectDocStrict);
   }, [baseSourceDocs]);
 
-  // Draft abono por proyecto
+  // 🔵 Inicialización de borradores de abono (COMENTADO)
+  /*
   useEffect(() => {
     setNewAbonoDraft((prev) => {
       const clone = { ...prev };
@@ -343,13 +375,13 @@ const ProjectTable = ({
       return clone;
     });
   }, [normalizedProjects]);
-  
+  */
 
   const handleSort = (key) => {
     let direction = 'asc';
     if (sortConfig?.key === key && sortConfig?.direction === 'asc') direction = 'desc';
     setSortConfig({ key, direction });
-    setCurrentPage(1); 
+    setCurrentPage(1);
   };
 
   const sortedProjects = useMemo(() => {
@@ -381,7 +413,6 @@ const ProjectTable = ({
     });
   }, [normalizedProjects, sortConfig]);
 
-  //Paginated slice 
   const totalItems = sortedProjects.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const startIndex = (currentPage - 1) * pageSize;
@@ -393,7 +424,6 @@ const ProjectTable = ({
     if (currentPage < 1) setCurrentPage(1);
   }, [currentPage, totalPages]);
 
-  // al cambiar pageSize, volver a página 1
   const handleChangePageSize = (e) => {
     const v = Number(e?.target?.value) || PAGE_SIZE_OPTIONS[0];
     setPageSize(v);
@@ -404,7 +434,6 @@ const ProjectTable = ({
   const prevPage = () => goToPage(currentPage - 1);
   const nextPage = () => goToPage(currentPage + 1);
 
-  // Helpers cliente
   const getPossibleClientId = (p) => {
     const r = p?.raw || {};
     return (
@@ -450,11 +479,9 @@ const ProjectTable = ({
     return c.email || c.correo || c.contacto?.email || c.telefono || c.phone || 'Sin contacto';
   };
 
-  //Select/expand 
   const handleSelectProject = (id) =>
     setSelectedProjects((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
-  // seleccionar/deseleccionar todos SOLO de la página actual
   const handleSelectAll = () => {
     const pageIds = pageItems.map((p) => p?.id);
     const allSelected = pageIds.every((id) => selectedProjects.includes(id));
@@ -468,34 +495,89 @@ const ProjectTable = ({
   const toggleRowExpansion = (id) =>
     setExpandedRows((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
-  // Delete
-  const handleDelete = async (project) => {
+  const usingLocalShadow = Array.isArray(localDocs);
+
+  //Eliminar (optimista, sin refresh) —>>> MENSAJE EDITADO
+  // 🔴 Eliminar (optimista, sin refresh)
+  const handleDelete = (project) => {
     if (!project?.id) return;
-    const ok = window.confirm(`¿Eliminar el proyecto "${project?.name || project?.code}"?`);
-    if (!ok) return;
-    try {
-      await proyectoService.deleteProyecto(project.id);
-      setRemoteDocs((prev) => prev.filter((d) => (d.id || d._id) !== project.id));
-      setSelectedProjects((prev) => prev.filter((x) => x !== project.id));
-      setExpandedRows((prev) => prev.filter((x) => x !== project.id));
-    } catch (e) {
-      console.error(e);
-      alert('No se pudo eliminar el proyecto.');
-    }
+
+    const doRemove = (list, id) => list.filter((d) => (d.id || d._id) !== id);
+
+    const nombre = project?.name || project?.code || 'sin nombre';
+
+    showConfirm(`¿Deseas eliminar este proyecto "${nombre}"?`, {
+      onConfirm: async () => {
+        const prevLocal = usingLocalShadow ? [...localDocs] : null;
+        const prevRemote = !usingLocalShadow ? [...remoteDocs] : null;
+
+        if (usingLocalShadow) {
+          setLocalDocs((prev) => doRemove(prev, project.id));
+        } else {
+          setRemoteDocs((prev) => doRemove(prev, project.id));
+        }
+        setSelectedProjects((prev) => prev.filter((x) => x !== project.id));
+        setExpandedRows((prev) => prev.filter((x) => x !== project.id));
+
+        setTimeout(() => {
+          const newTotal = (usingLocalShadow ? (prevLocal ? doRemove(prevLocal, project.id) : []) : (prevRemote ? doRemove(prevRemote, project.id) : [])).length;
+          const newTotalPages = Math.max(1, Math.ceil(newTotal / pageSize));
+          setCurrentPage((cp) => Math.min(cp, newTotalPages));
+        }, 0);
+
+        try {
+          await proyectoService.deleteProyecto(project.id);
+          showSuccess('Proyecto eliminado exitosamente');
+        } catch (e) {
+          console.error(e);
+          if (usingLocalShadow && prevLocal) setLocalDocs(prevLocal);
+          if (!usingLocalShadow && prevRemote) setRemoteDocs(prevRemote);
+          showError('No se pudo eliminar el proyecto');
+        }
+      },
+      onCancel: () => {},
+    });
   };
 
-  const handleBulkDelete = async () => {
+  //Eliminación masiva (optimista)
+  const handleBulkDelete = () => {
     if (!selectedProjects?.length) return;
-    const ok = window.confirm(`¿Eliminar ${selectedProjects.length} proyecto(s)?`);
-    if (!ok) return;
-    try {
-      for (const id of selectedProjects) await proyectoService.deleteProyecto(id);
-      setRemoteDocs((prev) => prev.filter((d) => !selectedProjects.includes(d.id || d._id)));
-      setSelectedProjects([]);
-    } catch (e) {
-      console.error(e);
-      alert('Ocurrió un error eliminando algunos proyectos.');
-    }
+
+    const toDelete = [...selectedProjects];
+
+    showConfirm(`¿Eliminar ${toDelete.length} proyecto(s)?`, {
+      onConfirm: async () => {
+        const doRemoveBulk = (list, ids) => list.filter((d) => !ids.includes(d.id || d._id));
+
+        const prevLocal = usingLocalShadow ? [...localDocs] : null;
+        const prevRemote = !usingLocalShadow ? [...remoteDocs] : null;
+
+        if (usingLocalShadow) {
+          setLocalDocs((prev) => doRemoveBulk(prev, toDelete));
+        } else {
+          setRemoteDocs((prev) => doRemoveBulk(prev, toDelete));
+        }
+        setSelectedProjects([]);
+        setExpandedRows((prev) => prev.filter((x) => !toDelete.includes(x)));
+
+        setTimeout(() => {
+          const newTotal = (usingLocalShadow ? (prevLocal ? doRemoveBulk(prevLocal, toDelete) : []) : (prevRemote ? doRemoveBulk(prevRemote, toDelete) : [])).length;
+          const newTotalPages = Math.max(1, Math.ceil(newTotal / pageSize));
+          setCurrentPage((cp) => Math.min(cp, newTotalPages));
+        }, 0);
+
+        try {
+          await Promise.allSettled(toDelete.map((id) => proyectoService.deleteProyecto(id)));
+          showSuccess('Proyectos eliminados exitosamente');
+        } catch (e) {
+          console.error(e);
+          if (usingLocalShadow && prevLocal) setLocalDocs(prevLocal);
+          if (!usingLocalShadow && prevRemote) setRemoteDocs(prevRemote);
+          showError('Ocurrió un error eliminando algunos proyectos');
+        }
+      },
+      onCancel: () => {},
+    });
   };
 
   /* Imagen demo */
@@ -518,10 +600,12 @@ const ProjectTable = ({
     }
   };
 
-  /* Abonos */
+  /* ====== ABONOS: helpers COMENTADOS ====== */
+  /*
   const getProjectLiveSnapshot = (projectId) => {
-    const inRemote = remoteDocs.find((d) => (d.id || d._id) === projectId);
-    if (inRemote) return inRemote;
+    const source = usingLocalShadow ? localDocs : remoteDocs;
+    const inSource = source?.find((d) => (d.id || d._id) === projectId);
+    if (inSource) return inSource;
     if (Array.isArray(projects)) {
       const inProps = projects.find((d) => (d.id || d._id) === projectId);
       if (inProps) return inProps;
@@ -556,16 +640,25 @@ const ProjectTable = ({
     const nuevo = { fecha: draft.fecha, monto, nota: draft.nota?.trim() || '', _tmpId: safeUUID() };
     const snap = getProjectLiveSnapshot(project.id);
     const updated = { ...(snap || {}), id: snap?.id ?? project.id, abonos: [...(snap?.abonos || []), nuevo] };
-    setRemoteDocs((prev) => {
-      const exists = prev.some((p) => (p.id || p._id) === project.id);
-      return exists ? prev.map((p) => ((p.id || p._id) === project.id ? updated : p)) : [...prev, updated];
-    });
+
+    if (usingLocalShadow) {
+      setLocalDocs((prev) => {
+        const exists = prev?.some((p) => (p.id || p._id) === project.id);
+        return exists ? prev.map((p) => ((p.id || p._id) === project.id ? updated : p)) : [...(prev || []), updated];
+      });
+    } else {
+      setRemoteDocs((prev) => {
+        const exists = prev.some((p) => (p.id || p._id) === project.id);
+        return exists ? prev.map((p) => ((p.id || p._id) === project.id ? updated : p)) : [...prev, updated];
+      });
+    }
     setNewAbonoDraft((prev) => ({ ...prev, [project.id]: { fecha: '', monto: '', nota: '' } }));
   };
+  */
 
   /* ===== Render ===== */
   return (
-    <div className="bg-card border border-border rounded-lg overflow-hidden">
+    <div className="bg-card border border-border rounded-lg overflow-visible">
       {loading && <div className="p-4 border-b border-border text-sm text-muted-foreground">Cargando proyectos…</div>}
       {!!errorMsg && <div className="p-4 border-b border-border text-sm text-red-600">{errorMsg}</div>}
 
@@ -635,9 +728,10 @@ const ProjectTable = ({
 
           <tbody>
             {pageItems?.map((project) => {
-              const { presupuestoTotal, abonosList, totalAbonado, restante, percent } = getTotalsForProject(project);
-              const draft = newAbonoDraft[project.id] || { fecha: '', monto: '', nota: '' };
-              const isPagado = restante <= 0;
+              // 🔵 Totales de abonos por proyecto (COMENTADO)
+              // const { presupuestoTotal, abonosList, totalAbonado, restante, percent } = getTotalsForProject(project);
+              // const draft = newAbonoDraft[project.id] || { fecha: '', monto: '', nota: '' };
+              // const isPagado = restante <= 0;
 
               const nameToShow = resolveClientName(project);
               const emailToShow = resolveClientEmailOrContact(project);
@@ -680,7 +774,7 @@ const ProjectTable = ({
                       </div>
                     </td>
 
-                    {/* Estado: solo pill, SIN select */}
+                    {/* Estado: solo pill */}
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColorByKey(statusUI.key)}`}>
@@ -739,7 +833,7 @@ const ProjectTable = ({
                   {expandedRows?.includes(project?.id) && (
                     <tr className="bg-muted/20">
                       <td colSpan={9} className="p-4">
-                        {/* Detalles + Abonos */}
+                        {/* Detalles + (ANTES ABONOS) */}
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                           <div>
                             <h4 className="font-medium text-foreground mb-2">Detalles del Proyecto</h4>
@@ -810,8 +904,7 @@ const ProjectTable = ({
                             </div>
                           </div>
                         </div>
-
-                        {/* ---- ABONOS ---- */}
+                        {/*
                         <div className="mt-6 border-t border-border pt-4">
                           <div className="flex items-start justify-between mb-3">
                             <div className="flex items-center gap-2">
@@ -844,8 +937,9 @@ const ProjectTable = ({
                             <div className="flex items-start justify-between mb-2">
                               <span className="text-[12px] font-medium text-foreground">Agregar abono (modo prueba)</span>
                               <button
-                                className={`flex items-center gap-1 text-[11px] ${isPagado ? 'text-muted-foreground cursor-not-allowed' : 'text-primary hover:underline'
-                                  }`}
+                                className={`flex items-center gap-1 text-[11px] ${
+                                  isPagado ? 'text-muted-foreground cursor-not-allowed' : 'text-primary hover:underline'
+                                }`}
                                 onClick={() => {
                                   if (!isPagado) handleAddAbono(project);
                                 }}
@@ -911,7 +1005,9 @@ const ProjectTable = ({
 
                             <div className="relative w-full h-3 bg-muted rounded overflow-hidden border border-border">
                               <div
-                                className={`h-full transition-all duration-500 ${percent >= 100 ? 'bg-green-600' : 'bg-green-500'}`}
+                                className={`h-full transition-all duration-500 ${
+                                  percent >= 100 ? 'bg-green-600' : 'bg-green-500'
+                                }`}
                                 style={{ width: `${percent}%` }}
                               />
                               <span className="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-white">
@@ -920,6 +1016,7 @@ const ProjectTable = ({
                             </div>
                           </div>
                         </div>
+                        */}
                       </td>
                     </tr>
                   )}
@@ -944,7 +1041,8 @@ const ProjectTable = ({
             <select
               value={pageSize}
               onChange={handleChangePageSize}
-              className="text-sm px-2 py-1 border border-border rounded bg-background text-foreground"
+              className="relative z-20 text-sm px-2 py-1 border border-border rounded bg-background text-foreground min-w-[84px] pr-6 pointer-events-auto"
+              style={{ appearance: 'auto' }}
             >
               {PAGE_SIZE_OPTIONS.map((opt) => (
                 <option key={opt} value={opt}>{opt}</option>
@@ -1012,7 +1110,8 @@ const ProjectTable = ({
             <select
               value={pageSize}
               onChange={handleChangePageSize}
-              className="text-sm px-2 py-1 border border-border rounded bg-background text-foreground"
+              className="relative z-20 text-sm px-2 py-1 border border-border rounded bg-background text-foreground min-w-[84px] pr-6 pointer-events-auto"
+              style={{ appearance: 'auto' }}
             >
               {PAGE_SIZE_OPTIONS.map((opt) => (
                 <option key={opt} value={opt}>{opt}</option>

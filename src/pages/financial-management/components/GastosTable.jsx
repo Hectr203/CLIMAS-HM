@@ -8,6 +8,8 @@ import useGastos from "../../../hooks/useGastos";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 
+
+
 const formatDate = (date) => {
   if (!date) return "—";
   const d = new Date(date);
@@ -60,7 +62,7 @@ const matchesEstado = (estado, tab) => {
 };
 
 
-const GastosTable = () => {
+const GastosTable = ({ filters = {}, data = [] }) => {
   const [ordenes, setOrdenes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -119,14 +121,72 @@ const GastosTable = () => {
 };
 
 
+// Si vienen datos externos desde FinanzasManagement, los usamos;
+// si no, usamos los que cargó localmente el componente.
+const baseOrders = Array.isArray(data) && data.length > 0 ? data : ordenes;
 
+// 1️⃣ Aplicar filtros generales (sin importar estado)
+const filteredBySearch = baseOrders.filter((o) => {
+  const search = (filters.search || "").toLowerCase();
+  const codigo = (filters.codigo || "").toLowerCase();
+  const proveedor = (filters.proveedor || "").toLowerCase();
+  const fechaDesde = filters.fechaDesde ? new Date(filters.fechaDesde) : null;
+  const fechaHasta = filters.fechaHasta ? new Date(filters.fechaHasta) : null;
+
+  const matchSearch =
+    !search ||
+    o.numeroOrden?.toLowerCase().includes(search) ||
+    o.proveedor?.nombre?.toLowerCase().includes(search) ||
+    o.notas?.toLowerCase().includes(search);
+
+  const matchCodigo = !codigo || o.numeroOrden?.toLowerCase().includes(codigo);
+  const matchProveedor = !proveedor || o.proveedor?.nombre?.toLowerCase().includes(proveedor);
+
+  const fechaOrden = o.fechaOrden ? new Date(o.fechaOrden) : null;
+  const matchFechaDesde = !fechaDesde || (fechaOrden && fechaOrden >= fechaDesde);
+  const matchFechaHasta = !fechaHasta || (fechaOrden && fechaOrden <= fechaHasta);
+
+  return (
+    matchSearch &&
+    matchCodigo &&
+    matchProveedor &&
+    matchFechaDesde &&
+    matchFechaHasta
+  );
+});
+
+// 2️⃣ Luego filtrar los que pertenecen a la pestaña activa
+const filteredOrders = filteredBySearch.filter((o) =>
+  matchesEstado(o.estado, activeTab)
+);
+
+// 3️⃣ Calcular los conteos dinámicos por pestaña
 const tabs = [
-  { id: "pendiente", label: "Pendientes", count: ordenes.filter((o) => matchesEstado(o.estado, "pendiente")).length },
-  { id: "aprobado", label: "Aprobadas", count: ordenes.filter((o) => matchesEstado(o.estado, "aprobado")).length },
-  { id: "rechazado", label: "Rechazadas", count: ordenes.filter((o) => matchesEstado(o.estado, "rechazado")).length },
+  {
+    id: "pendiente",
+    label: "Pendientes",
+    count: filteredBySearch.filter((o) =>
+      matchesEstado(o.estado, "pendiente")
+    ).length,
+  },
+  {
+    id: "aprobado",
+    label: "Aprobadas",
+    count: filteredBySearch.filter((o) =>
+      matchesEstado(o.estado, "aprobado")
+    ).length,
+  },
+  {
+    id: "rechazado",
+    label: "Rechazadas",
+    count: filteredBySearch.filter((o) =>
+      matchesEstado(o.estado, "rechazado")
+    ).length,
+  },
 ];
 
-const filteredOrders = ordenes.filter((o) => matchesEstado(o.estado, activeTab));
+
+
 
 
   
@@ -303,16 +363,10 @@ const handleDownloadPDF = (order) => {
 
 const handleAuthorize = async (id, payload, isRejection = false) => {
   try {
-    await approveGasto(id, payload); // Aquí actualizas en backend (estado: rejected o approved)
-
-    // Refrescar la lista después de actualizar
+    await approveGasto(id, payload);
     const updated = await getGastos();
     setOrdenes(Array.isArray(updated) ? updated : updated.data || []);
-
-    // Cambiar de pestaña según si fue aprobado o rechazado
     setActiveTab(isRejection ? "rechazado" : "aprobado");
-
-    // Cerrar modal
     setShowAuthModal(false);
   } catch (error) {
     console.error("Error al procesar gasto:", error);
@@ -455,19 +509,18 @@ const handleAuthorize = async (id, payload, isRejection = false) => {
   onClose={() => setShowAuthModal(false)}
   expense={selectedOrden}
   onAuthorize={handleAuthorize}
-  onDownload={() => handleDownloadPDF(selectedOrden)} // 👈 le pasamos la función de descarga
+  onDownload={() => handleDownloadPDF(selectedOrden)}
   mode={
     ["approved", "aprobado", "rejected", "rechazado", "cancelled"].includes(
       selectedOrden?.estado?.toLowerCase()
     )
-      ? "view" // 👈 modo "ver" para aprobadas y rechazadas
+      ? "view" 
       : "edit"
   }
 />
 
 
-
-    </div>
+  </div>
   );
 };
 

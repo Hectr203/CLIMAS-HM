@@ -4,7 +4,7 @@ import Button from '../../components/ui/Button';
 import Sidebar from '../../components/ui/Sidebar';
 import Header from '../../components/ui/Header';
 import Breadcrumb from '../../components/ui/Breadcrumb';
-
+import FilterGastos from "./components/FilterGastos";
 import FilterControls from './components/FilterControls';
 import ExpenseTrackingTable from './components/ExpenseTrackingTable';
 import FinancialSummaryWidget from './components/FinancialSummaryWidget';
@@ -217,11 +217,20 @@ const FinanzasManagement = () => {
                 )}
               </>
             )}
+{activeTab === "ordenes" && (
+  <>
+    <FilterGastos
+      filters={filters}
+      onFilterChange={handleFiltersChange}
+      onClearFilters={handleResetFilters}
+      totalCount={0}
+      filteredCount={0}
+    />
+    <GastosTable filters={filters} />
+  </>
+)}
 
-            {activeTab === 'ordenes' && (
-              <GastosTable />   
-              )}
-
+            
             {activeTab === 'summary' && (
               <FinancialSummaryWidget summaryData={{ totalExpenses: 0, totalRevenue: 0 }} />
             )}
@@ -233,6 +242,7 @@ const FinanzasManagement = () => {
           </div>
         </div>
       </main>
+      
 
       {/* MODALES */}
       <PaymentAuthorizationModal

@@ -8,6 +8,8 @@ import { useNotifications } from "../../../context/NotificationContext";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
+const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
+
 const WorkOrderTable = ({
   workOrders,
   requisitions,
@@ -25,8 +27,8 @@ const { oportunities, getOportunities, deleteWorkOrder } = useOperac();
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [sortConfig, setSortConfig] = useState({ key: "prioridad", direction: "asc" });
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
   const [localRequisitions, setLocalRequisitions] = useState([]);
-  const itemsPerPage = 5;
 
   // Modal
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -47,53 +49,73 @@ const { oportunities, getOportunities, deleteWorkOrder } = useOperac();
     () => (workOrders?.length ? workOrders : oportunities || []),
     [workOrders, oportunities]
   );
-
   
+    // PARA ELIMINARLO PERO NO DESDE EL BACK SI NO VISUAL
+const [deletedOrderIds, setDeletedOrderIds] = useState(() => {
+  const stored = localStorage.getItem("deletedWorkOrders");
+  return stored ? new Set(JSON.parse(stored)) : new Set();
+});
 
-  const sortedOrders = useMemo(() => {
-    const sorted = [...dataSource];
-    if (!sortConfig.key) return sorted;
-    sorted.sort((a, b) => {
-      const aVal = a[sortConfig.key] || "";
-      const bVal = b[sortConfig.key] || "";
-      if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
-      if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
-      return 0;
-    });
-    return sorted;
-  }, [dataSource, sortConfig]);
+useEffect(() => {
+  localStorage.setItem("deletedWorkOrders", JSON.stringify([...deletedOrderIds]));
+}, [deletedOrderIds]);
 
-  const totalPages = Math.ceil(sortedOrders.length / itemsPerPage);
-  const paginatedData = sortedOrders.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+const sortedOrders = useMemo(() => {
+  const filtered = dataSource.filter((order) => !deletedOrderIds.has(order.id));
+  if (!sortConfig.key) return filtered;
+  const sorted = [...filtered];
+  sorted.sort((a, b) => {
+    const aVal = a[sortConfig.key] || "";
+    const bVal = b[sortConfig.key] || "";
+    if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
+    if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
+    return 0;
+  });
+  return sorted;
+}, [dataSource, sortConfig, deletedOrderIds]);
+
+
+  // Paginación
+  const totalItems = sortedOrders.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+  const paginatedData = sortedOrders.slice(startIndex, endIndex);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+    if (currentPage < 1) setCurrentPage(1);
+  }, [currentPage, totalPages]);
+
+  const handleChangePageSize = (e) => {
+    const v = Number(e?.target?.value) || PAGE_SIZE_OPTIONS[0];
+    setPageSize(v);
+    setCurrentPage(1);
+  };
+
+  const goToPage = (n) => setCurrentPage(Math.min(Math.max(1, n), totalPages));
+  const prevPage = () => goToPage(currentPage - 1);
+  const nextPage = () => goToPage(currentPage + 1);
   
 
 const handleDelete = (order) => {
   showConfirm(`¿Seguro que deseas eliminar la orden "${order.ordenTrabajo}"?`, {
-    onConfirm: async () => {
-      const success = await deleteWorkOrder(order.id);
-
-      if (success) {
-  showOperationSuccess("delete", "Orden de trabajo");
-  onEditOrder?.({ type: "delete", id: order.id });
-} else {
-        showHttpError("No se pudo eliminar la orden");
-      }
+    onConfirm: () => {
+      setDeletedOrderIds((prev) => new Set([...prev, order.id]));
+      showOperationSuccess("delete", "Orden de trabajo");
+      onEditOrder?.({ type: "delete", id: order.id });
     },
     onCancel: () => {
       showInfo("Eliminación cancelada");
-    }
+    },
   });
 };
-
-
   const handleSort = (key) => {
     setSortConfig((prev) => ({
       key,
       direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
     }));
+    setCurrentPage(1);
   };
 
   const handlePageChange = (newPage) => {
@@ -436,36 +458,139 @@ const handleDelete = (order) => {
                 <h4 className="text-sm font-medium text-foreground mt-4">
                   Materiales Registrados
                 </h4>
-                <ul className="text-sm text-muted-foreground grid grid-cols-2 md:grid-cols-3 gap-2">
+                <div className="text-sm">
   {(() => {
-    const materialsForOrder = requisitions
-      ?.filter((req) => req.numeroOrdenTrabajo === order.ordenTrabajo)
-      ?.flatMap((req) => [
-        ...(req.materiales || req.items || []),
-        ...(req.materialesManuales || req.manualItems || [])
-      ]);
+    const reqForOrder = requisitions?.filter(
+      (req) => req.numeroOrdenTrabajo === order.ordenTrabajo
+    );
 
-    if (!materialsForOrder || materialsForOrder.length === 0) {
+    if (!reqForOrder || reqForOrder.length === 0) {
       return (
-        <li className="text-muted-foreground col-span-3">
+        <p className="text-muted-foreground text-sm">
           No hay materiales registrados para esta orden
-        </li>
+        </p>
       );
     }
 
-    return materialsForOrder.map((item, index) => (
-      <li key={index} className="flex items-center space-x-2">
-        <Icon name="Package" size={14} />
-        <span>
-          {item.nombreMaterial || item.nombre || item.descripcionEspecificaciones || "Material sin nombre"} —{" "}
-          <span className="text-muted-foreground">
-            Cantidad: {item.cantidad || item.quantity || 0} {item.unidad || ""}
+    return reqForOrder.map((req, reqIndex) => {
+      // Debug
+      console.log('Requisición en tabla:', req);
+      console.log('Materiales inventario:', req.materiales);
+      console.log('Materiales manuales:', req.materialesManuales);
+      
+      // Normalizar materiales
+      const materialesInventario = req.materiales || req.items || [];
+      const materialesManuales = req.materialesManuales || req.manualItems || [];
+      
+      return (
+      <div key={reqIndex} className="mb-4 border border-border rounded-lg p-3 bg-card">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-medium text-muted-foreground">
+            Requisición: {req.numeroOrdenTrabajo || req.requestNumber}
+          </p>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+            req.estado === 'Aprobada' ? 'bg-green-100 text-green-700' :
+            req.estado === 'Pendiente' ? 'bg-yellow-100 text-yellow-700' :
+            'bg-red-100 text-red-700'
+          }`}>
+            {req.estado}
           </span>
-        </span>
-      </li>
-    ));
+        </div>
+
+        {/* Materiales del Inventario */}
+        {materialesInventario.length > 0 && (
+          <div className="mb-3">
+            <p className="text-xs font-semibold text-blue-700 mb-1 flex items-center">
+              <Icon name="Package" size={14} className="mr-1" />
+              Del Inventario ({materialesInventario.length})
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 ml-4">
+              {materialesInventario.map((item, idx) => (
+                <div key={idx} className="flex items-start space-x-2 text-xs bg-blue-50 p-2 rounded border border-blue-200">
+                  <span className="text-blue-600 mt-0.5">•</span>
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground">
+                      {item.nombreMaterial || item.nombre || item.name}
+                    </p>
+                    {(item.codigoArticulo || item.codigo) && (
+                      <p className="text-[10px] text-muted-foreground">
+                        Código: {item.codigoArticulo || item.codigo}
+                      </p>
+                    )}
+                    <p className="text-muted-foreground">
+                      Cantidad: {item.cantidad || item.quantity} {item.unidad || item.unit}
+                    </p>
+                    {item.urgencia && item.urgencia !== 'Normal' && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                        item.urgencia === 'Urgente' || item.urgencia === 'Crítica'
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-orange-100 text-orange-700'
+                      }`}>
+                        {item.urgencia}
+                      </span>
+                    )}
+                    {item.descripcionEspecificaciones && (
+                      <p className="text-[10px] text-muted-foreground mt-1 italic">
+                        {item.descripcionEspecificaciones}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Materiales Manuales */}
+        {materialesManuales.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-green-700 mb-1 flex items-center">
+              <Icon name="Edit3" size={14} className="mr-1" />
+              Manuales ({materialesManuales.length})
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 ml-4">
+              {materialesManuales.map((item, idx) => (
+                <div key={idx} className="flex items-start space-x-2 text-xs bg-green-50 p-2 rounded border border-green-200">
+                  <span className="text-green-600 mt-0.5">•</span>
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground">
+                      {item.nombreMaterial || item.nombre || item.name}
+                    </p>
+                    <p className="text-muted-foreground">
+                      Cantidad: {item.cantidad || item.quantity} {item.unidad || item.unit}
+                    </p>
+                    {item.urgencia && item.urgencia !== 'Normal' && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                        item.urgencia === 'Urgente' || item.urgencia === 'Crítica'
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-orange-100 text-orange-700'
+                      }`}>
+                        {item.urgencia}
+                      </span>
+                    )}
+                    {item.descripcionEspecificaciones && (
+                      <p className="text-[10px] text-muted-foreground mt-1 italic">
+                        {item.descripcionEspecificaciones}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Si no hay materiales en esta requisición */}
+        {materialesInventario.length === 0 && materialesManuales.length === 0 && (
+          <p className="text-xs text-muted-foreground ml-4">
+            Esta requisición no tiene materiales registrados
+          </p>
+        )}
+      </div>
+    );
+    });
   })()}
-</ul>
+</div>
 
 
                 <p className="text-sm text-muted-foreground">
@@ -498,30 +623,32 @@ const handleDelete = (order) => {
         )}
       </div>
 
-      {/*  Paginación */}
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-2 p-4 border-t border-border">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={currentPage === 1}
-            onClick={() => handlePageChange(currentPage - 1)}
+      {/* Paginación */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-t border-border px-4 py-3 gap-3">
+        <div className="flex items-center gap-3">
+          <label className="text-xs text-muted-foreground">Mostrar</label>
+          <select
+            value={pageSize}
+            onChange={handleChangePageSize}
+            className="text-sm px-2 py-1 border border-border rounded bg-background text-foreground"
           >
-            <Icon name="ChevronLeft" size={14} />
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            Página {currentPage} de {totalPages}
+            {PAGE_SIZE_OPTIONS.map((opt) => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+          <span className="text-xs text-muted-foreground">por página</span>
+          <span className="text-xs text-muted-foreground ml-3">
+            Mostrando <span className="font-medium">{totalItems === 0 ? 0 : startIndex + 1}</span>-<span className="font-medium">{endIndex}</span> de <span className="font-medium">{totalItems}</span>
           </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={currentPage === totalPages}
-            onClick={() => handlePageChange(currentPage + 1)}
-          >
-            <Icon name="ChevronRight" size={14} />
-          </Button>
         </div>
-      )}
+        <div className="flex items-center gap-1">
+          <Button variant="outline" size="sm" onClick={() => goToPage(1)} disabled={currentPage === 1} iconName="ChevronsLeft" />
+          <Button variant="outline" size="sm" onClick={prevPage} disabled={currentPage === 1} iconName="ChevronLeft" />
+          <span className="px-2 text-sm text-foreground">{currentPage} / {totalPages}</span>
+          <Button variant="outline" size="sm" onClick={nextPage} disabled={currentPage === totalPages} iconName="ChevronRight" />
+          <Button variant="outline" size="sm" onClick={() => goToPage(totalPages)} disabled={currentPage === totalPages} iconName="ChevronsRight" />
+        </div>
+      </div>
     </div>
   );
 };

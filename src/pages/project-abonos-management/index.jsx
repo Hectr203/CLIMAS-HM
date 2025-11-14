@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Icon from '../../components/AppIcon';
 import Sidebar from '../../components/ui/Sidebar';
 import Header from '../../components/ui/Header';
+import Breadcrumb from '../../components/ui/Breadcrumb';
 import ProjectFilters from './components/ProjectFilters';
 import ProjectTable from './components/ProjectTable';
 import ProjectStats from './components/AbonosStats';
@@ -96,6 +97,9 @@ const ProjectManagement = () => {
   // Control del selector de proyecto (cuando se quiere crear un abono sin abrir desde la tabla)
   const [mostrarSelectorProyecto, setMostrarSelectorProyecto] = useState(false);
 
+  // Trigger para refrescar las estadísticas de abonos cuando se crea o actualiza un abono
+  const [refreshAbonosStats, setRefreshAbonosStats] = useState(0);
+
   /* =========================================================================
      Ciclo de vida
      - Cargar proyectos al montar
@@ -105,10 +109,13 @@ const ProjectManagement = () => {
   useEffect(() => {
     const arr = Array.isArray(proyectos) ? proyectos : [];
     uiEstadoCache.bulkMergeFromApi(arr);   // completa estados UI faltantes
-    // Si la lista filtrada está vacía o tiene la misma cantidad que la lista completa, actualizar
+    // Actualizar la lista filtrada cuando cambian los proyectos
+    // Esto asegura que los cambios en abonos se reflejen en la tabla
     if (!proyectosFiltrados || proyectosFiltrados.length === 0 || proyectosFiltrados.length === arr.length) {
-      setProyectosFiltrados(arr);            // por defecto, sin filtros
+      setProyectosFiltrados(arr);            // por defecto, sin filtros o misma cantidad
     }
+    // Nota: Si hay filtros aplicados y la cantidad cambió, los filtros se mantendrán
+    // pero los datos de los proyectos se actualizarán cuando se re-apliquen los filtros
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proyectos]);
 
@@ -420,6 +427,9 @@ const ProjectManagement = () => {
 
     cerrarRegistroAbono();
 
+    // Refrescar las estadísticas de abonos
+    setRefreshAbonosStats(prev => prev + 1);
+
     try {
       await getProyectos({ force: true });
     } catch (errorRecarga) {
@@ -479,7 +489,7 @@ const ProjectManagement = () => {
     return (
       <div className="min-h-screen bg-background flex">
         <Sidebar isCollapsed={barraLateralColapsada} onToggle={() => setBarraLateralColapsada(!barraLateralColapsada)} />
-        <div className={`flex-1 transition-all duration-300 ${barraLateralColapsada ? 'ml-16' : 'ml-60'}`}>
+        <div className={`flex-1 transition-all duration-300 ${barraLateralColapsada ? 'lg:ml-16' : 'lg:ml-60'}`}>
           <Header onMenuToggle={() => setMenuEncabezadoAbierto(!menuEncabezadoAbierto)} isMenuOpen={menuEncabezadoAbierto} />
           <div className="pt-16 flex items-center justify-center h-96">
             <div className="text-center">
@@ -501,11 +511,16 @@ const ProjectManagement = () => {
     <div className="min-h-screen bg-background flex">
       <Sidebar isCollapsed={barraLateralColapsada} onToggle={() => setBarraLateralColapsada(!barraLateralColapsada)} />
 
-      <div className={`flex-1 transition-all duration-300 ${barraLateralColapsada ? 'ml-16' : 'ml-60'}`}>
+      <div className={`flex-1 transition-all duration-300 ${barraLateralColapsada ? 'lg:ml-16' : 'lg:ml-60'}`}>
         <Header onMenuToggle={() => setMenuEncabezadoAbierto(!menuEncabezadoAbierto)} isMenuOpen={menuEncabezadoAbierto} />
 
-        <div className="pt-16">
+        <div className="">
           <div className="container mx-auto px-4 py-8">
+            {/* Breadcrumb */}
+            <div className="mb-6">
+              <Breadcrumb />
+            </div>
+
             {/* Encabezado de la página */}
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
               <div>
@@ -516,7 +531,11 @@ const ProjectManagement = () => {
 
             {/* Resumen de estadísticas (usa proyectos filtrados y total pagado calculado localmente) */}
             {proyectosFiltrados?.length > 0 && (
-              <ProjectStats projects={proyectosFiltrados} getTotalPagado={obtenerTotalPagado} />
+              <ProjectStats 
+                projects={proyectosFiltrados} 
+                getTotalPagado={obtenerTotalPagado}
+                refreshTrigger={refreshAbonosStats}
+              />
             )}
 
             {/* Filtros (emitirá onFiltersChange → manejarCambioFiltros) */}
@@ -640,6 +659,17 @@ const ProjectManagement = () => {
                 isOpen
                 project={verAbonosPara}
                 onClose={cerrarVerAbonos}
+                onAbonoUpdated={async (proyecto, abonoActualizado) => {
+                  // Refrescar las estadísticas de abonos
+                  setRefreshAbonosStats(prev => prev + 1);
+                  
+                  // Recargar los proyectos para actualizar la tabla
+                  try {
+                    await getProyectos({ force: true });
+                  } catch (errorRecarga) {
+                    console.error('Error al recargar los proyectos después de actualizar un abono:', errorRecarga);
+                  }
+                }}
               />
             )}
           </div>

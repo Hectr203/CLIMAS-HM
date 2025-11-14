@@ -333,6 +333,7 @@ const QuotationBuilder = ({ cotizacion, onUpdate, onAddRevision }) => {
                   </span>
                 </div>
                 <div className="flex space-x-2">
+                  {/* Botón comentado: Crear Revisión (se dejó comentado para posible uso futuro)
                   <Button
                     variant="outline"
                     onClick={handleCreateRevision}
@@ -341,6 +342,9 @@ const QuotationBuilder = ({ cotizacion, onUpdate, onAddRevision }) => {
                   >
                     Crear Revisión
                   </Button>
+                  */}
+
+                  {/* Botón comentado: Enviar a Revisión (se dejó comentado para posible uso futuro)
                   <Button
                     // console.log eliminado
                     iconName="Users"
@@ -348,6 +352,7 @@ const QuotationBuilder = ({ cotizacion, onUpdate, onAddRevision }) => {
                   >
                     Enviar a Revisión
                   </Button>
+                  */}
                   {/* Eliminar el botón azul de Guardar aquí */}
                 </div>
               </div>
