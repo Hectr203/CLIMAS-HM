@@ -77,31 +77,139 @@ const ProjectManagement = () => {
 
   const canonicalEstado = (raw) => {
     const v = norm(raw);
-    if (v.includes('planific')) return 'planificacion';
-    if (v.includes('en proceso') || v.includes('progress')) return 'en proceso';
-    if (v.includes('pausa') || v.includes('hold')) return 'en pausa';
-    if (v.includes('revision') || v.includes('review')) return 'en revision';
-    if (v.includes('complet')) return 'completado';
-    if (v.includes('cancel')) return 'cancelado';
+    // Mapear estados del backend (español) a valores del filtro (inglés)
+    if (v.includes('planific') || v === 'planning') return 'planning';
+    if (v.includes('en proceso') || v.includes('progress') || v === 'in-progress') return 'in-progress';
+    if (v.includes('pausa') || v.includes('hold') || v === 'on-hold') return 'on-hold';
+    if (v.includes('revision') || v.includes('review') || v === 'review') return 'review';
+    if (v.includes('complet') || v === 'completed') return 'completed';
+    if (v.includes('cancel') || v === 'cancelled') return 'cancelled';
     return v;
   };
 
   const handleFiltersChange = (filters) => {
     let filtered = Array.isArray(projects) ? [...projects] : [];
 
+    // Búsqueda por nombre, código o cliente
     if (filters?.search) {
       const q = norm(filters.search);
       filtered = filtered.filter(p =>
-        norm(p?.nombre)?.includes(q) ||
-        norm(p?.codigo)?.includes(q) ||
-        norm(p?.cliente?.nombre)?.includes(q)
+        norm(p?.nombre || p?.nombreProyecto || '')?.includes(q) ||
+        norm(p?.codigo || p?.code || '')?.includes(q) ||
+        norm(p?.cliente?.nombre || p?.cliente || '')?.includes(q)
       );
     }
 
+    // Filtro por estado
     if (filters?.status) {
-      filtered = filtered.filter(p =>
-        canonicalEstado(uiEstadoCache.get(p.id) || p.estado) === canonicalEstado(filters.status)
+      filtered = filtered.filter(p => {
+        const estadoProyecto = uiEstadoCache.get(p?.id || p?._id) || p?.estado || '';
+        return canonicalEstado(estadoProyecto) === canonicalEstado(filters.status);
+      });
+    }
+
+    // Filtro por departamento
+    if (filters?.department) {
+      const deptMap = {
+        'sales': 'Ventas',
+        'engineering': 'Ingeniería',
+        'installation': 'Instalación',
+        'maintenance': 'Mantenimiento',
+        'administration': 'Administración'
+      };
+      const deptTarget = deptMap[filters.department] || filters.department;
+      filtered = filtered.filter(p => 
+        norm(p?.departamento || '') === norm(deptTarget)
       );
+    }
+
+    // Filtro por prioridad
+    if (filters?.priority) {
+      const priorityMap = {
+        'low': 'Baja',
+        'medium': 'Media',
+        'high': 'Alta',
+        'urgent': 'Urgente'
+      };
+      const priorityTarget = priorityMap[filters.priority] || filters.priority;
+      filtered = filtered.filter(p => 
+        norm(p?.prioridad || '') === norm(priorityTarget)
+      );
+    }
+
+    // Filtro por rango de presupuesto
+    if (filters?.minBudget) {
+      const minBudget = Number(filters.minBudget);
+      filtered = filtered.filter(p => {
+        const presupuesto = Number(p?.presupuesto?.total || p?.totalPresupuesto || p?.budget || 0);
+        return presupuesto >= minBudget;
+      });
+    }
+
+    if (filters?.maxBudget) {
+      const maxBudget = Number(filters.maxBudget);
+      filtered = filtered.filter(p => {
+        const presupuesto = Number(p?.presupuesto?.total || p?.totalPresupuesto || p?.budget || 0);
+        return presupuesto <= maxBudget;
+      });
+    }
+
+    // Filtro por rango de fechas
+    if (filters?.dateRange) {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+      filtered = filtered.filter(p => {
+        const fechaInicio = p?.cronograma?.fechaInicio || p?.startDate;
+        if (!fechaInicio) return false;
+        const startDate = new Date(fechaInicio);
+        if (isNaN(startDate.getTime())) return false;
+
+        switch (filters.dateRange) {
+          case 'today':
+            return startDate.toDateString() === today.toDateString();
+          case 'week': {
+            const weekAgo = new Date(today);
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            return startDate >= weekAgo && startDate <= now;
+          }
+          case 'month':
+            return startDate.getMonth() === now.getMonth() && 
+                   startDate.getFullYear() === now.getFullYear();
+          case 'quarter': {
+            const quarter = Math.floor(now.getMonth() / 3);
+            const projectQuarter = Math.floor(startDate.getMonth() / 3);
+            return projectQuarter === quarter && 
+                   startDate.getFullYear() === now.getFullYear();
+          }
+          case 'year':
+            return startDate.getFullYear() === now.getFullYear();
+          default:
+            return true;
+        }
+      });
+    }
+
+    // Filtro por fecha de inicio exacta
+    if (filters?.startDate) {
+      const filterStartDate = new Date(filters.startDate);
+      filtered = filtered.filter(p => {
+        const fechaInicio = p?.cronograma?.fechaInicio || p?.startDate;
+        if (!fechaInicio) return false;
+        const projectStartDate = new Date(fechaInicio);
+        return !isNaN(projectStartDate.getTime()) && projectStartDate >= filterStartDate;
+      });
+    }
+
+    // Filtro por fecha de fin exacta
+    if (filters?.endDate) {
+      const filterEndDate = new Date(filters.endDate);
+      filtered = filtered.filter(p => {
+        const fechaFin = p?.cronograma?.fechaFin || p?.endDate;
+        if (!fechaFin) return false;
+        const projectEndDate = new Date(fechaFin);
+        return !isNaN(projectEndDate.getTime()) && projectEndDate <= filterEndDate;
+      });
     }
 
     setFilteredProjects(filtered);

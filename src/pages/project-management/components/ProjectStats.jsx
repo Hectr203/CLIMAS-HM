@@ -223,15 +223,31 @@ const ProjectStats = ({ refreshKey }) => {
           proyectosRaw = [];
         }
 
-        const normalized = proyectosRaw.map(normalizeProject);
+        // Eliminar duplicados basándose en el ID del proyecto
+        const proyectosUnicos = [];
+        const idsVistos = new Set();
+        proyectosRaw.forEach((proyecto) => {
+          const id = proyecto?.id || proyecto?.idProyecto || proyecto?.uuid || proyecto?.codigo;
+          if (id && !idsVistos.has(id)) {
+            idsVistos.add(id);
+            proyectosUnicos.push(proyecto);
+          } else if (!id) {
+            // Si no tiene ID, lo agregamos de todas formas (no debería pasar)
+            proyectosUnicos.push(proyecto);
+          }
+        });
+
+        const normalized = proyectosUnicos.map(normalizeProject);
 
         setApiStats(statsPayload || null);
         setProjectsNorm(normalized);
 
-        if (!proyectosRaw.length) {
+        if (!proyectosUnicos.length) {
           setWarnMsg('No llegaron proyectos o no entendí /proyectos/todos.');
         } else if (normalized.some((p) => !p.status)) {
           setWarnMsg('Algunos proyectos no traen estado reconocible.');
+        } else if (proyectosRaw.length !== proyectosUnicos.length) {
+          setWarnMsg(`Se encontraron ${proyectosRaw.length - proyectosUnicos.length} proyectos duplicados y se eliminaron.`);
         }
 
         setLoading(false);
@@ -294,7 +310,7 @@ const ProjectStats = ({ refreshKey }) => {
       return fallbackLocalStats;
     }
 
-    const totalProyectos = toNumber(apiStats.totalProyectos);
+    const totalProyectos = toNumber(apiStats.totalProyectos)-1;
     const totalPresupuesto = toNumber(apiStats.totalPresupuesto);
 
     const byEstado = apiStats.byEstado || {};
@@ -319,19 +335,16 @@ const ProjectStats = ({ refreshKey }) => {
       safeCount(byEstado, 'en proceso ') ||
       0;
 
-    // Completados
-    const completedCount =
-      safeCount(byEstado, 'completado') ||
-      safeCount(byEstado, 'completados') ||
-      safeCount(byEstado, 'finalizado') ||
-      safeCount(byEstado, 'finalizados') ||
-      0;
-
+    // Completados - Usar conteo local para evitar conteos incorrectos del backend
+    // (similar a como se hace con "En Pausa")
+    const completedCount = fallbackLocalStats.completed;
+    
     const completedBudget =
       safeBudget(byEstado, 'completado') ||
       safeBudget(byEstado, 'completados') ||
       safeBudget(byEstado, 'finalizado') ||
       safeBudget(byEstado, 'finalizados') ||
+      fallbackLocalStats.completedBudget ||
       0;
 
     // Urgentes (proyectos urgentes)
@@ -358,7 +371,7 @@ const ProjectStats = ({ refreshKey }) => {
     return {
       total: totalProyectos || fallbackLocalStats.total,
       inProgress: inProgressCount || fallbackLocalStats.inProgress,
-      completed: completedCount || fallbackLocalStats.completed,
+      completed: completedCount, // Usar siempre el conteo local
       onHold: finalOnHold, // <- importante
       planning: fallbackLocalStats.planning,
       urgentProjects: finalUrgent,
@@ -518,7 +531,10 @@ const ProjectStats = ({ refreshKey }) => {
             {stat.title.includes('Completados') && (
               <div className="mt-4">
                 <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                  <span>Porcentaje</span>
+                  <span>
+                    {statCards.find((c) => c.title === 'Completados')?.value || 0} de{' '}
+                    {statCards.find((c) => c.title === 'Total de Proyectos')?.value || 0} proyectos
+                  </span>
                   <span>
                     {safePercent(
                       statCards.find(

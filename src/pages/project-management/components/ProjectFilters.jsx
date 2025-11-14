@@ -159,13 +159,6 @@ const ProjectFilters = ({
     { value: 'year', label: 'Este Año' },
   ];
 
-  const clientTypeOptions = [
-    { value: '', label: 'Todos los Clientes' },
-    { value: 'residential', label: 'Residencial' },
-    { value: 'commercial', label: 'Comercial' },
-    { value: 'industrial', label: 'Industrial' },
-    { value: 'government', label: 'Gubernamental' },
-  ];
 
   const priorityOptions = [
     { value: '', label: 'Todas las Prioridades' },
@@ -252,7 +245,7 @@ const ProjectFilters = ({
         <div className="relative">
           <Input
             type="search"
-            placeholder="Buscar por nombre de proyecto, cliente, código..."
+            placeholder="Buscar por nombre de proyecto, código..."
             value={filters.search}
             onChange={(e) => handleFilterChange('search', e.target.value)}
             className="pl-10"
@@ -290,13 +283,6 @@ const ProjectFilters = ({
           className="w-full"
         />
 
-        <Select
-          label="Tipo de Cliente"
-          options={clientTypeOptions}
-          value={filters.clientType}
-          onChange={(value) => handleFilterChange('clientType', value)}
-          className="w-full"
-        />
 
         <Select
           label="Prioridad"
@@ -428,96 +414,134 @@ export default ProjectFilters;
    (YA CON OPCIÓN A IMPLEMENTADA)
 ========================================== */
 
-export const applyProjectFilters = (projects, filters) => {
-  let filtered = [...projects];
+// Función auxiliar para normalizar texto (sin acentos, minúsculas)
+const normalizeText = (text) => {
+  if (!text) return '';
+  return String(text)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+};
 
-  // Search
+// Función auxiliar para obtener estado canónico
+// Mapea estados del backend (español) a valores del filtro (inglés)
+const getCanonicalEstado = (estado) => {
+  const v = normalizeText(estado);
+  if (v.includes('planific') || v === 'planning') return 'planning';
+  if (v.includes('en proceso') || v.includes('progress') || v === 'in-progress') return 'in-progress';
+  if (v.includes('pausa') || v.includes('hold') || v === 'on-hold') return 'on-hold';
+  if (v.includes('revision') || v.includes('review') || v === 'review') return 'review';
+  if (v.includes('complet') || v === 'completed') return 'completed';
+  if (v.includes('cancel') || v === 'cancelled') return 'cancelled';
+  return v;
+};
+
+export const applyProjectFilters = (projects, filters) => {
+  let filtered = Array.isArray(projects) ? [...projects] : [];
+
+  // Búsqueda por nombre, código o cliente
   if (filters?.search) {
-    const searchTerm = filters.search.toLowerCase();
+    const searchTerm = normalizeText(filters.search);
     filtered = filtered.filter(
       (project) =>
-        project?.name?.toLowerCase()?.includes(searchTerm) ||
-        project?.code?.toLowerCase()?.includes(searchTerm) ||
-        project?.client?.name?.toLowerCase()?.includes(searchTerm)
+        normalizeText(project?.nombre || project?.nombreProyecto || project?.name || '')?.includes(searchTerm) ||
+        normalizeText(project?.codigo || project?.code || '')?.includes(searchTerm) ||
+        normalizeText(project?.cliente?.nombre || project?.client?.name || project?.cliente || '')?.includes(searchTerm)
     );
   }
 
-  // Status (incluye equivalentes cuando eliges "En Pausa")
+  // Filtro por estado
   if (filters?.status) {
     filtered = filtered.filter((project) => {
-      const raw = (project?.status || '').toLowerCase().trim();
-      const target = filters.status.toLowerCase().trim();
-
-      // Coincidencia directa
-      if (raw === target) return true;
-
-      // Caso especial "En Pausa"
-      // target === 'on-hold'
-      // Queremos incluir estados equivalentes que el backend mete en "pausa"
-      if (target === 'on-hold') {
-        if (
-          raw.includes('pausa') ||     // "en pausa", "pausado", "pausada"
-          raw.includes('paus')  ||
-          raw.includes('hold')  ||     // "on-hold"
-          raw.includes('suspend') ||   // "suspendido", "suspendida"
-          raw.includes('detenid')      // "detenido", "detenida"
-        ) {
-          return true;
-        }
+      const estadoProyecto = project?.estado || project?.status || '';
+      const estadoCanonico = getCanonicalEstado(estadoProyecto);
+      const targetCanonico = getCanonicalEstado(filters.status);
+      
+      // Caso especial "En Pausa" (on-hold)
+      if (targetCanonico === 'on-hold' || filters.status === 'on-hold') {
+        return estadoCanonico === 'on-hold' || 
+               normalizeText(estadoProyecto).includes('pausa') ||
+               normalizeText(estadoProyecto).includes('hold') ||
+               normalizeText(estadoProyecto).includes('suspend') ||
+               normalizeText(estadoProyecto).includes('detenid');
       }
-
-      return false;
+      
+      return estadoCanonico === targetCanonico;
     });
   }
 
-  // Department
+  // Filtro por departamento
   if (filters?.department) {
+    const deptMap = {
+      'sales': 'Ventas',
+      'engineering': 'Ingeniería',
+      'installation': 'Instalación',
+      'maintenance': 'Mantenimiento',
+      'administration': 'Administración',
+      'operations': 'Operaciones',
+      'projects': 'Proyectos',
+      'taller': 'Taller',
+      'maintenance': 'Mantenimiento',
+      'administration': 'Administración',
+      'operations': 'Operaciones',
+      'projects': 'Proyectos',
+      'taller': 'Taller',
+      'maintenance': 'Mantenimiento',
+    };
+    const deptTarget = deptMap[filters.department] || filters.department;
     filtered = filtered.filter(
       (project) =>
-        project?.department?.toLowerCase() ===
-        filters.department.toLowerCase()
+        normalizeText(project?.departamento || '') === normalizeText(deptTarget)
     );
   }
 
-  // Client type
+  // Filtro por tipo de cliente
   if (filters?.clientType) {
     filtered = filtered.filter(
-      (project) => project?.client?.type === filters.clientType
+      (project) => project?.cliente?.type === filters.clientType || project?.client?.type === filters.clientType
     );
   }
 
-  // Priority
+  // Filtro por prioridad
   if (filters?.priority) {
+    const priorityMap = {
+      'low': 'Baja',
+      'medium': 'Media',
+      'high': 'Alta',
+      'urgent': 'Urgente'
+    };
+    const priorityTarget = priorityMap[filters.priority] || filters.priority;
     filtered = filtered.filter(
-      (project) => project?.priority === filters.priority
+      (project) =>
+        normalizeText(project?.prioridad || '') === normalizeText(priorityTarget)
     );
   }
 
-  // Date range (sobre startDate)
+  // Filtro por rango de fechas
   if (filters?.dateRange) {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     filtered = filtered.filter((project) => {
-      const startDate = new Date(project?.startDate);
-      if (isNaN(startDate)) return false;
+      const fechaInicio = project?.cronograma?.fechaInicio || project?.startDate;
+      if (!fechaInicio) return false;
+      const startDate = new Date(fechaInicio);
+      if (isNaN(startDate.getTime())) return false;
 
       switch (filters.dateRange) {
         case 'today':
           return startDate.toDateString() === today.toDateString();
-
         case 'week': {
           const weekAgo = new Date(today);
           weekAgo.setDate(weekAgo.getDate() - 7);
           return startDate >= weekAgo && startDate <= now;
         }
-
         case 'month':
           return (
             startDate.getMonth() === now.getMonth() &&
             startDate.getFullYear() === now.getFullYear()
           );
-
         case 'quarter': {
           const quarter = Math.floor(now.getMonth() / 3);
           const projectQuarter = Math.floor(startDate.getMonth() / 3);
@@ -526,46 +550,50 @@ export const applyProjectFilters = (projects, filters) => {
             startDate.getFullYear() === now.getFullYear()
           );
         }
-
         case 'year':
           return startDate.getFullYear() === now.getFullYear();
-
         default:
           return true;
       }
     });
   }
 
-  // Budget range
+  // Filtro por rango de presupuesto
   if (filters?.minBudget) {
     const minBudget = Number(filters.minBudget);
-    filtered = filtered.filter(
-      (project) => Number(project?.budget) >= minBudget
-    );
+    filtered = filtered.filter((project) => {
+      const presupuesto = Number(project?.presupuesto?.total || project?.totalPresupuesto || project?.budget || 0);
+      return presupuesto >= minBudget;
+    });
   }
 
   if (filters?.maxBudget) {
     const maxBudget = Number(filters.maxBudget);
-    filtered = filtered.filter(
-      (project) => Number(project?.budget) <= maxBudget
-    );
-  }
-
-  // Exact start date (>=)
-  if (filters?.startDate) {
-    const filterStartDate = new Date(filters.startDate);
     filtered = filtered.filter((project) => {
-      const projectStartDate = new Date(project?.startDate);
-      return !isNaN(projectStartDate) && projectStartDate >= filterStartDate;
+      const presupuesto = Number(project?.presupuesto?.total || project?.totalPresupuesto || project?.budget || 0);
+      return presupuesto <= maxBudget;
     });
   }
 
-  // Exact end date (<=)
+  // Filtro por fecha de inicio exacta (>=)
+  if (filters?.startDate) {
+    const filterStartDate = new Date(filters.startDate);
+    filtered = filtered.filter((project) => {
+      const fechaInicio = project?.cronograma?.fechaInicio || project?.startDate;
+      if (!fechaInicio) return false;
+      const projectStartDate = new Date(fechaInicio);
+      return !isNaN(projectStartDate.getTime()) && projectStartDate >= filterStartDate;
+    });
+  }
+
+  // Filtro por fecha de fin exacta (<=)
   if (filters?.endDate) {
     const filterEndDate = new Date(filters.endDate);
     filtered = filtered.filter((project) => {
-      const projectEndDate = new Date(project?.endDate);
-      return !isNaN(projectEndDate) && projectEndDate <= filterEndDate;
+      const fechaFin = project?.cronograma?.fechaFin || project?.endDate;
+      if (!fechaFin) return false;
+      const projectEndDate = new Date(fechaFin);
+      return !isNaN(projectEndDate.getTime()) && projectEndDate <= filterEndDate;
     });
   }
 
