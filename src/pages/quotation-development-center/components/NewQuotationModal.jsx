@@ -319,6 +319,7 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
 
   const { createQuotation, loading: loadingQuotation, error: errorQuotation } = useQuotation();
   const { showOperationSuccess } = useNotifications();
+  const { actualizarOportunidad } = useOpportunity();
 
   const handleSubmit = async (e) => {
     e?.preventDefault();
@@ -430,6 +431,17 @@ const NewQuotationModal = ({ isOpen, onClose, onCreateQuotation }) => {
       const wasCreated = response?.success || response?.id || response?.data?.id;
       if (wasCreated) {
         showOperationSuccess('Cotización creada exitosamente');
+        
+        // Si viene de una oportunidad, mantener el estado y redirigir
+        if (opportunityId) {
+          // Limpiar completamente el estado del modal
+          resetModalState();
+          // Redirigir a oportunidades con mensaje de éxito
+          window.location.href = '/oportunidades?cotizacionCreada=true';
+          return;
+        }
+        
+        // Flujo normal si no viene de oportunidad
         onCreateQuotation?.(response.data || response);
         handleClose();
       } else {

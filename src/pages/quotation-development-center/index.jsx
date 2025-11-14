@@ -49,11 +49,19 @@ const QuotationDevelopmentCenter = () => {
           folio: cotizacion.folio || '', // folio
           clientId: cotizacion.informacion_basica?.cliente?.find?.(c => 'id_cliente' in c)?.id_cliente || '',
           clientName: cotizacion.informacion_basica?.cliente?.find?.(c => c?.nombre_cliente)?.nombre_cliente || '',
+          projectId: cotizacion.informacion_basica?.proyecto?.find?.(p => 'id_proyecto' in p)?.id_proyecto || '',
           projectName: cotizacion.informacion_basica?.proyecto?.find?.(p => p?.nombre_proyecto)?.nombre_proyecto || '',
+          projectType: cotizacion.informacion_basica?.tipo_proyecto || '',
+          description: cotizacion.detalles_proyecto?.descripcion_proyecto || '',
+          location: cotizacion.detalles_proyecto?.ubicacion_proyecto?.[0] || {},
+          executionTime: cotizacion.detalles_proyecto?.tiempo_ejecucion || '',
+          contactInfo: cotizacion.informacion_contacto?.[0]?.persona_contacto1?.[0] || {},
+          additionalNotes: cotizacion.asignacion?.notas_adicionales || '',
           status: 'development',
           createdDate: cotizacion.fechaCreacion ? new Date(cotizacion.fechaCreacion).toLocaleDateString('es-MX') : '',
           lastModified: cotizacion.fechaActualizacion ? new Date(cotizacion.fechaActualizacion).toLocaleDateString('es-MX') : '',
           assignedTo: cotizacion.asignacion?.responsables?.[0]?.nombre_responsable || '',
+          assignedToId: cotizacion.asignacion?.responsables?.[0]?.id_responsable || '',
           priority: cotizacion.informacion_basica?.prioridad || 'media',
           quotationData: {
             totalAmount: cotizacion.detalles_proyecto?.presupuesto_estimado_mxn || 0
@@ -74,12 +82,21 @@ const QuotationDevelopmentCenter = () => {
     // Extraer datos relevantes según el formato recibido
     const mappedQuotation = {
       id: newQuotation?.folio || newQuotation?.id || '',
+      clientId: newQuotation?.informacion_basica?.cliente?.find?.(c => 'id_cliente' in c)?.id_cliente || '',
       clientName: newQuotation?.informacion_basica?.cliente?.find?.(c => c?.nombre_cliente)?.nombre_cliente || '',
+      projectId: newQuotation?.informacion_basica?.proyecto?.find?.(p => 'id_proyecto' in p)?.id_proyecto || '',
       projectName: newQuotation?.informacion_basica?.proyecto?.find?.(p => p?.nombre_proyecto)?.nombre_proyecto || '',
+      projectType: newQuotation?.informacion_basica?.tipo_proyecto || '',
+      description: newQuotation?.detalles_proyecto?.descripcion_proyecto || '',
+      location: newQuotation?.detalles_proyecto?.ubicacion_proyecto?.[0] || {},
+      executionTime: newQuotation?.detalles_proyecto?.tiempo_ejecucion || '',
+      contactInfo: newQuotation?.informacion_contacto?.[0]?.persona_contacto1?.[0] || {},
+      additionalNotes: newQuotation?.asignacion?.notas_adicionales || '',
       status: 'development',
       createdDate: newQuotation?.fechaCreacion ? new Date(newQuotation?.fechaCreacion).toLocaleDateString('es-MX') : new Date().toLocaleDateString('es-MX'),
       lastModified: newQuotation?.fechaActualizacion ? new Date(newQuotation?.fechaActualizacion).toLocaleDateString('es-MX') : new Date().toLocaleDateString('es-MX'),
       assignedTo: newQuotation?.asignacion?.responsables?.[0]?.nombre_responsable || '',
+      assignedToId: newQuotation?.asignacion?.responsables?.[0]?.id_responsable || '',
       priority: newQuotation?.informacion_basica?.prioridad || 'media',
       quotationData: {
         totalAmount: newQuotation?.detalles_proyecto?.presupuesto_estimado_mxn || 0
@@ -107,11 +124,19 @@ const QuotationDevelopmentCenter = () => {
         folio: cotizacion.folio || '',
         clientId: cotizacion.informacion_basica?.cliente?.find?.(c => 'id_cliente' in c)?.id_cliente || '',
         clientName: cotizacion.informacion_basica?.cliente?.find?.(c => c?.nombre_cliente)?.nombre_cliente || '',
+        projectId: cotizacion.informacion_basica?.proyecto?.find?.(p => 'id_proyecto' in p)?.id_proyecto || '',
         projectName: cotizacion.informacion_basica?.proyecto?.find?.(p => p?.nombre_proyecto)?.nombre_proyecto || '',
+        projectType: cotizacion.informacion_basica?.tipo_proyecto || '',
+        description: cotizacion.detalles_proyecto?.descripcion_proyecto || '',
+        location: cotizacion.detalles_proyecto?.ubicacion_proyecto?.[0] || {},
+        executionTime: cotizacion.detalles_proyecto?.tiempo_ejecucion || '',
+        contactInfo: cotizacion.informacion_contacto?.[0]?.persona_contacto1?.[0] || {},
+        additionalNotes: cotizacion.asignacion?.notas_adicionales || '',
         status: 'development',
         createdDate: cotizacion.fechaCreacion ? new Date(cotizacion.fechaCreacion).toLocaleDateString('es-MX') : '',
         lastModified: cotizacion.fechaActualizacion ? new Date(cotizacion.fechaActualizacion).toLocaleDateString('es-MX') : '',
         assignedTo: cotizacion.asignacion?.responsables?.[0]?.nombre_responsable || '',
+        assignedToId: cotizacion.asignacion?.responsables?.[0]?.id_responsable || '',
         priority: cotizacion.informacion_basica?.prioridad || 'media',
         quotationData: {
           totalAmount: cotizacion.detalles_proyecto?.presupuesto_estimado_mxn || 0
@@ -273,6 +298,7 @@ const QuotationDevelopmentCenter = () => {
               </div>
               
               <div className="flex items-center space-x-4 mt-4 lg:mt-0">
+                {/* Botón comentado: Exportar PDF (se dejó comentado para posible uso futuro)
                 <Button
                   variant="outline"
                   iconName="Download"
@@ -280,6 +306,7 @@ const QuotationDevelopmentCenter = () => {
                 >
                   Exportar PDF
                 </Button>
+                */}
                 <Button
                   iconName="Plus"
                   iconPosition="left"

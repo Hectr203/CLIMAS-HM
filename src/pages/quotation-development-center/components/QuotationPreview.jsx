@@ -28,6 +28,16 @@ const formatDate = (dateString) => {
   });
 };
 
+// Función para obtener la fecha actual
+const getCurrentDate = () => {
+  const today = new Date();
+  return today.toLocaleDateString('es-MX', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+};
+
 const QuotationPreview = ({ quotation = {} }) => {
   const quotationRef = useRef(null);
   const [clientData, setClientData] = useState(null);
@@ -74,8 +84,22 @@ const QuotationPreview = ({ quotation = {} }) => {
       try {
         const cotizacionDetallada = await getCotizacionById(quotation.id);
         if (isMounted) {
-          console.log('Cotización obtenida:', cotizacionDetallada);
-          setCotizacionCompleta(cotizacionDetallada);
+          console.log('Cotización obtenida completa:', cotizacionDetallada);
+          // Extraer data de la respuesta si viene encapsulada
+          const dataContent = cotizacionDetallada?.data || cotizacionDetallada;
+          console.log('Data content:', dataContent);
+          console.log('Fecha creación:', dataContent.fechaCreacion);
+          console.log('Fecha actualización:', dataContent.fechaActualizacion);
+          console.log('Ultima modificación:', dataContent.ultimaModificacion);
+          
+          // Preservar las fechas originales en formato ISO
+          const cotizacionConFechas = {
+            ...dataContent,
+            fechaCreacion: dataContent.fechaCreacion,
+            fechaActualizacion: dataContent.fechaActualizacion || dataContent.ultimaModificacion
+          };
+          console.log('Cotización con fechas:', cotizacionConFechas);
+          setCotizacionCompleta(cotizacionConFechas);
         }
       } catch (error) {
         console.error('Error al obtener la cotización:', error);
@@ -313,22 +337,72 @@ const QuotationPreview = ({ quotation = {} }) => {
 
   const handlePrint = () => {
     try {
+      // Crear estilos de impresión
       const printStyles = `
         @media print {
-          body * { visibility: hidden; }
-          #root * { visibility: hidden; }
-          .print-section, .print-section * { visibility: visible; }
-          .print-section { position: absolute; left: 0; top: 0; width: 100%; }
-          @page { size: A4; margin: 20mm; }
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          
+          body * {
+            visibility: hidden;
+          }
+          
+          .print-section, .print-section * {
+            visibility: visible;
+          }
+          
+          .print-section {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+          }
+          
+          @page {
+            size: A4;
+            margin: 15mm;
+          }
+          
+          /* Ocultar botones */
+          button {
+            display: none !important;
+          }
+          
+          /* Ocultar estado de la cotización */
+          .space-y-6 > .bg-muted\\/30:last-child {
+            display: none !important;
+          }
         }
       `;
+      
       const style = document.createElement('style');
+      style.id = 'print-styles';
       style.textContent = printStyles;
       document.head.appendChild(style);
-      if (quotationRef.current) quotationRef.current.classList.add('print-section');
-      window.print();
-      if (quotationRef.current) quotationRef.current.classList.remove('print-section');
-      document.head.removeChild(style);
+      
+      // Añadir clase para impresión
+      if (quotationRef.current) {
+        quotationRef.current.classList.add('print-section');
+      }
+      
+      // Dar tiempo para que se apliquen los estilos
+      setTimeout(() => {
+        window.print();
+        
+        // Limpiar después de imprimir
+        setTimeout(() => {
+          if (quotationRef.current) {
+            quotationRef.current.classList.remove('print-section');
+          }
+          const styleElement = document.getElementById('print-styles');
+          if (styleElement) {
+            document.head.removeChild(styleElement);
+          }
+        }, 100);
+      }, 100);
+      
     } catch (error) {
       console.error('Error al imprimir:', error);
       showError && showError('Hubo un problema al imprimir el documento');
@@ -388,7 +462,7 @@ const QuotationPreview = ({ quotation = {} }) => {
             <h2 className="text-xl font-semibold mb-4">COTIZACIÓN</h2>
             <div className="space-y-2 text-sm">
               <p><span className="font-medium">No. Cotización:</span> {quotation?.folio || cotizacionCompleta?.folio || 'No disponible'}</p>
-              <p><span className="font-medium">Fecha:</span> {formatDate(quotation?.createdDate || cotizacionCompleta?.createdDate)}</p>
+              <p><span className="font-medium">Fecha:</span> {getCurrentDate()}</p>
               <p><span className="font-medium">Vendedor:</span> {quotation?.assignedTo || cotizacionCompleta?.assignedTo || 'No asignado'}</p>
             </div>
           </div>
@@ -410,27 +484,32 @@ const QuotationPreview = ({ quotation = {} }) => {
         <div className="mb-8">
           <h3 className="text-lg font-semibold mb-4 text-primary">INFORMACIÓN DEL PROYECTO</h3>
           <div className="bg-muted/30 rounded-lg p-4">
-            <h4 className="font-medium mb-2">{projectData?.data?.nombre || cotizacionCompleta?.projectName || 'Proyecto sin nombre'}</h4>
-            <p className="text-sm text-muted-foreground">{projectData?.data?.descripcion || cotizacionCompleta?.detalles_proyecto?.descripcion_proyecto || 'Sin descripción disponible'}</p>
-            <div className="text-sm text-muted-foreground mt-2">
-              <p><span className="font-medium">Ubicación:</span> {
-                cotizacionCompleta?.detalles_proyecto?.ubicacion_proyecto?.[0] ? 
-                `${cotizacionCompleta.detalles_proyecto.ubicacion_proyecto[0].direccion}, ${cotizacionCompleta.detalles_proyecto.ubicacion_proyecto[0].municipio}, ${cotizacionCompleta.detalles_proyecto.ubicacion_proyecto[0].estado}` :
-                (projectData?.data?.ubicacion || 'Ubicación no especificada')
+            <h4 className="font-medium mb-2">{projectData?.data?.nombre || projectData?.nombre || cotizacionCompleta?.projectName || 'Proyecto sin nombre'}</h4>
+            <p className="text-sm text-foreground mb-3">{projectData?.data?.descripcion || projectData?.descripcion || cotizacionCompleta?.description || 'Sin descripción disponible'}</p>
+            <div className="text-sm text-foreground space-y-2">
+              <p><span className="font-bold">Ubicación:</span> {
+                projectData?.data?.ubicacion ? 
+                `${projectData.data.ubicacion.direccion || ''}, ${projectData.data.ubicacion.municipio || ''}, ${projectData.data.ubicacion.estado || ''}` :
+                (projectData?.ubicacion ? 
+                  `${projectData.ubicacion.direccion || ''}, ${projectData.ubicacion.municipio || ''}, ${projectData.ubicacion.estado || ''}` :
+                  (cotizacionCompleta?.location ? 
+                    `${cotizacionCompleta.location.direccion || ''}, ${cotizacionCompleta.location.municipio || ''}, ${cotizacionCompleta.location.estado || ''}` :
+                    'Ubicación no especificada'))
               }</p>
-              <p className="mt-1"><span className="font-medium">Tipo de proyecto:</span> {(cotizacionCompleta?.informacion_basica?.tipo_proyecto || projectData?.data?.tipoProyecto || 'NO ESPECIFICADO')?.toUpperCase()}</p>
-              <p className="mt-1"><span className="font-medium">Total Presupuesto:</span> {formatCurrency(projectData?.data?.totalPresupuesto || cotizacionCompleta?.detalles_proyecto?.presupuesto_estimado_mxn || 0)}</p>
+              <p><span className="font-bold">Tipo de proyecto:</span> {(projectData?.data?.tipoProyecto || projectData?.tipoProyecto || cotizacionCompleta?.projectType || 'NO ESPECIFICADO')?.toUpperCase()}</p>
+              <p><span className="font-bold">Prioridad:</span> {(projectData?.data?.prioridad || projectData?.prioridad || cotizacionCompleta?.priority || 'Media')}</p>
             </div>
           </div>
         </div>
 
-        {/* Alcance */}
+        {/* Alcance - Comentado temporalmente
         <div className="mb-8">
           <h3 className="text-lg font-semibold mb-4 text-primary">ALCANCE DE TRABAJO</h3>
           <div className="text-sm leading-relaxed">
             <p>{quotation?.quotationData?.scope || cotizacionCompleta?.quotationData?.scope || 'No hay alcance disponible'}</p>
           </div>
         </div>
+        */}
 
         {/* Materiales y equipos */}
         {quotation?.materials && quotation?.materials?.length > 0 && (
@@ -493,8 +572,10 @@ const QuotationPreview = ({ quotation = {} }) => {
           <div className="flex items-center justify-between">
             <div><h3 className="text-xl font-semibold text-primary">INVERSIÓN TOTAL</h3></div>
             <div className="text-right">
-              <div className="text-3xl font-bold text-primary">{formatCurrency(cotizacionCompleta?.detalles_proyecto?.presupuesto_estimado_mxn || 0)}</div>
-              <p className="text-sm text-muted-foreground">IVA incluido</p>
+              <div className="text-3xl font-bold text-primary">{formatCurrency(
+                (projectData?.data?.totalPresupuesto || projectData?.totalPresupuesto || cotizacionCompleta?.quotationData?.totalAmount || 0) +
+                (quotation?.materials?.reduce((sum, m) => sum + (Number(m?.cost) || 0), 0) || 0)
+              )}</div>
             </div>
           </div>
         </div>
@@ -511,8 +592,8 @@ const QuotationPreview = ({ quotation = {} }) => {
       <div className="bg-muted/30 rounded-lg p-4">
         <h4 className="font-medium mb-2">Estado de la Cotización</h4>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-          <div className="flex items-center space-x-2"><Icon name="Calendar" size={16} className="text-muted-foreground" /><span>Creada: {formatDate(quotation?.createdDate || cotizacionCompleta?.createdDate)}</span></div>
-          <div className="flex items-center space-x-2"><Icon name="Clock" size={16} className="text-muted-foreground" /><span>Modificada: {formatDate(quotation?.lastModified || cotizacionCompleta?.lastModified)}</span></div>
+          <div className="flex items-center space-x-2"><Icon name="Calendar" size={16} className="text-muted-foreground" /><span>Creada: {cotizacionCompleta?.createdDate || cotizacionCompleta?.fechaCreacion || quotation?.createdDate || 'Fecha no disponible'}</span></div>
+          <div className="flex items-center space-x-2"><Icon name="Clock" size={16} className="text-muted-foreground" /><span>Modificada: {cotizacionCompleta?.lastModified || cotizacionCompleta?.fechaActualizacion || quotation?.lastModified || 'Fecha no disponible'}</span></div>
           <div className="flex items-center space-x-2"><Icon name="User" size={16} className="text-muted-foreground" /><span>Versión: {quotation?.revisions?.[quotation?.revisions?.length - 1]?.version || '1.0'}</span></div>
         </div>
       </div>
