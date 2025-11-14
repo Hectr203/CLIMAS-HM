@@ -39,7 +39,7 @@ const formatearFecha = (fecha) => {
   }
 };
 
-const ViewAbonosModal = ({ isOpen, onClose, project }) => {
+const ViewAbonosModal = ({ isOpen, onClose, project, onAbonoUpdated }) => {
   const { getAbonosByProyecto, loading } = useAbono();
   const [abonos, setAbonos] = useState([]);
   const [error, setError] = useState('');
@@ -83,7 +83,7 @@ const ViewAbonosModal = ({ isOpen, onClose, project }) => {
     setAbonoAEditar(null);
   };
 
-  const manejarAbonoActualizado = async () => {
+  const manejarAbonoActualizado = async (abonoActualizado) => {
     // Recargar la lista de abonos después de actualizar
     if (project) {
       const proyectoId = project?.id ?? project?._id ?? project?.rawId;
@@ -97,6 +97,11 @@ const ViewAbonosModal = ({ isOpen, onClose, project }) => {
       }
     }
     setAbonoAEditar(null);
+    
+    // Notificar al componente padre que se actualizó un abono, pasando el proyecto y el abono actualizado
+    if (typeof onAbonoUpdated === 'function') {
+      onAbonoUpdated(project, abonoActualizado);
+    }
   };
 
   // Calcular totales

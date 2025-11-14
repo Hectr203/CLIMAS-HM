@@ -85,6 +85,15 @@ const abonoService = {
   async getAbonosByCliente(clienteId, params = {}) {
     return await httpService.get(`${BASE_PATH}/cliente/${clienteId}`, { params });
   },
+    /**
+   * Lista abonos por cliente
+   * @param {string} clienteId
+   * @param {Object} [params]
+   * @returns {Promise<Object|Array>}
+   */
+    async obtenersumadortotaldeabonos(clienteId, params = {}) {
+      return await httpService.get(`${BASE_PATH}/suma`, { params });
+    },
 
   /**
    * Aprueba un abono
