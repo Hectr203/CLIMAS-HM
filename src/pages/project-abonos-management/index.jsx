@@ -97,6 +97,9 @@ const ProjectManagement = () => {
   // Control del selector de proyecto (cuando se quiere crear un abono sin abrir desde la tabla)
   const [mostrarSelectorProyecto, setMostrarSelectorProyecto] = useState(false);
 
+  // Trigger para refrescar las estadísticas de abonos cuando se crea o actualiza un abono
+  const [refreshAbonosStats, setRefreshAbonosStats] = useState(0);
+
   /* =========================================================================
      Ciclo de vida
      - Cargar proyectos al montar
@@ -106,10 +109,13 @@ const ProjectManagement = () => {
   useEffect(() => {
     const arr = Array.isArray(proyectos) ? proyectos : [];
     uiEstadoCache.bulkMergeFromApi(arr);   // completa estados UI faltantes
-    // Si la lista filtrada está vacía o tiene la misma cantidad que la lista completa, actualizar
+    // Actualizar la lista filtrada cuando cambian los proyectos
+    // Esto asegura que los cambios en abonos se reflejen en la tabla
     if (!proyectosFiltrados || proyectosFiltrados.length === 0 || proyectosFiltrados.length === arr.length) {
-      setProyectosFiltrados(arr);            // por defecto, sin filtros
+      setProyectosFiltrados(arr);            // por defecto, sin filtros o misma cantidad
     }
+    // Nota: Si hay filtros aplicados y la cantidad cambió, los filtros se mantendrán
+    // pero los datos de los proyectos se actualizarán cuando se re-apliquen los filtros
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proyectos]);
 
@@ -421,6 +427,9 @@ const ProjectManagement = () => {
 
     cerrarRegistroAbono();
 
+    // Refrescar las estadísticas de abonos
+    setRefreshAbonosStats(prev => prev + 1);
+
     try {
       await getProyectos({ force: true });
     } catch (errorRecarga) {
@@ -522,7 +531,11 @@ const ProjectManagement = () => {
 
             {/* Resumen de estadísticas (usa proyectos filtrados y total pagado calculado localmente) */}
             {proyectosFiltrados?.length > 0 && (
-              <ProjectStats projects={proyectosFiltrados} getTotalPagado={obtenerTotalPagado} />
+              <ProjectStats 
+                projects={proyectosFiltrados} 
+                getTotalPagado={obtenerTotalPagado}
+                refreshTrigger={refreshAbonosStats}
+              />
             )}
 
             {/* Filtros (emitirá onFiltersChange → manejarCambioFiltros) */}
@@ -646,6 +659,17 @@ const ProjectManagement = () => {
                 isOpen
                 project={verAbonosPara}
                 onClose={cerrarVerAbonos}
+                onAbonoUpdated={async (proyecto, abonoActualizado) => {
+                  // Refrescar las estadísticas de abonos
+                  setRefreshAbonosStats(prev => prev + 1);
+                  
+                  // Recargar los proyectos para actualizar la tabla
+                  try {
+                    await getProyectos({ force: true });
+                  } catch (errorRecarga) {
+                    console.error('Error al recargar los proyectos después de actualizar un abono:', errorRecarga);
+                  }
+                }}
               />
             )}
           </div>

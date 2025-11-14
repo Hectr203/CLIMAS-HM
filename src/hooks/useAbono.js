@@ -130,15 +130,33 @@ const useAbono = () => {
 
     try {
       // Sanitiza y formatea el payload
+      // La fecha debe venir en formato ISO UTC desde el modal
+      let fechaISO = payload.fecha;
+      if (!fechaISO) {
+        fechaISO = new Date().toISOString();
+      } else if (typeof fechaISO === 'string' && !fechaISO.includes('T')) {
+        // Si viene en formato dd/mm/yyyy, convertir a ISO UTC
+        const [dia, mes, año] = fechaISO.split('/');
+        if (dia && mes && año) {
+          const fecha = new Date(`${año}-${mes}-${dia}T00:00:00.000Z`);
+          fechaISO = fecha.toISOString();
+        }
+      }
+
       const cleanPayload = {
         idProyecto: payload.idProyecto?.trim(),
         montoAbono: Number(payload.montoAbono),
-        fecha: toDDMMYYYY(payload.fecha || new Date().toISOString()),
+        fecha: fechaISO,
         metodoPago: payload.metodoPago || 'Otro',
         descripcion: payload.descripcion?.trim() || 'Abono registrado',
         descripcionMetodo: payload.descripcionMetodo || '',
         notas: payload.notas || '',
       };
+
+      // Incluir referenciaPago solo si tiene valor
+      if (payload.referenciaPago?.trim()) {
+        cleanPayload.referenciaPago = payload.referenciaPago.trim();
+      }
 
       const response = await abonoService.createAbono(cleanPayload);
       const created = response?.data || response;
@@ -174,8 +192,37 @@ const useAbono = () => {
     setError(null);
     setSuccess(false);
     try {
-      const response = await abonoService.updateAbono(id, payload);
-      const updated = response?.data || payload;
+      // Sanitiza y formatea el payload
+      // La fecha debe venir en formato ISO UTC desde el modal
+      let fechaISO = payload.fecha;
+      if (!fechaISO) {
+        fechaISO = new Date().toISOString();
+      } else if (typeof fechaISO === 'string' && !fechaISO.includes('T')) {
+        // Si viene en formato dd/mm/yyyy, convertir a ISO UTC
+        const [dia, mes, año] = fechaISO.split('/');
+        if (dia && mes && año) {
+          const fecha = new Date(`${año}-${mes}-${dia}T00:00:00.000Z`);
+          fechaISO = fecha.toISOString();
+        }
+      }
+
+      const cleanPayload = {
+        idProyecto: payload.idProyecto?.trim(),
+        montoAbono: Number(payload.montoAbono),
+        fecha: fechaISO,
+        metodoPago: payload.metodoPago || 'Otro',
+        descripcion: payload.descripcion?.trim() || 'Abono registrado',
+        descripcionMetodo: payload.descripcionMetodo || '',
+        notas: payload.notas || '',
+      };
+
+      // Incluir referenciaPago solo si tiene valor
+      if (payload.referenciaPago?.trim()) {
+        cleanPayload.referenciaPago = payload.referenciaPago.trim();
+      }
+
+      const response = await abonoService.updateAbono(id, cleanPayload);
+      const updated = response?.data || cleanPayload;
 
       setAbonos((prev) => {
         const next = prev.map((a) =>
