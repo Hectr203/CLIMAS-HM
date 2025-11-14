@@ -6,7 +6,10 @@ import Button from '../../components/ui/Button';
 import PersonnelTable from './components/PersonnelTable';
 import FilterToolbar from './components/FilterToolbar';
 import ComplianceDashboard from './components/ComplianceDashboard';
-import PersonnelModal from './components/PersonnelModal';
+import AddEmployeeModal from './components/AddEmployeeModal';
+import EditEmployeeModal from './components/EditEmployeeModal';
+import EditEPPModal from './components/EditEPPModal';
+import ViewEmployeeModal from './components/ViewEmployeeModal';
 import usePerson from '../../hooks/usePerson'; 
 
 const PersonnelManagement = () => {
@@ -407,9 +410,21 @@ const PersonnelManagement = () => {
             />
           )}
 
-          {/* Modal */}
-          <PersonnelModal
-            isOpen={isModalOpen}
+          {/* Modales */}
+          <AddEmployeeModal
+            isOpen={isModalOpen && modalMode === 'create'}
+            onClose={() => {
+              setIsModalOpen(false);
+              setSelectedEmployee(null);
+              setModalMode(null);
+              setInitialStep(0);
+              setOpenedFromEPP(false);
+            }}
+            onSave={handleSavePersonnel}
+          />
+          
+          <EditEmployeeModal
+            isOpen={isModalOpen && modalMode === 'edit' && !openedFromEPP}
             onClose={() => {
               setIsModalOpen(false);
               setSelectedEmployee(null);
@@ -418,11 +433,32 @@ const PersonnelManagement = () => {
               setOpenedFromEPP(false);
             }}
             employee={selectedEmployee}
-            mode={modalMode}
-            initialStep={initialStep}
-            openedFromEPP={openedFromEPP}
             onSave={handleSavePersonnel}
-            error={error}
+          />
+          
+          <EditEPPModal
+            isOpen={isModalOpen && modalMode === 'edit' && openedFromEPP}
+            onClose={() => {
+              setIsModalOpen(false);
+              setSelectedEmployee(null);
+              setModalMode(null);
+              setInitialStep(0);
+              setOpenedFromEPP(false);
+            }}
+            employee={selectedEmployee}
+            onSave={handleSavePersonnel}
+          />
+          
+          <ViewEmployeeModal
+            isOpen={isModalOpen && modalMode === 'view'}
+            onClose={() => {
+              setIsModalOpen(false);
+              setSelectedEmployee(null);
+              setModalMode(null);
+              setInitialStep(0);
+              setOpenedFromEPP(false);
+            }}
+            employee={selectedEmployee}
           />
         </div>
       </div>
