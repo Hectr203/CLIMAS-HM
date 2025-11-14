@@ -94,6 +94,25 @@ const usePerson = () => {
     }
   };
 
+  // 🔹 FUNCIÓN PARA OBTENER UN EMPLEADO INDIVIDUAL POR EMPLEADOID
+  const getPersonByEmpleadoId = async (empleadoId) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await personService.getPersonByEmpleadoId(empleadoId);
+      if (response.success) {
+        return response.data;
+      }
+      return null;
+    } catch (err) {
+      console.error("Error en usePerson.getPersonByEmpleadoId:", err);
+      setError(err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     persons,
     departmentPersons,
@@ -103,6 +122,7 @@ const usePerson = () => {
     getPersonsByDepartment,
     createPerson,
     updatePersonByEmpleadoId,
+    getPersonByEmpleadoId,
   };
 };
 

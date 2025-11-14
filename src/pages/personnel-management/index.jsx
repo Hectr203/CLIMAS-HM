@@ -409,6 +409,7 @@ const PersonnelManagement = () => {
 
           {/* Modal */}
           <PersonnelModal
+            key={selectedEmployee?.empleadoId || selectedEmployee?.id || 'new'}
             isOpen={isModalOpen}
             onClose={() => {
               setIsModalOpen(false);

@@ -45,6 +45,17 @@ const personService = {
       throw error;
     }
   },
+  async getPersonByEmpleadoId(empleadoId) {
+    try {
+      const response = await httpService.get(
+        `/empleados/byEmpleadoId/${empleadoId}`
+      );
+      return response;
+    } catch (error) {
+      console.error("Error al obtener empleado:", error);
+      throw error;
+    }
+  },
 };
 
 export default personService;
