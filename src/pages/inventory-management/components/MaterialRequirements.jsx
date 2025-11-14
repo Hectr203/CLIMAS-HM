@@ -61,24 +61,25 @@ const MaterialRequirements = ({ requirements, onApproveRequirement, onRejectRequ
 
   return (
     <div className="bg-card rounded-lg border border-border">
-      {/* Header */}
+      
+      {/* Header igual al de Órdenes */}
       <div className="flex items-center justify-between p-6 border-b border-border">
         <div className="flex items-center space-x-3">
           <Icon name="ClipboardList" size={20} className="text-primary" />
           <h3 className="text-lg font-semibold text-foreground">Requisiciones de Material</h3>
         </div>
-        
+
         <Button
-          variant="outline"
-          size="sm"
-          onClick={() => console.log('View all requirements')}
-          iconName="ExternalLink"
+          variant="default"
+          iconName="Plus"
           iconSize={16}
+          onClick={() => console.log('Nueva Requisición')}
         >
-          Ver Todas
+          Nueva Requisición
         </Button>
       </div>
-      {/* Tabs */}
+
+      {/* Tabs igual que en Ordenes */}
       <div className="flex border-b border-border">
         {tabs?.map((tab) => (
           <button
@@ -86,13 +87,16 @@ const MaterialRequirements = ({ requirements, onApproveRequirement, onRejectRequ
             onClick={() => setActiveTab(tab?.id)}
             className={`flex items-center space-x-2 px-6 py-3 text-sm font-medium border-b-2 transition-smooth ${
               activeTab === tab?.id
-                ? 'border-primary text-primary bg-primary/5' :'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                ? 'border-primary text-primary bg-primary/5'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
             }`}
           >
             <span>{tab?.label}</span>
             {tab?.count > 0 && (
               <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                activeTab === tab?.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                activeTab === tab?.id 
+                ? 'bg-primary text-primary-foreground' 
+                : 'bg-muted text-muted-foreground'
               }`}>
                 {tab?.count}
               </span>
@@ -100,130 +104,150 @@ const MaterialRequirements = ({ requirements, onApproveRequirement, onRejectRequ
           </button>
         ))}
       </div>
-      {/* Requirements List */}
+
+      {/* LISTA con el MISMO estilo que Órdenes */}
       <div className="divide-y divide-border max-h-96 overflow-y-auto">
         {filteredRequirements?.length === 0 ? (
+          
           <div className="text-center py-8">
             <Icon name="ClipboardList" size={48} className="text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">No hay requisiciones {getStatusLabel(activeTab)?.toLowerCase()}</p>
+
+            <Button
+              variant="outline"
+              size="sm"
+              iconName="Plus"
+              iconSize={16}
+              onClick={() => console.log('Crear primera requisición')}
+              className="mt-4"
+            >
+              Crear Primera Requisición
+            </Button>
           </div>
+
         ) : (
-          filteredRequirements?.map((requirement) => (
-            <div key={requirement?.id} className="p-4 hover:bg-muted/50 transition-smooth">
+          filteredRequirements?.map((req) => (
+            <div key={req?.id} className="p-4 hover:bg-muted/50 transition-smooth">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
+
+                  {/* Encabezado igual al de OC */}
                   <div className="flex items-center space-x-3 mb-2">
-                    <h4 className="font-medium text-foreground">{requirement?.requestNumber}</h4>
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(requirement?.status)}`}>
-                      {getStatusLabel(requirement?.status)}
+                    <h4 className="font-medium text-foreground">{req?.requestNumber}</h4>
+
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(req?.status)}`}>
+                      {getStatusLabel(req?.status)}
                     </span>
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(requirement?.priority)} bg-background border border-current`}>
+
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(req?.priority)} bg-background border border-current`}>
                       <Icon name="Flag" size={12} className="mr-1" />
-                      {getPriorityLabel(requirement?.priority)}
+                      {getPriorityLabel(req?.priority)}
                     </span>
                   </div>
-                  
+
+                  {/* GRID igual al de OC */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground mb-3">
                     <div>
                       <span className="font-medium">Proyecto:</span>
-                      <div className="text-foreground">{requirement?.projectName}</div>
+                      <div className="text-foreground">{req?.projectName}</div>
                     </div>
                     <div>
                       <span className="font-medium">Solicitante:</span>
-                      <div className="text-foreground">{requirement?.requestedBy}</div>
+                      <div className="text-foreground">{req?.requestedBy}</div>
                     </div>
                     <div>
                       <span className="font-medium">Fecha Solicitud:</span>
-                      <div className="text-foreground">{formatDate(requirement?.requestDate)}</div>
+                      <div className="text-foreground">{formatDate(req?.requestDate)}</div>
                     </div>
                     <div>
-                      <span className="font-medium">Fecha Requerida:</span>
-                      <div className="text-foreground">{formatDate(requirement?.requiredDate)}</div>
+                      <span className="font-medium">Requerido:</span>
+                      <div className="text-foreground">{formatDate(req?.requiredDate)}</div>
                     </div>
                   </div>
-                  
-                  {/* Items Preview */}
+
+                  {/* Items */}
                   <div className="mb-3">
-                    <div className="text-sm font-medium text-foreground mb-2">
-                      Artículos Solicitados ({requirement?.items?.length}):
+                    <div className="text-sm font-medium text-foreground mb-1">
+                      Artículos Solicitados ({req?.items?.length}):
                     </div>
+
                     <div className="space-y-1">
-                      {requirement?.items?.slice(0, 3)?.map((item, index) => (
+                      {req?.items?.slice(0, 3)?.map((item, index) => (
                         <div key={index} className="flex items-center justify-between text-xs text-muted-foreground bg-muted/50 rounded px-2 py-1">
                           <span>{item?.description}</span>
                           <span className="font-medium">{item?.quantity} {item?.unit}</span>
                         </div>
                       ))}
-                      {requirement?.items?.length > 3 && (
+
+                      {req?.items?.length > 3 && (
                         <div className="text-xs text-muted-foreground px-2">
-                          +{requirement?.items?.length - 3} artículos más
+                          +{req?.items?.length - 3} artículos más
                         </div>
                       )}
                     </div>
                   </div>
-                  
-                  {requirement?.notes && (
-                    <div className="text-xs text-muted-foreground mb-3 p-2 bg-muted/50 rounded">
-                      <span className="font-medium">Notas:</span> {requirement?.notes}
-                    </div>
-                  )}
-                  
+
+                  {/* Acciones IGUALES a las de OC */}
                   <div className="flex items-center space-x-2">
+
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => console.log('View requirement details:', requirement)}
                       iconName="Eye"
                       iconSize={16}
+                      onClick={() => console.log('Ver detalles', req)}
                     >
                       Ver Detalles
                     </Button>
-                    
-                    {requirement?.status === 'pending' && (
+
+                    {req?.status === 'pending' && (
                       <>
                         <Button
                           variant="default"
                           size="sm"
-                          onClick={() => onApproveRequirement(requirement)}
                           iconName="Check"
                           iconSize={16}
+                          onClick={() => onApproveRequirement(req)}
                         >
                           Aprobar
                         </Button>
+
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => onRejectRequirement(requirement)}
                           iconName="X"
                           iconSize={16}
+                          onClick={() => onRejectRequirement(req)}
                         >
                           Rechazar
                         </Button>
                       </>
                     )}
-                    
-                    {requirement?.status === 'approved' && (
+
+                    {req?.status === 'approved' && (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => onCreatePO(requirement)}
                         iconName="ShoppingCart"
                         iconSize={16}
+                        onClick={() => onCreatePO(req)}
                       >
                         Crear OC
                       </Button>
                     )}
-                    
+
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => console.log('Download requirement:', requirement)}
                       iconName="Download"
                       iconSize={16}
+                      onClick={() => console.log('Descargar', req)}
                     >
                       Descargar
                     </Button>
+
                   </div>
+
                 </div>
               </div>
             </div>

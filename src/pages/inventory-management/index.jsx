@@ -21,7 +21,6 @@ import useInventory from '../../hooks/useInventory';
 import useOrder from '../../hooks/useOrder';
 import useRequisi from '../../hooks/useRequisi';
 import { useNotifications } from '../../context/NotificationContext';
-
 // Función auxiliar para formatear fechas
 const formatDate = (dateString) => {
   if (!dateString) return '';
@@ -353,6 +352,46 @@ const InventoryManagement = () => {
   const [selectedRequisition, setSelectedRequisition] = useState(null);
   const [showRequisitionModal, setShowRequisitionModal] = useState(false);
 
+
+const handleViewRequisition = (req) => {
+  const reqForView = {
+    id: req.id,
+    orderNumber: req.numeroOrdenTrabajo,
+    projectName: req.nombreProyecto,
+    requestedBy: req.solicitadoPor,
+    requestDate: req.fechaSolicitud,
+    status: req.estado || 'Pendiente',
+    priority: req.prioridad || 'Normal',
+    description: req.descripcionSolicitud,
+    items: req.materiales?.map(m => ({
+      id: m.id || Date.now(),
+      name: m.nombreMaterial,
+      quantity: m.cantidad,
+      unit: m.unidad,
+      description: m.descripcionEspecificaciones,
+      urgency: m.urgencia,
+    })) || [],
+    manualItems: req.materialesManuales?.map(m => ({
+      id: m.id || Date.now(),
+      name: m.nombreMaterial,
+      quantity: m.cantidad,
+      unit: m.unidad,
+      description: m.descripcionEspecificaciones,
+      urgency: m.urgencia,
+    })) || [],
+    justification: req.justificacionSolicitud,
+    notes: req.notasAdicionales
+  };
+
+  setSelectedRequisition(reqForView);
+  setViewOnly(true);   // 👈 MUY IMPORTANTE
+  setShowRequisitionModal(true);
+};
+
+
+
+
+
   const handleEditRequisition = (req) => {
     const reqForEdit = {
       id: req.id,
@@ -376,7 +415,10 @@ const InventoryManagement = () => {
 
     setSelectedRequisition(reqForEdit);
     setShowRequisitionModal(true);
+    setViewOnly(false); 
   };
+
+  
 
   const handleSaveRequisition = async (editedReq) => {
     try {
@@ -908,96 +950,156 @@ ${order.notas || 'Sin notas adicionales'}
               onDeleteOrder={handleDeleteOrder}
             />
           )}
+{activeView === 'requirements' && (
+  <div className="bg-card rounded-lg border border-border shadow-sm">
 
-          {activeView === 'requirements' && (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold">Requisiciones de Material</h2>
-                <Button
-                  variant="default"
-                  iconName="Plus"
-                  onClick={() => setShowCreatePOModal(true)}
-                >
-                  Nueva Requisición
-                </Button>
-              </div>
-              
-              {requisitionsLoading ? (
-                <p className="text-muted-foreground">Cargando requisiciones...</p>
-              ) : requisitions && requisitions.length > 0 ? (
-                <div className="space-y-4">
-                  {requisitions.map((req) => (
-                    <div
-                      key={req.id}
-                      className="bg-card border border-border rounded-lg p-4 space-y-3"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="font-medium">{req.numeroOrdenTrabajo || 'Sin número'}</h3>
-                          <p className="text-sm text-muted-foreground">{req.nombreProyecto || 'Sin proyecto'}</p>
-                        </div>
-                        <div className="flex space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            iconName="Edit"
-                            onClick={() => handleEditRequisition(req)}
-                          />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            iconName="Trash"
-                            onClick={() => handleDelete(req)}
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-muted-foreground">Solicitado por</p>
-                          <p>{req.solicitadoPor || 'No especificado'}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Estado</p>
-                          <p>{req.estado || 'Pendiente'}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Fecha</p>
-                          <p>{req.fechaSolicitud ? new Date(req.fechaSolicitud).toLocaleDateString('es-MX') : 'No especificada'}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Prioridad</p>
-                          <p>{req.prioridad || 'Normal'}</p>
-                        </div>
-                      </div>
-                      
-                      {req.descripcionSolicitud && (
-                        <div>
-                          <p className="text-muted-foreground">Descripción</p>
-                          <p className="text-sm">{req.descripcionSolicitud}</p>
-                        </div>
-                      )}
-                      
-                      {req.materiales && req.materiales.length > 0 && (
-                        <div>
-                          <p className="font-medium mb-2">Materiales solicitados</p>
-                          <ul className="space-y-1">
-                            {req.materiales.map((item, index) => (
-                              <li key={index} className="text-sm">
-                                {item.cantidad || item.quantity} {item.unidad || item.unit || 'unidades'} - {item.nombreMaterial || item.name}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+    {/* Header */}
+    <div className="flex items-center justify-between p-6 border-b border-border">
+      <div className="flex items-center space-x-3">
+        <Icon name="ClipboardList" size={20} className="text-primary" />
+        <h3 className="text-lg font-semibold text-foreground">
+          Requisiciones de Material
+        </h3>
+      </div>
+
+      <Button
+        variant="default"
+        iconName="Plus"
+        onClick={() => setShowCreatePOModal(true)}
+      >
+        Nueva Requisición
+      </Button>
+    </div>
+
+    {/* Contenido */}
+    <div className="divide-y divide-border max-h-96 overflow-y-auto">
+
+      {requisitionsLoading ? (
+        <div className="text-center py-8 text-muted-foreground">
+          Cargando requisiciones...
+        </div>
+      ) : requisitions?.length > 0 ? (
+        requisitions.map((req) => (
+          <div
+            key={req.id}
+            className="p-5 hover:bg-muted/50 transition-colors"
+          >
+            <div className="flex items-start justify-between">
+
+              {/* Info principal */}
+              <div className="flex-1">
+
+                {/* Encabezado */}
+                <div className="flex items-center space-x-3 mb-2">
+                  <h4 className="text-base font-semibold text-foreground">
+                    {req.numeroOrdenTrabajo || 'Sin número'}
+                  </h4>
+
+                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                    {req.estado || 'Pendiente'}
+                  </span>
                 </div>
-              ) : (
-                <p className="text-muted-foreground">No hay requisiciones disponibles.</p>
-              )}
+
+                {/* Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground mb-3">
+
+                  <div>
+                    <span className="font-medium">Proyecto:</span>
+                    <div className="text-foreground">{req.nombreProyecto || 'Sin proyecto'}</div>
+                  </div>
+
+                  <div>
+                    <span className="font-medium">Solicitado por:</span>
+                    <div className="text-foreground">{req.solicitadoPor || 'No especificado'}</div>
+                  </div>
+
+                  <div>
+                    <span className="font-medium">Fecha:</span>
+                    <div className="text-foreground">
+                      {req.fechaSolicitud
+                        ? new Date(req.fechaSolicitud).toLocaleDateString('es-MX')
+                        : 'No especificada'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="font-medium">Prioridad:</span>
+                    <div className="text-foreground">{req.prioridad || 'Normal'}</div>
+                  </div>
+                </div>
+
+                {/* Descripción */}
+                {req.descripcionSolicitud && (
+                  <div className="text-sm text-muted-foreground mb-3">
+                    <span className="font-medium text-foreground">Descripción:</span>
+                    <p className="text-foreground">{req.descripcionSolicitud}</p>
+                  </div>
+                )}
+
+                {/* Materiales */}
+                {req.materiales?.length > 0 && (
+                  <div className="mb-3">
+                    <span className="font-medium">Materiales solicitados:</span>
+                    <ul className="mt-2 space-y-1 text-sm">
+                      {req.materiales.map((item, index) => (
+                        <li key={index} className="text-foreground">
+                          {item.cantidad || item.quantity} {item.unidad || item.unit || 'unidades'} - {item.nombreMaterial || item.name}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Acciones */}
+                <div className="flex items-center space-x-3 mt-3">
+
+                  {/* VER DETALLES */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    iconName="Eye"
+                    onClick={() => handleViewRequisition(req)}
+                  >
+                    Ver detalles
+                  </Button>
+
+                  {/* EDITAR */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconName="Edit"
+                    onClick={() => handleEditRequisition(req)}
+                  >
+                    Editar
+                  </Button>
+
+                  {/* ELIMINAR */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-error hover:text-error"
+                    iconName="Trash2"
+                    onClick={() => handleDelete(req)}
+                  >
+                    Eliminar
+                  </Button>
+
+                </div>
+
+              </div>
             </div>
-          )}
+          </div>
+        ))
+      ) : (
+        <div className="text-center py-8 text-muted-foreground">
+          No hay requisiciones disponibles.
+        </div>
+      )}
+
+    </div>
+  </div>
+)}
+
 
           {/* New Item Modal */}
           <NewItemModal
