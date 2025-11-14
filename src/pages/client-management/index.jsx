@@ -291,52 +291,67 @@ const ClientManagement = () => {
   };
 
   const handleExportClients = () => {
-    const headers = [
-      'Empresa',
-      'Contacto', 
-      'Email',
-      'Teléfono',
-      'Industria',
-      'Ubicación',
-      'Estado',
-      'Salud Relación',
-      'RFC',
-      'Cliente Desde',
-      'Total Proyectos',
-      'Contratos Activos',
-      'Valor Total'
-    ];
-
-    const csvContent = [
-      headers?.join(','),
-      ...filteredClients?.map(client => [
-        `"${client?.companyName}"`,
-        `"${client?.contactPerson}"`,
-        client?.email,
-        `"${client?.phone}"`,
-        client?.industry,
-        `"${client?.location}"`,
-        client?.status,
-        client?.relationshipHealth,
-        client?.rfc,
-        client?.clientSince,
-        client?.totalProjects,
-        client?.activeContracts,
-        client?.totalValue
-      ]?.join(','))
-    ]?.join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    if (link?.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      link?.setAttribute('href', url);
-      link?.setAttribute('download', `clientes_${new Date()?.toISOString()?.split('T')?.[0]}.csv`);
-      link.style.visibility = 'hidden';
-      document.body?.appendChild(link);
-      link?.click();
-      document.body?.removeChild(link);
+    if (!filteredClients || filteredClients.length === 0) {
+      alert('No hay datos para exportar');
+      return;
     }
+
+    // Preparar los datos para exportar (sin Cliente Desde, Total Proyectos, Contratos Activos, Valor Total)
+    const dataToExport = filteredClients.map(client => {
+      // Extraer contactos adicionales si existen
+      const contactosAdicionales = Array.isArray(client.contactos) && client.contactos.length > 1
+        ? client.contactos.slice(1).map((c, idx) => `${c.contacto} (${c.email}, ${c.telefono})`).join(' | ')
+        : '';
+
+      return {
+        'Empresa': client.companyName || client.empresa || '',
+        'RFC': client.rfc || '',
+        'Contacto Principal': client.contactPerson || client.contacto || '',
+        'Email Principal': client.email || '',
+        'Teléfono Principal': client.phone || client.telefono || '',
+        'Contactos Adicionales': contactosAdicionales,
+        'Industria': client.industry || client.industria || '',
+        'Ubicación Empresa - Estado': client.ubicacionEmpre?.estado || '',
+        'Ubicación Empresa - Municipio': client.ubicacionEmpre?.municipio || '',
+        'URL Ubicación Empresa': client.ubicacionUrl || '',
+        'Dirección Cliente - Estado': client.ubicacion?.estado || '',
+        'Dirección Cliente - Municipio': client.ubicacion?.municipio || '',
+        'Dirección Completa': client.ubicacion?.direccion || client.address || '',
+        'Sitio Web': client.website || client.sitioWeb || '',
+        'Estado': client.status || client.estado || '',
+        'Relación': client.relationshipHealth || client.relacion || '',
+        'Próximo Seguimiento': client.nextFollowUp || client.proximoSeguimiento || '',
+        'Notas': client.notes || client.notas || ''
+      };
+    });
+
+    // Convertir a CSV
+    const headers = Object.keys(dataToExport[0]);
+    const csvContent = [
+      headers.join(','),
+      ...dataToExport.map(row => 
+        headers.map(header => {
+          const value = row[header];
+          // Escapar comillas y envolver en comillas si contiene comas
+          const escaped = String(value).replace(/"/g, '""');
+          return `"${escaped}"`;
+        }).join(',')
+      )
+    ].join('\n');
+
+    // Crear el archivo y descargarlo
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    const fecha = new Date().toISOString().split('T')[0];
+    link.setAttribute('href', url);
+    link.setAttribute('download', `clientes_${fecha}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleViewDetails = (client) => {

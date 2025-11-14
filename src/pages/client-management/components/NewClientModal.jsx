@@ -29,10 +29,14 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
     notes: '',
     estadoEmpresa: '',
     municipioEmpresa: '',
+    ubicacionUrl: '',
     estadoDireccion: '',
     municipioDireccion: '',
     direccionCompleta: ''
   });
+
+  // Estado para contactos adicionales (máximo 3 adicionales)
+  const [additionalContacts, setAdditionalContacts] = useState([]);
 
   // Hooks para estados y municipios
   const { estados, loading: loadingEstados, error: errorEstados } = useEstados();
@@ -60,10 +64,23 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
         notes: initialData.notes || initialData.notas || '',
         estadoEmpresa: initialData.ubicacionEmpre?.estado || '',
         municipioEmpresa: initialData.ubicacionEmpre?.municipio || '',
+        ubicacionUrl: initialData.ubicacionUrl || '',
         estadoDireccion: (initialData.ubicacion && initialData.ubicacion.estado) || '',
         municipioDireccion: (initialData.ubicacion && initialData.ubicacion.municipio) || '',
         direccionCompleta: initialData.address || (initialData.ubicacion && initialData.ubicacion.direccion) || ''
       });
+      
+      // Cargar contactos adicionales si existen
+      if (initialData.contactos && Array.isArray(initialData.contactos) && initialData.contactos.length > 1) {
+        // El primer contacto es el principal, los demás son adicionales
+        const extraContacts = initialData.contactos.slice(1);
+        setAdditionalContacts(extraContacts);
+      } else {
+        setAdditionalContacts([]);
+      }
+    } else if (isOpen && mode === 'create') {
+      // Limpiar contactos adicionales en modo create
+      setAdditionalContacts([]);
     }
   }, [isOpen, mode, initialData]);
 
@@ -176,6 +193,37 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
       newErrors.direccionCompleta = 'La dirección debe ser más específica (mínimo 10 caracteres)';
     }
 
+    // Validación para ubicacionUrl (opcional pero si se llena debe ser válida)
+    if (formData?.ubicacionUrl?.trim() && !/^https?:\/\/.+\..+/?.test(formData?.ubicacionUrl)) {
+      newErrors.ubicacionUrl = 'El formato de la URL no es válido (debe comenzar con http:// o https://)';
+    }
+
+    // Validación para contactos adicionales
+    additionalContacts.forEach((contact, index) => {
+      const hasAnyField = contact.contacto?.trim() || contact.email?.trim() || contact.telefono?.trim();
+      
+      if (hasAnyField) {
+        // Si tiene algún campo, todos deben estar completos
+        if (!contact.contacto?.trim()) {
+          newErrors[`additionalContact_${index}_name`] = 'El nombre es requerido si agregas este contacto';
+        } else if (contact.contacto.length < 3) {
+          newErrors[`additionalContact_${index}_name`] = 'El nombre debe tener al menos 3 caracteres';
+        }
+        
+        if (!contact.email?.trim()) {
+          newErrors[`additionalContact_${index}_email`] = 'El email es requerido si agregas este contacto';
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/?.test(contact.email)) {
+          newErrors[`additionalContact_${index}_email`] = 'El formato del email no es válido';
+        }
+        
+        if (!contact.telefono?.trim()) {
+          newErrors[`additionalContact_${index}_phone`] = 'El teléfono es requerido si agregas este contacto';
+        } else if (!/^\d{10}$/?.test(contact.telefono)) {
+          newErrors[`additionalContact_${index}_phone`] = 'El teléfono debe tener exactamente 10 dígitos';
+        }
+      }
+    });
+
     setErrors(newErrors);
     return Object.keys(newErrors)?.length === 0;
   };
@@ -232,6 +280,14 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
         [field]: cleanValue
       }));
     }
+    // Validación para ubicacionUrl
+    else if (field === 'ubicacionUrl') {
+      const cleanValue = value.slice(0, 200);
+      setFormData(prev => ({
+        ...prev,
+        [field]: cleanValue
+      }));
+    }
     // Otros campos sin validación especial
     else {
       setFormData(prev => ({
@@ -249,13 +305,74 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
     }
   };
 
+  // Funciones para manejar contactos adicionales
+  const addAdditionalContact = () => {
+    if (additionalContacts.length < 3) {
+      setAdditionalContacts([...additionalContacts, { contacto: '', email: '', telefono: '' }]);
+    }
+  };
+
+  const removeAdditionalContact = (index) => {
+    const newContacts = additionalContacts.filter((_, i) => i !== index);
+    setAdditionalContacts(newContacts);
+    // Limpiar errores relacionados con este contacto
+    const newErrors = { ...errors };
+    delete newErrors[`additionalContact_${index}_name`];
+    delete newErrors[`additionalContact_${index}_email`];
+    delete newErrors[`additionalContact_${index}_phone`];
+    setErrors(newErrors);
+  };
+
+  const handleAdditionalContactChange = (index, field, value) => {
+    const newContacts = [...additionalContacts];
+    
+    // Validación y formateo
+    if (field === 'telefono') {
+      value = value.replace(/\D/g, '').slice(0, 10);
+    } else if (field === 'contacto') {
+      value = value.slice(0, 100);
+    } else if (field === 'email') {
+      value = value.slice(0, 100);
+    }
+    
+    newContacts[index][field] = value;
+    setAdditionalContacts(newContacts);
+    
+    // Limpiar error si existe
+    const errorKey = `additionalContact_${index}_${field === 'contacto' ? 'name' : field === 'telefono' ? 'phone' : 'email'}`;
+    if (errors[errorKey]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[errorKey];
+        return newErrors;
+      });
+    }
+  };
+
   const handleSubmit = async (e) => {
     e?.preventDefault();
     if (!validateForm()) {
       return;
     }
+    
+    // Construir array de contactos: principal + adicionales que estén completos
+    const contactosCompletos = additionalContacts.filter(c => {
+      // Solo incluir contactos que tengan los 3 campos completos
+      return c.contacto?.trim() && c.email?.trim() && c.telefono?.trim();
+    });
+    
+    const contactos = [
+      {
+        contacto: formData.contactPerson,
+        email: formData.email,
+        telefono: formData.phone
+      },
+      ...contactosCompletos
+    ];
+    
     const clientData = {
       empresa: formData.companyName,
+      contactos: contactos,
       contacto: formData.contactPerson,
       email: formData.email,
       telefono: formData.phone,
@@ -264,6 +381,7 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
         estado: formData.estadoEmpresa,
         municipio: formData.municipioEmpresa,
       },
+      ubicacionUrl: formData.ubicacionUrl,
       ubicacion: {
         estado: formData.estadoDireccion,
         municipio: formData.municipioDireccion,
@@ -323,10 +441,12 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
       notes: '',
       estadoEmpresa: '',
       municipioEmpresa: '',
+      ubicacionUrl: '',
       estadoDireccion: '',
       municipioDireccion: '',
       direccionCompleta: ''
     });
+    setAdditionalContacts([]);
     setErrors({});
     onClose();
   };
@@ -375,6 +495,17 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
               />
             </div>
 
+            {/* Contacto Principal */}
+            <div className="md:col-span-2 mt-6">
+              <h3 className="text-lg font-medium text-foreground mb-2 flex items-center">
+                <Icon name="User" size={20} className="mr-2" />
+                Contacto Principal
+              </h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Información del contacto principal (obligatorio)
+              </p>
+            </div>
+
             <div>
               <Input
                 label="Persona de Contacto"
@@ -415,7 +546,89 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
               )}
             </div>
 
-            <div>
+            {/* Contactos Adicionales */}
+            <div className="md:col-span-2 mt-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-medium text-foreground flex items-center">
+                    <Icon name="Users" size={20} className="mr-2" />
+                    Contactos Adicionales
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Puedes agregar hasta 3 contactos adicionales (opcional)
+                  </p>
+                </div>
+                {additionalContacts.length < 3 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addAdditionalContact}
+                    iconName="Plus"
+                    iconPosition="left"
+                  >
+                    Agregar Contacto
+                  </Button>
+                )}
+              </div>
+
+              {additionalContacts.map((contact, index) => (
+                <div key={index} className="border border-border rounded-lg p-4 mb-4 bg-muted/30">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-sm font-medium text-foreground">
+                      Contacto Adicional {index + 1}
+                    </h4>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeAdditionalContact(index)}
+                      iconName="X"
+                    >
+                      Eliminar
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Input
+                        label="Nombre"
+                        placeholder="Ej. María García"
+                        value={contact.contacto}
+                        onChange={(e) => handleAdditionalContactChange(index, 'contacto', e.target.value)}
+                        error={errors?.[`additionalContact_${index}_name`]}
+                      />
+                    </div>
+                    <div>
+                      <Input
+                        type="email"
+                        label="Email"
+                        placeholder="Ej. maria@empresa.com"
+                        value={contact.email}
+                        onChange={(e) => handleAdditionalContactChange(index, 'email', e.target.value)}
+                        error={errors?.[`additionalContact_${index}_email`]}
+                      />
+                    </div>
+                    <div>
+                      <Input
+                        label="Teléfono"
+                        placeholder="1234567890"
+                        value={contact.telefono}
+                        onChange={(e) => handleAdditionalContactChange(index, 'telefono', e.target.value)}
+                        error={errors?.[`additionalContact_${index}_phone`]}
+                        maxLength={10}
+                      />
+                      {contact.telefono && contact.telefono.length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {contact.telefono.length}/10 dígitos
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="md:col-span-2">
               <Select
                 label="Industria"
                 value={formData?.industry}
@@ -480,6 +693,19 @@ const NewClientModal = ({ isOpen, onClose, onSubmit, mode = 'create', initialDat
                   searchable
                 />
               </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <Input
+                label="URL de Ubicación"
+                placeholder="Ej. https://maps.google.com/..."
+                value={formData?.ubicacionUrl}
+                onChange={(e) => handleInputChange('ubicacionUrl', e?.target?.value)}
+                error={errors?.ubicacionUrl}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Opcional: Link de Google Maps o ubicación web de la empresa
+              </p>
             </div>
 
             {/* RFC y Sitio Web */}
