@@ -41,58 +41,133 @@ const PersonnelManagement = () => {
 
   // ✅ Lógica de filtrado robusta
   const filteredPersonnel = useMemo(() => {
-  if (!persons) return [];
+    if (!persons) return [];
 
-  return persons.filter((employee) => {
-    const searchTerm = filters.search?.toLowerCase().trim() || '';
+    return persons.filter((employee) => {
+      const searchTerm = filters.search?.toLowerCase().trim() || '';
 
-    const matchSearch =
-      !searchTerm ||
-      employee?.nombreCompleto?.toLowerCase()?.includes(searchTerm) ||
-      employee?.empleadoId?.toLowerCase()?.includes(searchTerm) ||
-      employee?.puesto?.toLowerCase()?.includes(searchTerm);
+      // Filtro de búsqueda
+      const matchSearch =
+        !searchTerm ||
+        employee?.nombreCompleto?.toLowerCase()?.includes(searchTerm) ||
+        employee?.empleadoId?.toLowerCase()?.includes(searchTerm) ||
+        employee?.puesto?.toLowerCase()?.includes(searchTerm);
 
-    const matchDept =
-      !filters.department ||
-      employee?.departamento?.toLowerCase() === filters.department.toLowerCase();
+      // Filtro de departamento
+      const matchDept =
+        !filters.department ||
+        (employee?.departamento?.toLowerCase() === filters.department.toLowerCase());
 
-    const matchStatus =
-      !filters.status ||
-      employee?.estado?.toLowerCase() === filters.status.toLowerCase();
+      // Filtro de estado
+      const matchStatus =
+        !filters.status ||
+        (employee?.estado?.toLowerCase() === filters.status.toLowerCase());
 
-    const matchPosition =
-      !filters.position ||
-      employee?.puesto?.toLowerCase() === filters.position.toLowerCase();
+      // Filtro de puesto
+      const matchPosition =
+        !filters.position ||
+        (employee?.puesto?.toLowerCase() === filters.position.toLowerCase());
 
-    // ❌ Eliminamos o comentamos estos porque NO existen en tu base
-    // const matchMedical =
-    //   !filters.medicalCompliance ||
-    //   employee?.cumplimientoMedico?.toLowerCase() ===
-    //     filters.medicalCompliance.toLowerCase();
+      // Filtro de cumplimiento médico
+      const medicalStudies = Array.isArray(employee.examenesMedicos) && employee.examenesMedicos[0]
+        ? employee.examenesMedicos[0]
+        : employee.medicalStudies || {};
+      
+      // Determinar el estado de cumplimiento médico
+      let medicalStatus = medicalStudies.status || 'Pendiente';
+      
+      // Si no hay status explícito, intentar determinarlo por fecha
+      if (!medicalStudies.status && medicalStudies.nextExam) {
+        try {
+          const nextExamDate = new Date(medicalStudies.nextExam);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          if (nextExamDate < today) {
+            medicalStatus = 'Vencido';
+          } else if (medicalStudies.lastExam) {
+            medicalStatus = 'Completo';
+          } else {
+            medicalStatus = 'Pendiente';
+          }
+        } catch (e) {
+          // Si hay error al parsear la fecha, usar el estado por defecto
+          medicalStatus = employee?.estado === 'Activo' ? 'Completo' : 'Pendiente';
+        }
+      } else if (!medicalStudies.status) {
+        // Si no hay información, usar estado del empleado como referencia
+        medicalStatus = employee?.estado === 'Activo' ? 'Completo' : 'Pendiente';
+      }
+      
+      const matchMedical =
+        !filters.medicalCompliance ||
+        (medicalStatus?.toLowerCase() === filters.medicalCompliance.toLowerCase());
 
-    // const matchPPE =
-    //   !filters.ppeCompliance ||
-    //   employee?.cumplimientoEPP?.toLowerCase() ===
-    //     filters.ppeCompliance.toLowerCase();
+      // Filtro de cumplimiento EPP
+      const ppe = Array.isArray(employee.equipos) && employee.equipos[0]
+        ? employee.equipos[0]
+        : employee.ppe || {};
+      
+      // Calcular el estado de cumplimiento de EPP
+      const hasRequiredPPE = ppe.helmet && ppe.vest && ppe.boots && ppe.gloves && ppe.glasses && ppe.mask;
+      let ppeComplianceStatus = 'Pendiente';
+      
+      if (hasRequiredPPE) {
+        ppeComplianceStatus = 'Completo';
+      } else if (ppe.helmet || ppe.vest || ppe.boots || ppe.gloves || ppe.glasses || ppe.mask) {
+        // Tiene al menos un elemento pero no todos
+        ppeComplianceStatus = 'Pendiente';
+      } else {
+        // No tiene ningún elemento
+        ppeComplianceStatus = 'Pendiente';
+      }
+      
+      // Nota: Para determinar "Vencido" en EPP, necesitarías fechas de vencimiento
+      // que no están en la estructura actual. Si las agregas en el futuro, puedes
+      // verificar aquí comparando fechas de vencimiento con la fecha actual.
+      
+      const matchPPE =
+        !filters.ppeCompliance ||
+        (ppeComplianceStatus?.toLowerCase() === filters.ppeCompliance.toLowerCase());
 
-    const matchHireDateFrom =
-      !filters.hireDateFrom ||
-      new Date(employee?.fechaIngreso) >= new Date(filters.hireDateFrom);
+      // Filtros de fecha de ingreso
+      let matchHireDateFrom = true;
+      let matchHireDateTo = true;
+      
+      if (filters.hireDateFrom && employee?.fechaIngreso) {
+        try {
+          const hireDate = new Date(employee.fechaIngreso);
+          const fromDate = new Date(filters.hireDateFrom);
+          matchHireDateFrom = hireDate >= fromDate;
+        } catch (e) {
+          matchHireDateFrom = true; // Si hay error en la fecha, no filtrar
+        }
+      }
+      
+      if (filters.hireDateTo && employee?.fechaIngreso) {
+        try {
+          const hireDate = new Date(employee.fechaIngreso);
+          const toDate = new Date(filters.hireDateTo);
+          // Ajustar la fecha "hasta" al final del día para incluir todo el día
+          toDate.setHours(23, 59, 59, 999);
+          matchHireDateTo = hireDate <= toDate;
+        } catch (e) {
+          matchHireDateTo = true; // Si hay error en la fecha, no filtrar
+        }
+      }
 
-    const matchHireDateTo =
-      !filters.hireDateTo ||
-      new Date(employee?.fechaIngreso) <= new Date(filters.hireDateTo);
-
-    return (
-      matchSearch &&
-      matchDept &&
-      matchStatus &&
-      matchPosition &&
-      matchHireDateFrom &&
-      matchHireDateTo
-    );
-  });
-}, [persons, filters]);
+      return (
+        matchSearch &&
+        matchDept &&
+        matchStatus &&
+        matchPosition &&
+        matchMedical &&
+        matchPPE &&
+        matchHireDateFrom &&
+        matchHireDateTo
+      );
+    });
+  }, [persons, filters]);
 
   // ✅ Acciones UI
   const handleViewProfile = (employee) => {
@@ -395,11 +470,12 @@ const PersonnelManagement = () => {
               />
 
               <PersonnelTable
-  personnel={filteredPersonnel}
-  onViewProfile={handleViewProfile}
-  onEditPersonnel={handleEditPersonnel}
-  onAssignPPE={handleAssignPPE}
-/>
+                personnel={filteredPersonnel}
+                onViewProfile={handleViewProfile}
+                onEditPersonnel={handleEditPersonnel}
+                onAssignPPE={handleAssignPPE}
+                hasActiveFilters={Object.values(filters).some(value => value !== '')}
+              />
 
             </div>
           ) : (

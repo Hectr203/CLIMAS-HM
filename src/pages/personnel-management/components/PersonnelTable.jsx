@@ -6,7 +6,7 @@ import usePerson from '../../../hooks/usePerson';
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
 
-const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE }) => {
+const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE, hasActiveFilters }) => {
   const { persons, loading, error, getPersons } = usePerson();
 
   const [sortConfig, setSortConfig] = useState({ key: 'nombreCompleto', direction: 'asc' });
@@ -25,6 +25,11 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
     }
     return personnel;
   }, [personnel, persons]);
+
+  // 🔹 Reiniciar a la primera página cuando cambian los datos filtrados
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [personnel]);
 
   // 🔹 Ordenamiento
   const sortedPersonnel = useMemo(() => {
@@ -140,13 +145,20 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
       </div>
     );
 
-  if (!sortedPersonnel?.length)
+  // Si hay filtros activos y no hay resultados, no mostrar nada
+  if (!sortedPersonnel?.length && hasActiveFilters) {
+    return null;
+  }
+
+  // Si no hay datos en absoluto (sin filtros), mostrar mensaje
+  if (!sortedPersonnel?.length) {
     return (
       <div className="text-center py-10 text-muted-foreground">
         <Icon name="UserX" className="inline-block mr-2" size={18} />
         No hay empleados registrados.
       </div>
     );
+  }
 
   // 🔹 Render principal
   return (
@@ -199,10 +211,47 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
                 <td className="px-6 py-4 whitespace-nowrap text-sm">{emp.puesto || '-'}</td>
                 <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(emp.estado)}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  {getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}
+                  {(() => {
+                    const medicalStudies = Array.isArray(emp.examenesMedicos) && emp.examenesMedicos[0]
+                      ? emp.examenesMedicos[0]
+                      : emp.medicalStudies || {};
+                    
+                    let medicalStatus = medicalStudies.status || 'Pendiente';
+                    
+                    if (!medicalStudies.status && medicalStudies.nextExam) {
+                      try {
+                        const nextExamDate = new Date(medicalStudies.nextExam);
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        
+                        if (nextExamDate < today) {
+                          medicalStatus = 'Vencido';
+                        } else if (medicalStudies.lastExam) {
+                          medicalStatus = 'Completo';
+                        } else {
+                          medicalStatus = 'Pendiente';
+                        }
+                      } catch (e) {
+                        medicalStatus = emp?.estado === 'Activo' ? 'Completo' : 'Pendiente';
+                      }
+                    } else if (!medicalStudies.status) {
+                      medicalStatus = emp?.estado === 'Activo' ? 'Completo' : 'Pendiente';
+                    }
+                    
+                    return getComplianceBadge(medicalStatus);
+                  })()}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  {getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}
+                  {(() => {
+                    const ppe = Array.isArray(emp.equipos) && emp.equipos[0]
+                      ? emp.equipos[0]
+                      : emp.ppe || {};
+                    
+                    const hasRequiredPPE = ppe.helmet && ppe.vest && ppe.boots && ppe.gloves && ppe.glasses && ppe.mask;
+                    const ppeStatus = hasRequiredPPE ? 'Completo' : 'Pendiente';
+                    
+                    return getComplianceBadge(ppeStatus);
+                  })()}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                   {emp.fechaIngreso || '-'}
@@ -302,11 +351,48 @@ const PersonnelTable = ({ personnel, onViewProfile, onEditPersonnel, onAssignPPE
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Estudios Médicos:</span>
-                {getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}
+                {(() => {
+                  const medicalStudies = Array.isArray(emp.examenesMedicos) && emp.examenesMedicos[0]
+                    ? emp.examenesMedicos[0]
+                    : emp.medicalStudies || {};
+                  
+                  let medicalStatus = medicalStudies.status || 'Pendiente';
+                  
+                  if (!medicalStudies.status && medicalStudies.nextExam) {
+                    try {
+                      const nextExamDate = new Date(medicalStudies.nextExam);
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      
+                      if (nextExamDate < today) {
+                        medicalStatus = 'Vencido';
+                      } else if (medicalStudies.lastExam) {
+                        medicalStatus = 'Completo';
+                      } else {
+                        medicalStatus = 'Pendiente';
+                      }
+                    } catch (e) {
+                      medicalStatus = emp?.estado === 'Activo' ? 'Completo' : 'Pendiente';
+                    }
+                  } else if (!medicalStudies.status) {
+                    medicalStatus = emp?.estado === 'Activo' ? 'Completo' : 'Pendiente';
+                  }
+                  
+                  return getComplianceBadge(medicalStatus);
+                })()}
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">EPP:</span>
-                {getComplianceBadge(emp.estado === 'Activo' ? 'Completo' : 'Pendiente')}
+                {(() => {
+                  const ppe = Array.isArray(emp.equipos) && emp.equipos[0]
+                    ? emp.equipos[0]
+                    : emp.ppe || {};
+                  
+                  const hasRequiredPPE = ppe.helmet && ppe.vest && ppe.boots && ppe.gloves && ppe.glasses && ppe.mask;
+                  const ppeStatus = hasRequiredPPE ? 'Completo' : 'Pendiente';
+                  
+                  return getComplianceBadge(ppeStatus);
+                })()}
               </div>
             </div>
 
