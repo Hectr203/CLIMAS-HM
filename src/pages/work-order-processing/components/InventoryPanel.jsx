@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import useRequisi from '../../../hooks/useRequisi';
-import useInventario from '../../../hooks/useInventario';
+import useInventario from '../../../hooks/useInventory';
 import RequisitionModal from "../components/RequisitionModal";
 import { useNotifications } from '../../../context/NotificationContext';
 
