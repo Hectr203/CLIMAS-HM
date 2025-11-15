@@ -4,7 +4,7 @@ import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
 import Sidebar from '../../components/ui/Sidebar';
 import Header from '../../components/ui/Header';
-
+import Breadcrumb from '../../components/ui/Breadcrumb';
 import ClientRegistrationPanel from './components/ClientRegistrationPanel';
 import CommunicationPanel from './components/CommunicationPanel';
 import QuotationRequestPanel from './components/QuotationRequestPanel';
@@ -12,10 +12,12 @@ import WorkOrderPanel from './components/WorkOrderPanel';
 import ChangeManagementPanel from './components/ChangeManagementPanel';
 import NewOpportunityModal from './components/NewOpportunityModal';
 import { useOpportunity } from '../../hooks/useOpportunity';
+import { useNotifications } from '../../context/NotificationContext';
 
 
 const SalesOpportunityManagement = () => {
   const { oportunidades, loading, error, crearOportunidad, fetchOportunidades, actualizarOportunidad } = useOpportunity();
+  const { showOperationSuccess } = useNotifications();
   // Estado local de oportunidades para el mock y handlers
   const [opportunities, setOpportunities] = useState([]);
   const [selectedOpportunity, setSelectedOpportunity] = useState(null);
@@ -24,6 +26,18 @@ const SalesOpportunityManagement = () => {
   const [showNewOpportunityModal, setShowNewOpportunityModal] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+
+  // Verificar si viene de crear cotización
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('cotizacionCreada') === 'true') {
+      showOperationSuccess('Cotización creada exitosamente. La oportunidad permanece en Desarrollo de Cotización.');
+      // Limpiar el parámetro de la URL
+      window.history.replaceState({}, '', '/oportunidades');
+      // Recargar oportunidades para ver los datos actualizados
+      fetchOportunidades();
+    }
+  }, []);
 
   // Etapas del flujo de ventas
   const salesStages = useMemo(() => [
@@ -334,9 +348,17 @@ const SalesOpportunityManagement = () => {
 
   const handleStageTransition = async (opportunityId, newStage) => {
     try {
-      // Actualiza en backend y refresca oportunidades
+      // Si se selecciona "Desarrollo de Cotización", redirigir antes de la actualización
+      if (newStage === 'quotation-development') {
+        // Actualiza primero el estado
+        await actualizarOportunidad(opportunityId, { etapa: newStage });
+        // Redirige a cotizaciones con los parámetros necesarios
+        window.location.href = `/cotizaciones?opportunityId=${opportunityId}&newQuotation=true`;
+        return;
+      }
+
+      // Para otras etapas, continúa con el flujo normal
       await actualizarOportunidad(opportunityId, { etapa: newStage });
-      // El hook ya refresca oportunidades, solo actualiza selección si corresponde
       if (selectedOpportunity?.id === opportunityId) {
         setSelectedOpportunity(prev => ({ ...prev, stage: newStage, stageDuration: 0 }));
       }
@@ -430,9 +452,9 @@ const SalesOpportunityManagement = () => {
     return (
       <div className="min-h-screen bg-background flex">
         <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
-        <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
+        <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'}`}>
           <Header onMenuToggle={() => setHeaderMenuOpen(!headerMenuOpen)} isMenuOpen={headerMenuOpen} />
-          <div className="pt-16 flex items-center justify-center h-96">
+          <div className="flex items-center justify-center h-96">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
               <p className="text-muted-foreground">Cargando oportunidades de venta...</p>
@@ -448,11 +470,16 @@ const SalesOpportunityManagement = () => {
     <div className="min-h-screen bg-background flex">
       <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
 
-      <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
+      <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'}`}>
         <Header onMenuToggle={() => setHeaderMenuOpen(!headerMenuOpen)} isMenuOpen={headerMenuOpen} />
 
-        <main className="pt-16">
+        <main className="">
           <div className="container mx-auto px-4 py-8">
+            {/* Breadcrumb */}
+            <div className="mb-6">
+              <Breadcrumb />
+            </div>
+
             {/* Encabezado */}
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
               <div>
@@ -581,7 +608,6 @@ const SalesOpportunityManagement = () => {
                                     {opportunity.stageDuration} días
                                   </span>
                                 </div>
-                                <div className="text-xs font-medium text-gray-600">ID: {opportunity.id}</div>
                               </div>
 
                               {opportunity.workOrderGenerated && (
@@ -648,19 +674,19 @@ const SalesOpportunityManagement = () => {
                         <div className="space-y-4">
                           <div>
                             <h4 className="font-medium mb-2 text-sm sm:text-base">{selectedOpportunity?.clientName}</h4>
-                            <p className="text-xs text-muted-foreground">{selectedOpportunity?.id}</p>
                           </div>
 
-                          {/* Paneles según etapa */}
-                          {(selectedOpportunity?.stage === 'initial-contact' || !selectedOpportunity?.stage) && (
+                          {/* OCULTO TEMPORALMENTE - Paneles según etapa */}
+                          {/* {(selectedOpportunity?.stage === 'initial-contact' || !selectedOpportunity?.stage) && (
                             <ClientRegistrationPanel
                               opportunity={selectedOpportunity}
                               onRegister={(clientData) =>
                                 handleClientRegistration(selectedOpportunity?.id, clientData)
                               }
                             />
-                          )}
+                          )} */}
 
+                          {/* Panel de Comunicación - VISIBLE */}
                           <CommunicationPanel
                             opportunity={selectedOpportunity}
                             onAddCommunication={(communication) =>
@@ -668,7 +694,8 @@ const SalesOpportunityManagement = () => {
                             }
                           />
 
-                          {(selectedOpportunity?.stage === 'quotation-development' ||
+                          {/* OCULTO TEMPORALMENTE - QuotationRequestPanel */}
+                          {/* {(selectedOpportunity?.stage === 'quotation-development' ||
                             selectedOpportunity?.stage === 'client-review' ||
                             selectedOpportunity?.stage === 'closure') && (
                             <QuotationRequestPanel
@@ -690,10 +717,10 @@ const SalesOpportunityManagement = () => {
                                 handleQuotationUpdate(selectedOpportunity?.id, quotationData)
                               }
                             />
-                          )}
+                          )} */}
 
-                          {/* Panel de revisión del cliente */}
-                          {selectedOpportunity?.stage === 'client-review' && selectedOpportunity?.quotationStatus && (
+                          {/* OCULTO TEMPORALMENTE - Panel de revisión del cliente */}
+                          {/* {selectedOpportunity?.stage === 'client-review' && selectedOpportunity?.quotationStatus && (
                             <div className="border rounded-lg p-4 bg-muted/10">
                               <h4 className="font-medium mb-2 flex items-center">
                                 <Icon name="Eye" size={16} className="mr-2 text-yellow-600" />
@@ -707,34 +734,32 @@ const SalesOpportunityManagement = () => {
                                 <strong>Feedback del cliente:</strong> {selectedOpportunity.quotationStatus.clientFeedback || 'Sin comentarios'}
                               </div>
                             </div>
-                          )}
+                          )} */}
 
-
-                          {/* Panel de orden de trabajo en cierre */}
-
-                          {selectedOpportunity?.stage === 'closure' && (
+                          {/* OCULTO TEMPORALMENTE - Panel de orden de trabajo en cierre */}
+                          {/* {selectedOpportunity?.stage === 'closure' && (
                             <WorkOrderPanel
                               opportunity={selectedOpportunity}
                               onGenerateWorkOrder={(workOrderData) =>
                                 handleWorkOrderGeneration(selectedOpportunity?.id, workOrderData)
                               }
                             />
-                          )}
+                          )} */}
 
-                          {selectedOpportunity?.stage !== 'initial-contact' && (
+                          {/* OCULTO TEMPORALMENTE - ChangeManagementPanel */}
+                          {/* {selectedOpportunity?.stage !== 'initial-contact' && (
                             <ChangeManagementPanel
                               opportunity={selectedOpportunity}
                               onRequestChange={(changeData) =>
                                 console.log('Change requested:', changeData)
                               }
                             />
-                          )}
+                          )} */}
 
-                          {/* Botones para cambiar etapa */}
+                          {/* Botones para cambiar etapa - VISIBLE */}
                           <div className="space-y-2">
                             <label className="text-sm font-medium">Avanzar Etapa</label>
-                            <div className="grid grid-cols-1 gap-2">
-                              {salesStages?.map((stage) => (
+                            <div className="grid grid-cols-1 gap-2">{salesStages?.map((stage) => (
                                 <Button
                                   key={stage?.id}
                                   variant={selectedOpportunity?.stage === stage?.id ? 'default' : 'outline'}

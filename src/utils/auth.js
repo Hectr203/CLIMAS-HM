@@ -11,78 +11,80 @@ export const AUTH_ROLES = {
 export const ROLE_PERMISSIONS = {
   [AUTH_ROLES?.SALES_REPRESENTATIVE]: {
     allowedPaths: [
-      '/client-management',
-      '/sales-opportunity-management',
-      '/quotation-development-center',
-      '/sales-execution-monitoring'
+      '/clientes',
+      '/oportunidades',
+      '/cotizaciones',
+      '/monitoreo-ventas'
     ],
-    defaultPath: '/client-management'
+    defaultPath: '/clientes'
   },
   [AUTH_ROLES?.ADMIN]: {
     allowedPaths: [
-      '/main-dashboard',
-      '/sales-opportunity-management',
-      '/quotation-development-center',
-      '/project-management',
-      '/work-order-processing',
-      '/personnel-management',
-      '/inventory-management',
-      '/client-management',
-      '/financial-management',
-      '/project-gallery-viewer',
-      '/project-detail-gallery',
-      '/project-documentation-center',
-      '/project-workflow-management',
-      '/quotation-builder',
-      '/workshop-operations-management',
-      '/workshop-operations-center',
-      '/sales-execution-monitoring'
+      '/dashboard',
+      '/oportunidades',
+      '/cotizaciones',
+      '/proyectos',
+      '/abonos',
+      '/operaciones',
+      '/personal',
+      '/inventario',
+      '/clientes',
+      '/finanzas',
+      '/usuarios',
+      '/visor-galeria',
+      '/galeria-proyecto',
+      '/documentacion-proyectos',
+      '/flujo-proyecto',
+      '/constructor-cotizaciones',
+      '/operaciones-taller',
+      '/centro-operaciones-taller',
+      '/monitoreo-ventas'
     ],
-    defaultPath: '/main-dashboard'
+    defaultPath: '/dashboard'
   },
   [AUTH_ROLES?.PROJECT_MANAGER]: {
     allowedPaths: [
-      '/project-management',
-      '/project-gallery-viewer',
-      '/project-detail-gallery',
-      '/project-documentation-center',
-      '/project-workflow-management',
-      '/quotation-builder'
+      '/proyectos',
+      '/visor-galeria',
+      '/galeria-proyecto',
+      '/documentacion-proyectos',
+      '/flujo-proyecto',
+      '/constructor-cotizaciones'
     ],
-    defaultPath: '/project-management'
+    defaultPath: '/proyectos'
   },
   'proyect manager': {
     allowedPaths: [
-      '/project-management',
-      '/project-gallery-viewer',
-      '/project-detail-gallery',
-      '/project-documentation-center',
-      '/project-workflow-management',
-      '/quotation-builder'
+      '/proyectos',
+      '/visor-galeria',
+      '/galeria-proyecto',
+      '/documentacion-proyectos',
+      '/flujo-proyecto',
+      '/constructor-cotizaciones'
     ],
-    defaultPath: '/project-management'
+    defaultPath: '/proyectos'
   },
   [AUTH_ROLES?.WORKSHOP_SUPERVISOR]: {
     allowedPaths: [
-      '/inventory-management',
-      '/work-order-processing',
-      '/workshop-operations-management',
-      '/workshop-operations-center'
+      '/inventario',
+      '/operaciones',
+      '/operaciones-taller',
+      '/centro-operaciones-taller'
     ],
-    defaultPath: '/inventory-management'
+    defaultPath: '/inventario'
   },
   [AUTH_ROLES?.FINANCIAL_CONTROLLER]: {
     allowedPaths: [
-      '/financial-management',
-      '/quotation-development-center'
+      '/finanzas',
+      '/cotizaciones'
     ],
-    defaultPath: '/financial-management'
+    defaultPath: '/finanzas'
   },
   [AUTH_ROLES?.HR_MANAGER]: {
     allowedPaths: [
-      '/personnel-management'
+      '/personal'
     ],
-    defaultPath: '/personnel-management'
+    defaultPath: '/personal'
   }
 };
 
@@ -91,11 +93,11 @@ export const getCurrentUser = () => {
   const authToken = localStorage.getItem('authToken');
   const userRole = localStorage.getItem('userRole');
   const userEmail = localStorage.getItem('userEmail');
-  
+
   if (!authToken || !userRole) {
     return null;
   }
-  
+
   return {
     token: authToken,
     role: userRole,
@@ -148,64 +150,71 @@ export const getAllowedNavigationItems = (userRole) => {
   if (!userRole || !ROLE_PERMISSIONS?.[userRole]) {
     return [];
   }
-  
+
   const allowedPaths = ROLE_PERMISSIONS?.[userRole]?.allowedPaths;
-  
+
   const allNavigationItems = [
     {
       label: 'Dashboard',
-      path: '/main-dashboard',
+      path: '/dashboard',
       icon: 'LayoutDashboard',
       tooltip: 'Resumen operacional y KPIs',
       badge: null,
-  roles: [AUTH_ROLES?.ADMIN]
+      roles: [AUTH_ROLES?.ADMIN]
     },
     {
       label: 'Oportunidades',
-      path: '/sales-opportunity-management',
+      path: '/oportunidades',
       icon: 'Target',
       tooltip: 'Gestión de oportunidades de venta',
       badge: 8,
-  roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.SALES_REPRESENTATIVE]
+      roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.SALES_REPRESENTATIVE]
     },
     {
       label: 'Cotizaciones',
-      path: '/quotation-development-center',
+      path: '/cotizaciones',
       icon: 'FileText',
       tooltip: 'Desarrollo y gestión de cotizaciones',
       badge: null,
-  roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.SALES_REPRESENTATIVE, AUTH_ROLES?.FINANCIAL_CONTROLLER]
+      roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.SALES_REPRESENTATIVE, AUTH_ROLES?.FINANCIAL_CONTROLLER]
     },
     {
       label: 'Proyectos',
-      path: '/project-management',
+      path: '/proyectos',
       icon: 'FolderOpen',
       tooltip: 'Gestión del ciclo de vida de proyectos',
       badge: 5,
-  roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.PROJECT_MANAGER]
+      roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.PROJECT_MANAGER]
+    },
+    {
+      label: 'Abonos',
+      path: '/abonos',
+      icon: 'CreditCard',
+      tooltip: 'Gestión de abonos de proyectos',
+      roles: [AUTH_ROLES?.ADMIN]
     },
     {
       label: 'Operaciones',
-      path: '/work-order-processing',
+      path: '/operaciones',
       icon: 'ClipboardList',
       tooltip: 'Procesamiento y seguimiento de órdenes de trabajo',
       badge: 12,
-  roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.WORKSHOP_SUPERVISOR]
+      roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.WORKSHOP_SUPERVISOR]
     },
     {
       label: 'Operaciones de Taller',
-      path: '/workshop-operations-management',
+      path: '/operaciones-taller',
       icon: 'Tool',
       tooltip: 'Gestión de operaciones de taller',
       roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.WORKSHOP_SUPERVISOR]
     },
-    {
-      label: 'Centro de Operaciones de Taller',
-      path: '/workshop-operations-center',
-      icon: 'Home',
-      tooltip: 'Centro de operaciones de taller',
-      roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.WORKSHOP_SUPERVISOR]
-    },
+    // {
+    //   label: 'Centro de Operaciones de Taller',
+    //   path: '/workshop-operations-center',
+    //   icon: 'Home',
+    //   tooltip: 'Centro de operaciones de taller',
+    //   roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.WORKSHOP_SUPERVISOR]
+    // },
     {
       label: 'Recursos',
       icon: 'Users',
@@ -213,14 +222,14 @@ export const getAllowedNavigationItems = (userRole) => {
       children: [
         {
           label: 'Personal',
-          path: '/personnel-management',
+          path: '/personal',
           icon: 'UserCheck',
           tooltip: 'Gestión de personal y horarios',
           roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.HR_MANAGER]
         },
         {
           label: 'Inventario',
-          path: '/inventory-management',
+          path: '/inventario',
           icon: 'Package',
           tooltip: 'Seguimiento de equipos y repuestos',
           roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.WORKSHOP_SUPERVISOR]
@@ -235,28 +244,36 @@ export const getAllowedNavigationItems = (userRole) => {
       children: [
         {
           label: 'Clientes',
-          path: '/client-management',
+          path: '/clientes',
           icon: 'Users',
           tooltip: 'Gestión de relaciones con clientes',
           roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.SALES_REPRESENTATIVE]
         },
         {
           label: 'Finanzas',
-          path: '/financial-management',
+          path: '/finanzas',
           icon: 'DollarSign',
           tooltip: 'Supervisión y reportes financieros',
           badge: 3,
           roles: [AUTH_ROLES?.ADMIN, AUTH_ROLES?.FINANCIAL_CONTROLLER]
         }
       ]
+    },
+    {
+      label: 'Usuarios',
+      path: '/usuarios',
+      icon: 'UserCog',
+      tooltip: 'Gestión de usuarios del sistema',
+      badge: null,
+      roles: [AUTH_ROLES?.ADMIN]
     }
   ];
-  
+
   // Filter navigation items based on user role and allowed paths
   const filterItems = (items) => {
     return items?.filter(item => {
       if (item?.children) {
-        const allowedChildren = item?.children?.filter(child => 
+        const allowedChildren = item?.children?.filter(child =>
           child?.roles?.includes(userRole) && allowedPaths?.includes(child?.path)
         );
         if (allowedChildren?.length > 0) {
@@ -269,7 +286,7 @@ export const getAllowedNavigationItems = (userRole) => {
       }
     });
   };
-  
+
   return filterItems(allNavigationItems);
 };
 
@@ -278,36 +295,102 @@ export const getDefaultPath = (userRole) => {
   if (!userRole || !ROLE_PERMISSIONS?.[userRole]) {
     return '/login';
   }
-  
+
   return ROLE_PERMISSIONS?.[userRole]?.defaultPath;
 };
 
 // Logout user
 export const logoutUser = () => {
+  // Limpiar todos los elementos de autenticación
   localStorage.removeItem('authToken');
+  localStorage.removeItem('token'); 
+  localStorage.removeItem('tokenExpiresAt');
   localStorage.removeItem('userRole');
   localStorage.removeItem('userEmail');
+  localStorage.removeItem('role');
+  localStorage.removeItem('rol');
   localStorage.removeItem('rememberMe');
-  window.location.href = '/login';
+  
+  // Forzar recarga completa para limpiar estado
+  window.location.replace('/login');
 }
 
 import axios from "axios";
+import { jwtDecode } from "jwt-decode";
 
 export function logout() {
+  // Limpiar todos los elementos de autenticación
+  localStorage.removeItem("authToken");
   localStorage.removeItem("token");
-  window.location.href = "/login";
+  localStorage.removeItem("tokenExpiresAt");
+  localStorage.removeItem("userRole");
+  localStorage.removeItem("userEmail");
+  localStorage.removeItem("role");
+  localStorage.removeItem("rol");
+  localStorage.removeItem("rememberMe");
+  
+  // Forzar recarga completa para limpiar estado
+  window.location.replace("/login");
+}
+
+export async function checkBackendTokenConfig() {
+  try {
+    const apiUrl = import.meta.env.VITE_API_URL || "";
+    
+    // Hacer una petición de login de prueba para ver la configuración del token
+    console.log("=== VERIFICANDO CONFIGURACIÓN DEL BACKEND ===");
+    console.log("API URL:", apiUrl);
+    console.log("============================================");
+    
+    return true;
+  } catch (error) {
+    console.error("Error verificando configuración del backend:", error);
+    return false;
+  }
 }
 
 export async function renewToken(currentToken) {
-  const apiUrl = import.meta.env.VITE_API_URL || "";
-  const res = await axios.get(
-    `${apiUrl}/usuarios/token-info`,
-    {
-      headers: { Authorization: `Bearer ${currentToken}` },
+  try {
+    const apiUrl = import.meta.env.VITE_API_URL || "";
+    const response = await axios.post(
+      `${apiUrl}/usuarios/extender-sesion`,
+      {}, // POST sin body
+      {
+        headers: { Authorization: `Bearer ${currentToken}` },
+      }
+    );
+    
+    if (response.data && response.data.success && response.data.data && response.data.data.token) {
+      const newToken = response.data.data.token;
+      localStorage.setItem("authToken", newToken);
+      
+      // Debug info del token renovado
+      try {
+        const decoded = jwtDecode(newToken);
+        if (decoded) {
+          const tokenDurationMs = (decoded.exp - decoded.iat) * 1000;
+          const tokenDurationMin = Math.round(tokenDurationMs / 1000 / 60);
+          
+          console.log("=== TOKEN RENOVADO INFO ===");
+          console.log("Nuevo token emitido en:", new Date(decoded.iat * 1000).toLocaleString());
+          console.log("Nuevo token expira en:", new Date(decoded.exp * 1000).toLocaleString());
+          console.log("Duración configurada:", tokenDurationMin, "minutos");
+          console.log("¿Fue extendido?", decoded.extendedAt ? "Sí" : "No");
+          console.log("========================");
+        }
+      } catch (error) {
+        console.warn("Error al decodificar token renovado:", error);
+      }
+      
+      return newToken;
+    } else {
+      throw new Error("No se recibió un token válido del servidor");
     }
-  );
-  const { nuevoToken } = res.data;
-  localStorage.setItem("authToken", nuevoToken);
-  return nuevoToken;
+  } catch (error) {
+    console.error("Error al renovar token:", error);
+    // Si falla la renovación, hacer logout
+    logout();
+    throw error;
+  }
 }
 // ...existing code...

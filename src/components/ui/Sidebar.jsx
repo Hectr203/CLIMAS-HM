@@ -39,9 +39,9 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
       )?.filter(Boolean);
 
       const mockResults = [
-        { type: 'project', title: 'Instalación Aire Acondicionado - Edificio A', path: '/project-management' },
-        { type: 'client', title: 'ABC Corporation', path: '/client-management' },
-        { type: 'work-order', title: 'WO-2024-001', path: '/work-order-processing' }
+        { type: 'project', title: 'Instalación Aire Acondicionado - Edificio A', path: '/proyectos' },
+        { type: 'client', title: 'ABC Corporation', path: '/clientes' },
+        { type: 'work-order', title: 'WO-2024-001', path: '/operaciones' }
       ]?.filter(item => 
         item?.title?.toLowerCase()?.includes(query?.toLowerCase()) &&
         allowedPaths?.includes(item?.path)
@@ -87,6 +87,17 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
     const hasChildren = item?.children && item?.children?.length > 0;
     const isExpanded = expandedItems?.includes(item?.label);
 
+    const handleItemClick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      if (hasChildren) {
+        toggleExpanded(item?.label);
+      } else if (item?.path) {
+        handleNavigation(item?.path);
+      }
+    };
+
     return (
       <div key={item?.label} className="relative">
         <div
@@ -95,14 +106,15 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
               ? 'bg-primary text-primary-foreground'
               : 'text-foreground hover:bg-muted'
           } ${level > 0 ? 'ml-4' : ''}`}
-          onClick={() => {
-            if (hasChildren) {
-              toggleExpanded(item?.label);
-            } else if (item?.path) {
-              handleNavigation(item?.path);
+          onClick={handleItemClick}
+          title={isCollapsed ? item?.tooltip : ''}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              handleItemClick(e);
             }
           }}
-          title={isCollapsed ? item?.tooltip : ''}
         >
           <div className="flex items-center space-x-3 min-w-0 flex-1">
             <Icon 
@@ -183,8 +195,8 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
             </Button>
           </div>
 
-          {/* Search */}
-          {!isCollapsed && (
+          {/* Search - Oculto temporalmente */}
+          {false && !isCollapsed && (
             <div className="p-4 relative">
               <div className="relative">
                 <Input

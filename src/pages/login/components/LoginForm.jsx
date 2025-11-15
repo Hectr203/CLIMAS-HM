@@ -85,13 +85,13 @@ const LoginForm = () => {
         console.log('Rol recibido:', data.data.usuario.rol);
         // Redirigir según rol (ignorando mayúsculas/minúsculas)
         const role = String(data.data.usuario.rol).toLowerCase();
-        let redirect = '/main-dashboard';
-        if (role === 'admin') redirect = '/main-dashboard';
-        else if (role === 'proyect manager') redirect = '/project-management';
-        else if (role === 'sales representative') redirect = '/client-management';
-        else if (role === 'workshop supervisor') redirect = '/inventory-management';
-        else if (role === 'financial controller') redirect = '/financial-management';
-        else if (role === 'hr manager') redirect = '/personnel-management';
+        let redirect = '/dashboard';
+        if (role === 'admin') redirect = '/dashboard';
+        else if (role === 'proyect manager') redirect = '/proyectos';
+        else if (role === 'sales representative') redirect = '/clientes';
+        else if (role === 'workshop supervisor') redirect = '/inventario';
+        else if (role === 'financial controller') redirect = '/finanzas';
+        else if (role === 'hr manager') redirect = '/personal';
         navigate(redirect);
         window.location.reload();
       } else {

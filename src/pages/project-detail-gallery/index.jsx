@@ -136,7 +136,7 @@ const ProjectDetailGallery = () => {
         
         const foundProject = mockProjects?.find(p => p?.id === projectId);
         if (!foundProject) {
-          navigate('/project-management');
+          navigate('/proyectos');
           return;
         }
         
@@ -148,7 +148,7 @@ const ProjectDetailGallery = () => {
         
       } catch (error) {
         console.error('Error loading project data:', error);
-        navigate('/project-management');
+        navigate('/proyectos');
       } finally {
         setIsLoading(false);
       }
@@ -230,7 +230,7 @@ const ProjectDetailGallery = () => {
   ];
 
   const breadcrumbItems = [
-    { label: 'Gestión de Proyectos', href: '/project-management' },
+    { label: 'Gestión de Proyectos', href: '/proyectos' },
     { label: project?.name || 'Proyecto', href: '#' },
     { label: 'Galería', href: '#' }
   ];
@@ -239,9 +239,9 @@ const ProjectDetailGallery = () => {
     return (
       <div className="min-h-screen bg-background flex">
         <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
-        <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
+        <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'}`}>
           <Header onMenuToggle={() => setHeaderMenuOpen(!headerMenuOpen)} isMenuOpen={headerMenuOpen} />
-          <div className="pt-16 flex items-center justify-center h-96">
+          <div className="flex items-center justify-center h-96">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
               <p className="text-muted-foreground">Cargando proyecto...</p>
@@ -255,10 +255,10 @@ const ProjectDetailGallery = () => {
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
-      <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
+      <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'}`}>
         <Header onMenuToggle={() => setHeaderMenuOpen(!headerMenuOpen)} isMenuOpen={headerMenuOpen} />
         
-        <div className="pt-16">
+        <div className="">
           <div className="container mx-auto px-4 py-8">
             {/* Breadcrumb */}
             <Breadcrumb items={breadcrumbItems} />
@@ -270,7 +270,7 @@ const ProjectDetailGallery = () => {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => navigate('/project-management')}
+                    onClick={() => navigate('/proyectos')}
                   >
                     <Icon name="ArrowLeft" size={20} />
                   </Button>

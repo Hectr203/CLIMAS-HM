@@ -13,7 +13,7 @@ const QuickActions = () => {
       description: 'Crear proyecto desde cotización',
       icon: 'Plus',
       color: 'bg-primary text-primary-foreground',
-      path: '/project-management'
+      path: '/proyectos'
     },
     {
       id: 'approve-expenses',
@@ -22,7 +22,7 @@ const QuickActions = () => {
       icon: 'CheckCircle',
       color: 'bg-success text-success-foreground',
       badge: '3',
-      path: '/financial-management'
+      path: '/finanzas'
     },
     {
       id: 'generate-report',
@@ -30,7 +30,7 @@ const QuickActions = () => {
       description: 'Reportes financieros y operativos',
       icon: 'FileText',
       color: 'bg-accent text-accent-foreground',
-      path: '/financial-management'
+      path: '/finanzas'
     },
     {
       id: 'inventory-check',
@@ -39,7 +39,7 @@ const QuickActions = () => {
       icon: 'Package',
       color: 'bg-warning text-warning-foreground',
       badge: '5',
-      path: '/inventory-management'
+      path: '/inventario'
     },
     {
       id: 'client-contact',
@@ -47,7 +47,7 @@ const QuickActions = () => {
       description: 'Seguimiento de propuestas',
       icon: 'Phone',
       color: 'bg-secondary text-secondary-foreground',
-      path: '/client-management'
+      path: '/clientes'
     },
     {
       id: 'schedule-maintenance',
@@ -55,7 +55,7 @@ const QuickActions = () => {
       description: 'Equipos requieren servicio',
       icon: 'Calendar',
       color: 'bg-muted text-foreground',
-      path: '/work-order-processing'
+      path: '/operaciones'
     }
   ];
 
@@ -67,18 +67,18 @@ const QuickActions = () => {
 
   const handleRefreshData = async () => {
     try {
-      console.log('Actualizando datos...');
+  // console.log eliminado
       // Simulate refresh action
       await new Promise(resolve => setTimeout(resolve, 1000));
       // In a real app, you would refetch data here
-      console.log('Datos actualizados exitosamente');
+  // console.log eliminado
     } catch (error) {
       console.error('Error al actualizar datos:', error);
     }
   };
 
   const handleMoreOptions = () => {
-    console.log('Mostrando más opciones...');
+  // console.log eliminado
     // Add dropdown menu or modal with additional options
   };
 

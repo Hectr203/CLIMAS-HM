@@ -1,11 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import Button from '../../../components/ui/Button';
 import Icon from '../../../components/AppIcon';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import proyectoService from 'services/proyectoService';
 import clientService from 'services/clientService';
-import usePerson from 'hooks/usePerson'; // ⬅️ agregado: para obtener empleados reales
+import usePerson from 'hooks/usePerson';
+import { useErrorHandler, useNotifications } from 'context/NotificationContext';
+import { useEstados, useMunicipios } from '../../../hooks/useEstado';
 
 const projectTypes = [
   { value: 'Instalación', label: 'Instalación' },
@@ -27,11 +29,19 @@ const priorityOptions = [
   { value: 'urgent', label: 'Urgente' },
 ];
 
-// Opcional: si ya tienes un catálogo real de personal, cámbialo aquí
-const personnelOptions = [
-  { value: 'Andrés Torres - Técnico HVAC', label: 'Andrés Torres - Técnico HVAC' },
-  { value: 'Laura Gómez - Supervisora de Mantenimiento', label: 'Laura Gómez - Supervisora de Mantenimiento' },
-  { value: 'Pedro Hernández - Ingeniero de Campo', label: 'Pedro Hernández - Ingeniero de Campo' },
+const projectStatusOptions = [
+  { value: 'Planificación', label: 'Planificación' },
+  { value: 'En Progreso', label: 'En Progreso' },
+  { value: 'En Pausa', label: 'En Pausa' },
+  { value: 'En Revisión', label: 'En Revisión' },
+  { value: 'Completado', label: 'Completado' },
+  { value: 'Cancelado', label: 'Cancelado' },
+];
+
+const personnelOptionsFallback = [
+  { value: 'Andrés Torres — Técnico HVAC', label: 'Andrés Torres — Técnico HVAC' },
+  { value: 'Laura Gómez — Supervisora de Mantenimiento', label: 'Laura Gómez — Supervisora de Mantenimiento' },
+  { value: 'Pedro Hernández — Ingeniero de Campo', label: 'Pedro Hernández — Ingeniero de Campo' },
 ];
 
 const mapPriorityToEs = (v) => {
@@ -39,8 +49,6 @@ const mapPriorityToEs = (v) => {
   return m[(v || '').toString().toLowerCase()] || v || '';
 };
 
-/* ===================== Helpers de números con comas ===================== */
-// Formato visual con comas; decide decimales según sea entero o no.
 const formatWithCommas = (v, decimals = 2) => {
   if (v === '' || v == null) return '';
   const num = Number(v);
@@ -51,53 +59,58 @@ const formatWithCommas = (v, decimals = 2) => {
   return num.toLocaleString('es-MX', options);
 };
 
-// Limpia un string con comas/símbolos → número JS
 const unformatNumber = (raw) => {
   if (raw === '' || raw == null) return 0;
   const clean = String(raw).replace(/[^\d.-]/g, '');
   const n = parseFloat(clean);
   return Number.isFinite(n) ? n : 0;
 };
-/* ======================================================================= */
+
+const rateSafe = (rate) => (Number.isFinite(Number(rate)) ? Number(rate) : 0);
 
 const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
-
-  // ⬇️ hook de personal
   const { persons, getPersons } = usePerson();
+  const { handleError, handleSuccess } = useErrorHandler();
+  const { showWarning, showError } = useNotifications();
 
-  // Estado del formulario (guardamos NÚMEROS en budgetBreakdown)
   const [formData, setFormData] = useState({
     name: '',
     code: '',
     type: '',
-    client: '', // id del cliente
+    client: '',
     department: '',
     priority: '',
+    status: '',
     budgetBreakdown: {
       labor: 0,
       parts: 0,
-      equipment: 0, // SIEMPRE almacenado en MXN
+      equipment: 0,
       materials: 0,
       transportation: 0,
       other: 0,
     },
-    location: '',
+    estado: '',
+    municipio: '',
+    direccion: '',
     startDate: '',
     endDate: '',
-    assignedPersonnel: [], // arreglo de strings "Nombre — Rol"
+    assignedPersonnel: [],
     description: '',
   });
 
-  // === NUEVO: Control para USD en Equipos ===
   const [isEquipmentInUSD, setIsEquipmentInUSD] = useState(false);
-  const [exchangeRate, setExchangeRate] = useState(18); // MXN por 1 USD (editable)
-  const [uiEquipmentUSD, setUiEquipmentUSD] = useState(''); // valor visual cuando está en USD
+  const [exchangeRate, setExchangeRate] = useState(18);
+  const [uiEquipmentUSD, setUiEquipmentUSD] = useState('');
+  const [loadingFx, setLoadingFx] = useState(false);
+  const [fxError, setFxError] = useState(null);
 
-  // CLIENTES: reales → options { value, label }
   const [clientOptions, setClientOptions] = useState([]);
   const [loadingClients, setLoadingClients] = useState(false);
+
+  const { estados, loading: loadingEstados, error: errorEstados } = useEstados();
+  const { municipios, loading: loadingMunicipios, error: errorMunicipios } = useMunicipios(formData.estado);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -105,34 +118,41 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
     (async () => {
       try {
         setLoadingClients(true);
-        const resp = await clientService.getClients(); // {success, data:[...] }
-        const list = Array.isArray(resp?.data) ? resp.data : [];
-        const opts = list.map((c) => ({
-          value: c.id,
-          label: c.empresa || c.contacto || '—',
-        }));
+        const resp = await clientService.getClients();
+        const list = Array.isArray(resp?.data) ? resp.data : (Array.isArray(resp) ? resp : []);
+        const opts = list.map((c) => ({ value: c.id, label: c.empresa || c.contacto || '—' }));
         if (mounted) setClientOptions(opts);
       } catch (e) {
-        console.error('Error cargando clientes:', e);
+        handleError(e, 'Error cargando clientes');
       } finally {
         if (mounted) setLoadingClients(false);
       }
     })();
     return () => { mounted = false; };
-  }, [isOpen]);
+  }, [isOpen, handleError]);
 
-  // Cargar empleados al abrir
+  const fetchedPersonsRef = useRef(false);
   useEffect(() => {
     if (!isOpen) return;
-    getPersons().catch((e) => console.error('Error cargando empleados:', e));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+    if (fetchedPersonsRef.current) return;
+    fetchedPersonsRef.current = true;
 
-  // Construir opciones desde persons, deduplicadas
+    const controller = new AbortController();
+    (async () => {
+      try {
+        await getPersons({ signal: controller.signal });
+      } catch (e) {
+        if (e?.name !== 'AbortError') handleError(e, 'Error cargando empleados');
+      }
+    })();
+
+    return () => {
+      controller.abort();
+    };
+  }, [isOpen, handleError, getPersons]);
+
   const personnelOptionsFinal = useMemo(() => {
-    if (!Array.isArray(persons) || persons.length === 0) {
-      return personnelOptions; // fallback
-    }
+    if (!Array.isArray(persons) || persons.length === 0) return personnelOptionsFallback;
     const built = persons
       .map((p) => {
         const nombre =
@@ -154,74 +174,60 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
       seen.add(opt.value);
       dedup.push(opt);
     }
-    return dedup.length ? dedup : personnelOptions;
+    return dedup.length ? dedup : personnelOptionsFallback;
   }, [persons]);
-
-  // Total presupuesto (siempre en MXN)
-  const totalBudget = useMemo(() => {
-    const b = formData.budgetBreakdown || {};
-    const sum = ['labor','parts','equipment','materials','transportation','other']
-      .map(k => Number(b[k] || 0))
-      .reduce((a,b) => a + b, 0);
-    return Number.isFinite(sum) ? sum : 0;
-  }, [formData.budgetBreakdown]);
-
-  const calculateTotalBudget = () => totalBudget;
 
   const handleInputChange = (key, value) => {
     setFormData((s) => ({ ...s, [key]: value }));
     if (errors[key]) setErrors((e) => ({ ...e, [key]: undefined }));
   };
 
-  // ⬇️ Manejo genérico de partidas en MXN
+  useEffect(() => {
+    if (!isEquipmentInUSD) return;
+    const mxn = Number(formData?.budgetBreakdown?.equipment || 0);
+    const rate = rateSafe(exchangeRate);
+    const usd = rate ? mxn / rate : 0;
+    setUiEquipmentUSD(usd ? formatWithCommas(usd, 2) : '0.00');
+  }, [isEquipmentInUSD, exchangeRate, formData?.budgetBreakdown?.equipment]);
+
   const handleBudgetChange = (key, rawValue) => {
     const cleanedNumber = unformatNumber(rawValue);
-    // Si la clave es "equipment" y estamos en USD, convertir a MXN
-    if (key === 'equipment' && isEquipmentInUSD) {
-      const usd = cleanedNumber;
-      setUiEquipmentUSD(rawValue); // conservar visual en USD
-      const mxn = Number(usd) * Number(exchangeRate || 0);
-      setFormData((s) => ({
-        ...s,
-        budgetBreakdown: { ...s.budgetBreakdown, equipment: mxn },
-      }));
-      return;
-    }
-
-    // Resto de claves o equipment en MXN normal
+    if (key === 'equipment' && isEquipmentInUSD) return;
     setFormData((s) => ({
       ...s,
       budgetBreakdown: { ...s.budgetBreakdown, [key]: cleanedNumber },
     }));
   };
 
-  // Cuando se activa/desactiva el modo USD para Equipos
+  const fetchUsdMxnRate = useCallback(async () => {
+    try {
+      setFxError(null);
+      setLoadingFx(true);
+      const resp = await proyectoService.getCurrencyRates({ base: 'USD', currencies: ['MXN'] });
+      const mxnInfo = resp?.data?.MXN || resp?.MXN;
+      const rate = Number(mxnInfo?.value ?? mxnInfo ?? 0);
+      if (rate > 0) {
+        setExchangeRate(rate);
+        return rate;
+      } else {
+        const msg = 'No llegó una tasa válida.';
+        setFxError(msg);
+        showError(msg);
+        return null;
+      }
+    } catch (e) {
+      const msg = e?.message || 'Error llamando currencyapi';
+      setFxError(msg);
+      handleError(e, 'Tipo de cambio');
+      return null;
+    } finally {
+      setLoadingFx(false);
+    }
+  }, [handleError, showError]);
+
   const toggleEquipmentUSD = (checked) => {
     setIsEquipmentInUSD(checked);
-    if (checked) {
-      // Pasamos el valor MXN actual a USD visual
-      const currentMXN = Number(formData?.budgetBreakdown?.equipment || 0);
-      const usd = exchangeRate ? currentMXN / Number(exchangeRate) : 0;
-      setUiEquipmentUSD(usd ? formatWithCommas(usd, 2) : '');
-    } else {
-      // Al volver a MXN, copiamos el valor visual (si existiera) convirtiéndolo a MXN? No: ya guardamos MXN.
-      // Solo limpiamos el visual USD
-      setUiEquipmentUSD('');
-    }
-  };
-
-  // Cambio del tipo de cambio: re-calcular MXN si estamos en USD
-  const handleExchangeRateChange = (raw) => {
-    const rate = unformatNumber(raw);
-    setExchangeRate(rate);
-    if (isEquipmentInUSD) {
-      const usd = unformatNumber(uiEquipmentUSD);
-      const mxn = usd * (rate || 0);
-      setFormData((s) => ({
-        ...s,
-        budgetBreakdown: { ...s.budgetBreakdown, equipment: mxn },
-      }));
-    }
+    if (!checked) setUiEquipmentUSD('');
   };
 
   const validate = () => {
@@ -231,13 +237,21 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
     if (!formData.client) e.client = 'Seleccione un cliente';
     if (!formData.department) e.department = 'Requerido';
     if (!formData.priority) e.priority = 'Requerido';
-    if (!formData.location) e.location = 'Requerido';
+    if (!formData.status) e.status = 'Requerido';
+
+    if (!formData.estado) e.estado = 'Requerido';
+    if (!formData.municipio) e.municipio = 'Requerido';
+    if (!formData.direccion) e.direccion = 'Requerido';
+
     if (!formData.startDate) e.startDate = 'Requerido';
     if (!formData.endDate) e.endDate = 'Requerido';
-    if (new Date(formData.endDate) < new Date(formData.startDate)) {
+    if (
+      formData.startDate &&
+      formData.endDate &&
+      new Date(formData.endDate) < new Date(formData.startDate)
+    ) {
       e.endDate = 'La fecha de fin no puede ser anterior al inicio';
     }
-    // Validación adicional si está en USD y no hay tipo de cambio
     if (isEquipmentInUSD && !(exchangeRate > 0)) {
       e.exchangeRate = 'Indique un tipo de cambio válido';
     }
@@ -245,63 +259,60 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
     return Object.keys(e).length === 0;
   };
 
-  const buildPayloadES = () => {
-    // nombre del cliente desde options
-    const clienteFound = clientOptions.find((o) => o.value === formData.client);
-    const clienteNombre = clienteFound?.label || '';
-
-    const manoObra = Number(formData?.budgetBreakdown?.labor || 0);
-    const piezas = Number(formData?.budgetBreakdown?.parts || 0);
-    const equipos = Number(formData?.budgetBreakdown?.equipment || 0); // MXN
-    const materiales = Number(formData?.budgetBreakdown?.materials || 0);
-    const transporte = Number(formData?.budgetBreakdown?.transportation || 0);
-    const otros = Number(formData?.budgetBreakdown?.other || 0);
-    const total = manoObra + piezas + equipos + materiales + transporte + otros;
-
-    // (Opcional) Puedes incluir metadatos de cómo se capturó equipos
-    const metaEquipos = isEquipmentInUSD
-      ? { capturadoEn: 'USD', tipoCambio: Number(exchangeRate || 0), valorUSD: unformatNumber(uiEquipmentUSD) }
-      : { capturadoEn: 'MXN' };
+  const buildPayloadForBackend = () => {
+    const b = formData.budgetBreakdown || {};
+    const equipoDolares = isEquipmentInUSD ? unformatNumber(uiEquipmentUSD) : undefined;
 
     return {
       codigo: formData.code || '',
-      nombreProyecto: formData.name || '',
+      nombre: formData.name || '',
       tipoProyecto: formData.type || '',
-      cliente: {
-        id: formData.client || '',
-        nombre: clienteNombre,
-      },
+      cliente: { id: formData.client || '', nombre: formData.clientName || '' },
       departamento: formData.department || '',
       prioridad: mapPriorityToEs(formData.priority),
-      ubicacion: formData.location || '',
+      ubicacion: {
+        estado: formData.estado || '',
+        municipio: formData.municipio || '',
+        direccion: formData.direccion || '',
+      },
       descripcion: formData.description || '',
-      personalAsignado: Array.isArray(formData.assignedPersonnel) ? formData.assignedPersonnel : [],
+      personalAsignado: Array.isArray(formData.assignedPersonnel)
+        ? formData.assignedPersonnel
+        : [],
       cronograma: {
         fechaInicio: formData.startDate || '',
         fechaFin: formData.endDate || '',
       },
       presupuesto: {
-        manoObra, piezas, equipos, materiales, transporte, otros, total,
-        _metaEquipos: metaEquipos, // <- no rompe nada si tu backend lo ignora
+        manoObra: Number(b.labor) || 0,
+        piezas: Number(b.parts) || 0,
+        equipos: Number(b.equipment) || 0,
+        ...(equipoDolares !== undefined ? { equipoDolares } : {}),
+        materiales: Number(b.materials) || 0,
+        transporte: Number(b.transportation) || 0,
+        otros: Number(b.other) || 0,
+        _metaEquipos: { capturadoEn: isEquipmentInUSD ? 'USD' : 'MXN' },
       },
-      totalPresupuesto: total,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      estado: formData.status,
     };
   };
 
   const handleSubmit = async (e) => {
     e?.preventDefault();
-    if (!validate()) return;
+    if (!validate()) {
+      showWarning('Revisa los campos requeridos del formulario.');
+      return;
+    }
     setIsSubmitting(true);
     try {
-      const payload = buildPayloadES();
+      const payload = buildPayloadForBackend();
       await proyectoService.createProyecto(payload);
+      handleSuccess('create', 'Proyecto');
       onSubmit && onSubmit(payload);
       onClose && onClose();
     } catch (err) {
       console.error('Error creando proyecto:', err);
-      alert('No se pudo crear el proyecto.');
+      handleError(err, 'Error creando proyecto');
     } finally {
       setIsSubmitting(false);
     }
@@ -310,27 +321,36 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
   if (!isOpen) return null;
 
   const b = formData.budgetBreakdown || {};
+  const totalMXN =
+    (Number(b?.labor) || 0) +
+    (Number(b?.parts) || 0) +
+    (Number(b?.equipment) || 0) +
+    (Number(b?.materials) || 0) +
+    (Number(b?.transportation) || 0) +
+    (Number(b?.other) || 0);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-1050 p-4">
       <div className="bg-card border border-border rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border">
           <div>
             <h2 className="text-xl font-semibold text-foreground">Crear Nuevo Proyecto</h2>
-            <p className="text-sm text-muted-foreground">Complete la información del proyecto</p>
+            <p className="text-sm text-muted-foreground">
+              Complete la información del proyecto
+            </p>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <Icon name="X" size={20} />
           </Button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Basic Information */}
+            {/* Información básica */}
             <div className="md:col-span-2">
-              <h3 className="text-lg font-medium text-foreground mb-4">Información Básica</h3>
+              <h3 className="text-lg font-medium text-foreground mb-4">
+                Información Básica
+              </h3>
             </div>
 
             <Input
@@ -346,7 +366,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
             <Input
               label="Código del Proyecto"
               type="text"
-              placeholder="Ej: PROJ-2024-001"
+              placeholder="Ej: PROJ-2025-001"
               value={formData?.code}
               onChange={(e) => handleInputChange('code', e?.target?.value)}
               error={errors?.code}
@@ -391,12 +411,125 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
               required
             />
 
-            {/* Desglose de Presupuesto */}
+            <Select
+              label="Estado del Proyecto"
+              options={projectStatusOptions}
+              value={formData?.status}
+              onChange={(value) => handleInputChange('status', value)}
+              error={errors?.status}
+              required
+            />
+
+            {/* Ubicación */}
+            <div className="md:col-span-2 mt-2">
+              <h3 className="text-lg font-medium text-foreground mb-2">
+                Ubicación del Proyecto
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Seleccione estado y municipio, luego escriba la dirección completa del sitio.
+              </p>
+            </div>
+
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4 items-center">
+              <div className="flex flex-col justify-end h-full">
+                <Select
+                  label={
+                    <>
+                      Estado <span className="text-destructive">*</span>
+                    </>
+                  }
+                  value={formData.estado}
+                  onChange={(value) => {
+                    handleInputChange('estado', value);
+                    handleInputChange('municipio', '');
+                  }}
+                  options={
+                    estados
+                      ? [
+                          { value: '', label: 'Selecciona un estado' },
+                          ...estados.map((e) => ({
+                            value: e.code,
+                            label: e.name,
+                          })),
+                        ]
+                      : []
+                  }
+                  loading={loadingEstados}
+                  error={errors?.estado}
+                  required
+                  disabled={loadingEstados || !!errorEstados}
+                  placeholder={
+                    loadingEstados ? 'Cargando estados...' : 'Selecciona un estado'
+                  }
+                  searchable
+                  className="h-12 md:h-14 w-full text-base"
+                />
+              </div>
+
+              <div className="flex flex-col justify-end h-full">
+                <Select
+                  label={
+                    <>
+                      Municipio <span className="text-destructive">*</span>
+                    </>
+                  }
+                  value={formData.municipio}
+                  onChange={(value) => handleInputChange('municipio', value)}
+                  options={
+                    formData.estado === ''
+                      ? [{ value: '', label: 'Selecciona un estado primero' }]
+                      : loadingMunicipios
+                      ? [{ value: '', label: 'Cargando municipios...' }]
+                      : errorMunicipios
+                      ? [{ value: '', label: 'Error al cargar municipios' }]
+                      : [
+                          { value: '', label: 'Selecciona un municipio' },
+                          ...(municipios
+                            ? Object.values(municipios.municipios || {}).map((m) => ({
+                                value: m,
+                                label: m,
+                              }))
+                            : []),
+                        ]
+                  }
+                  loading={loadingMunicipios}
+                  error={errors?.municipio}
+                  required
+                  disabled={
+                    formData.estado === '' ||
+                    loadingMunicipios ||
+                    !!errorMunicipios
+                  }
+                  placeholder={
+                    formData.estado === ''
+                      ? 'Selecciona un estado primero'
+                      : loadingMunicipios
+                      ? 'Cargando municipios...'
+                      : 'Selecciona un municipio'
+                  }
+                  searchable
+                  className="h-12 md:h-14 w-full text-base"
+                />
+              </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <Input
+                label="Dirección"
+                required
+                value={formData?.direccion}
+                onChange={(e) => handleInputChange('direccion', e?.target?.value)}
+                error={errors?.direccion}
+                placeholder="Dirección completa"
+                className="h-12 md:h-14 w-full text-base"
+              />
+            </div>
+
+            {/* Presupuesto */}
             <div className="md:col-span-2 mt-6">
-              <h3 className="text-lg font-medium text-foreground mb-4">Desglose de Presupuesto</h3>
-              {errors?.budget && (
-                <p className="text-sm text-destructive mb-4">{errors?.budget}</p>
-              )}
+              <h3 className="text-lg font-medium text-foreground mb-4">
+                Desglose de Presupuesto
+              </h3>
             </div>
 
             <Input
@@ -417,11 +550,12 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
               onChange={(e) => handleBudgetChange('parts', e?.target?.value)}
             />
 
-            {/* ====== Equipos con toggle USD ====== */}
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-foreground">
-                  Equipos ({isEquipmentInUSD ? 'USD (se convierte a MXN)' : 'MXN'})
+                  {isEquipmentInUSD
+                    ? 'Equipos (USD se convierte a MXN)'
+                    : 'Equipos (MXN)'}
                 </label>
                 <label className="inline-flex items-center gap-2 text-sm text-foreground cursor-pointer select-none">
                   <input
@@ -434,7 +568,6 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
                 </label>
               </div>
 
-              {/* Input de Equipos: muestra USD o MXN según el toggle */}
               <input
                 type="text"
                 inputMode="decimal"
@@ -445,30 +578,50 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
                     : formatWithCommas(b?.equipment)
                 }
                 onChange={(e) => handleBudgetChange('equipment', e?.target?.value)}
-                className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                readOnly={isEquipmentInUSD}
+                className={`w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent ${
+                  isEquipmentInUSD ? 'bg-muted cursor-not-allowed' : ''
+                }`}
               />
 
-              {/* Tipo de cambio visible solo en modo USD */}
               {isEquipmentInUSD && (
-                <div className="flex items-center gap-3">
-                  <div className="flex-1">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex-1 min-w-[220px]">
                     <Input
                       label="Tipo de cambio (MXN / USD)"
                       type="text"
                       inputMode="decimal"
-                      placeholder="Ej: 18.00"
                       value={formatWithCommas(exchangeRate, 4)}
-                      onChange={(e) => handleExchangeRateChange(e?.target?.value)}
-                      error={errors?.exchangeRate}
+                      onChange={() => {}}
+                      readOnly
+                      disabled
                     />
                   </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={fetchUsdMxnRate}
+                    loading={loadingFx}
+                    iconName="RefreshCcw"
+                    iconPosition="left"
+                  >
+                    {loadingFx ? 'Actualizando…' : 'Actualizar tipo de cambio'}
+                  </Button>
+
                   <div className="text-sm text-muted-foreground whitespace-nowrap">
-                    Guardado en MXN: <span className="font-semibold">${formatWithCommas(b?.equipment, 2)}</span>
+                    Guardado en MXN:{' '}
+                    <span className="font-semibold">
+                      ${formatWithCommas(b?.equipment, 2)}
+                    </span>
                   </div>
+
+                  {fxError && (
+                    <div className="text-xs text-destructive">{fxError}</div>
+                  )}
                 </div>
               )}
             </div>
-            {/* ====== Fin Equipos ====== */}
 
             <Input
               label="Materiales (MXN)"
@@ -485,7 +638,9 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
               inputMode="decimal"
               placeholder="0.00"
               value={formatWithCommas(b?.transportation)}
-              onChange={(e) => handleBudgetChange('transportation', e?.target?.value)}
+              onChange={(e) =>
+                handleBudgetChange('transportation', e?.target?.value)
+              }
             />
 
             <Input
@@ -497,31 +652,24 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
               onChange={(e) => handleBudgetChange('other', e?.target?.value)}
             />
 
-            {/* Total */}
             <div className="md:col-span-2">
               <div className="bg-muted p-4 rounded-lg">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-foreground">Total del Presupuesto (MXN):</span>
+                  <span className="text-sm font-medium text-foreground">
+                    Total del Presupuesto (MXN):
+                  </span>
                   <span className="text-lg font-semibold text-primary">
-                    ${formatWithCommas(calculateTotalBudget(), 2)} MXN
+                    ${formatWithCommas(totalMXN, 2)} MXN
                   </span>
                 </div>
               </div>
             </div>
 
-            <Input
-              label="Ubicación"
-              type="text"
-              placeholder="Ej: Ciudad de México, CDMX"
-              value={formData?.location}
-              onChange={(e) => handleInputChange('location', e?.target?.value)}
-              error={errors?.location}
-              required
-            />
-
             {/* Cronograma */}
             <div className="md:col-span-2 mt-6">
-              <h3 className="text-lg font-medium text-foreground mb-4">Cronograma</h3>
+              <h3 className="text-lg font-medium text-foreground mb-4">
+                Cronograma
+              </h3>
             </div>
 
             <Input
@@ -542,9 +690,11 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
               required
             />
 
-            {/* Personal */}
+            {/* Asignación */}
             <div className="md:col-span-2 mt-6">
-              <h3 className="text-lg font-medium text-foreground mb-4">Asignación de Personal</h3>
+              <h3 className="text-lg font-medium text-foreground mb-4">
+                Asignación de Personal
+              </h3>
             </div>
 
             <div className="md:col-span-2">
@@ -552,7 +702,9 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
                 label="Personal Asignado"
                 options={personnelOptionsFinal}
                 value={formData?.assignedPersonnel}
-                onChange={(value) => handleInputChange('assignedPersonnel', value)}
+                onChange={(value) =>
+                  handleInputChange('assignedPersonnel', value)
+                }
                 multiple
                 searchable
                 description="Seleccione el personal que trabajará en este proyecto"
@@ -568,18 +720,29 @@ const CreateProjectModal = ({ isOpen, onClose, onSubmit }) => {
                 rows={4}
                 placeholder="Describa los objetivos, alcance y detalles importantes del proyecto..."
                 value={formData?.description}
-                onChange={(e) => handleInputChange('description', e?.target?.value)}
+                onChange={(e) =>
+                  handleInputChange('description', e?.target?.value)
+                }
                 className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
               />
             </div>
           </div>
 
-          {/* Acciones */}
           <div className="flex items-center justify-end space-x-4 mt-8 pt-6 border-t border-border">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
               Cancelar
             </Button>
-            <Button type="submit" loading={isSubmitting} iconName="Plus" iconPosition="left">
+            <Button
+              type="submit"
+              loading={isSubmitting}
+              iconName="Plus"
+              iconPosition="left"
+            >
               {isSubmitting ? 'Creando...' : 'Crear Proyecto'}
             </Button>
           </div>

@@ -9,8 +9,16 @@ import InventoryPanel from './components/InventoryPanel';
 import WorkOrderModal from './components/WorkOrderModal';
 import RequisitionModal from './components/RequisitionModal';
 import StatsCards from './components/StatsCards';
+import useOperac from '../../hooks/useOperac';
+import useRequisi from '../../hooks/useRequisi';
+import jsPDF from "jspdf";
+import "jspdf-autotable";
+
 
 const WorkOrderProcessing = () => {
+  const { oportunities, loading, error, getOportunities } = useOperac();
+  const { requisitions, loading: loadingRequisitions, getRequisitions, updateRequisition, createRequisition, deleteRequisition } = useRequisi();
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [workOrders, setWorkOrders] = useState([]);
@@ -177,34 +185,70 @@ const WorkOrderProcessing = () => {
   }, []);
 
   const handleFiltersChange = (filters) => {
-    let filtered = [...workOrders];
+  let filtered = [...(localOrders || [])];
 
-    if (filters?.search) {
-      filtered = filtered?.filter(order => 
-        order?.orderNumber?.toLowerCase()?.includes(filters?.search?.toLowerCase()) ||
-        order?.projectName?.toLowerCase()?.includes(filters?.search?.toLowerCase()) ||
-        order?.clientName?.toLowerCase()?.includes(filters?.search?.toLowerCase())
-      );
-    }
+  // Búsqueda general
+  if (filters?.search) {
+    const search = filters.search.toLowerCase();
+    filtered = filtered.filter(order =>
+      order?.ordenTrabajo?.toLowerCase()?.includes(search) ||
+      order?.cliente?.nombre?.toLowerCase()?.includes(search) ||
+      order?.cliente?.empresa?.toLowerCase()?.includes(search) ||
+      order?.tipo?.toLowerCase()?.includes(search) ||
+      order?.tecnicoAsignado?.nombre?.toLowerCase()?.includes(search) ||
+      order?.notasAdicionales?.toLowerCase()?.includes(search)
+    );
+  }
 
-    if (filters?.status) {
-      filtered = filtered?.filter(order => order?.status === filters?.status);
-    }
+  //  Estado
+  if (filters?.status)
+    filtered = filtered.filter(order => order?.estado === filters.status);
 
-    if (filters?.priority) {
-      filtered = filtered?.filter(order => order?.priority === filters?.priority);
-    }
+  // Prioridad
+  if (filters?.priority)
+    filtered = filtered.filter(order => order?.prioridad === filters.priority);
 
-    if (filters?.technician) {
-      filtered = filtered?.filter(order => order?.assignedTechnician === filters?.technician);
-    }
+  // Técnico
+  if (filters?.technician)
+    filtered = filtered.filter(order =>
+      order?.tecnicoAsignado?.nombre === filters.technician
+    );
 
-    if (filters?.project) {
-      filtered = filtered?.filter(order => order?.orderNumber === filters?.project);
-    }
+  // Proyecto (por tipo)
+  if (filters?.project)
+    filtered = filtered.filter(order => order?.tipo === filters.project);
 
-    setFilteredOrders(filtered);
-  };
+  // Rango de fechas
+  if (filters?.dateRange) {
+    const today = new Date();
+    filtered = filtered.filter(order => {
+      const dueDate = new Date(order?.fechaLimite);
+      if (isNaN(dueDate)) return false;
+      switch (filters.dateRange) {
+        case 'today':
+          return dueDate.toDateString() === today.toDateString();
+        case 'week': {
+          const startOfWeek = new Date(today);
+          startOfWeek.setDate(today.getDate() - today.getDay());
+          const endOfWeek = new Date(startOfWeek);
+          endOfWeek.setDate(startOfWeek.getDate() + 6);
+          return dueDate >= startOfWeek && dueDate <= endOfWeek;
+        }
+        case 'month':
+          return (
+            dueDate.getMonth() === today.getMonth() &&
+            dueDate.getFullYear() === today.getFullYear()
+          );
+        case 'overdue':
+          return dueDate < today;
+        default:
+          return true;
+      }
+    });
+  }
+
+  setFilteredOrders(filtered);
+};
 
   const handleStatusUpdate = (order, newStatus) => {
     const updatedOrders = workOrders?.map(wo => 
@@ -214,28 +258,42 @@ const WorkOrderProcessing = () => {
     setFilteredOrders(updatedOrders);
   };
 
-  const handleAssignTechnician = (order) => {
-    setSelectedOrder(order);
-    setIsModalOpen(true);
-  };
+  // CRUD de órdenes
+  const handleSaveOrder = async (data) => {
+  // 🗑 Si es eliminación
+  if (data?.type === "delete") {
+    setLocalOrders(prev => prev.filter(o => o.id !== data.id));
+    setFilteredOrders(prev => prev.filter(o => o.id !== data.id));
+    return;
+  }
 
-  const handleViewDetails = (order) => {
-    setSelectedOrder(order);
-    setIsModalOpen(true);
-  };
+  //Si es creación o edición
+  let newOrder = { ...data };
 
-  const handleEditOrder = (order) => {
-    setSelectedOrder(order);
-    setIsModalOpen(true);
-  };
+  if (!newOrder?.id) {
+    newOrder.id = Date.now();
+    newOrder.estado = 'Pendiente';
+    newOrder.fechaCreacion = new Date().toISOString();
+  }
 
-  const handleSaveOrder = (updatedOrder) => {
-    const updatedOrders = workOrders?.map(wo => 
-      wo?.id === updatedOrder?.id ? updatedOrder : wo
-    );
-    setWorkOrders(updatedOrders);
-    setFilteredOrders(updatedOrders);
-  };
+  setLocalOrders(prev => {
+    const exists = prev.some(o => o.id === newOrder.id);
+    return exists
+      ? prev.map(o => (o.id === newOrder.id ? newOrder : o))
+      : [newOrder, ...prev];
+  });
+
+  setFilteredOrders(prev => {
+    const exists = prev.some(o => o.id === newOrder.id);
+    return exists
+      ? prev.map(o => (o.id === newOrder.id ? newOrder : o))
+      : [newOrder, ...prev];
+  });
+
+  setIsModalOpen(false);
+  setSelectedOrder(null);
+};
+
 
   const handleCreateNewOrder = () => {
     // Create empty order structure for new order creation
@@ -286,64 +344,151 @@ const WorkOrderProcessing = () => {
     setIsRequisitionModalOpen(true);
   };
 
-  const handleSaveRequisition = (updatedRequisition) => {
-    console.log('Saving requisition:', updatedRequisition);
-    
-    // Generate a unique ID if it's a new requisition
-    if (!updatedRequisition?.id) {
-      updatedRequisition.id = Date.now();
-      updatedRequisition.requestNumber = `REQ-${new Date()?.getFullYear()}-${String(updatedRequisition?.id)?.slice(-3)}`;
+  // Guardar requisición
+  const handleSaveRequisition = async (savedRequisition) => {
+    let newReq = { ...savedRequisition };
+    try {
+      if (!newReq?.id) {
+        // Si es una nueva requisición, la creamos en el backend
+        const response = await createRequisition(newReq);
+        if (response) {
+          newReq = response;
+        }
+      } else {
+        // Si es una actualización, actualizamos en el backend
+        const response = await updateRequisition(newReq.id, newReq);
+        if (response) {
+          newReq = response;
+        }
+      }
+
+      setLocalRequisitions(prev => [newReq, ...prev.filter(r => r.id !== newReq.id)]);
+      setLocalOrders(prev => [newReq, ...prev.filter(r => r.id !== newReq.id)]);
+
+      // Forzar actualización de requisiciones
+      await getRequisitions();
+      
+      setIsRequisitionModalOpen(false);
+      setSelectedRequisition(null);
+    } catch (error) {
+      console.error("Error al guardar la requisición:", error);
     }
-    
-    // Here you would typically save to your backend
-    // For now, just show success message and close modal
-    alert(`Requisición ${updatedRequisition?.requestNumber} ${updatedRequisition?.id ? 'actualizada' : 'creada'} exitosamente`);
-    
-    setIsRequisitionModalOpen(false);
-    setSelectedRequisition(null);
   };
 
-  const handleCreatePurchaseOrder = (item) => {
-    console.log('Creating purchase order for:', item);
-    // Navigate to purchase order creation
-  };
+const handleExportData = () => {
+  if (!filteredOrders || filteredOrders.length === 0) {
+    alert("No hay datos disponibles para exportar.");
+    return;
+  }
 
-  const handleRequestMaterial = (request) => {
-    console.log('Processing material request:', request);
-    // Update request status
-  };
+  const doc = new jsPDF({
+    orientation: "landscape",
+    unit: "pt",
+    format: "A4",
+  });
 
-  const handleExportData = () => {
-    // Generate CSV data with work orders
-    const csvData = filteredOrders?.map(order => ({
-      'Número de Orden': order?.orderNumber,
-      'Proyecto': order?.projectName,
-      'Cliente': order?.clientName,
-      'Tipo': order?.type,
-      'Prioridad': order?.priority,
-      'Estado': order?.status,
-      'Técnico Asignado': order?.assignedTechnician,
-      'Fecha Límite': order?.dueDate,
-      'Progreso': `${order?.progress}%`
-    }));
+  const gray = "#333333";
 
-    // Convert to CSV format
-    const headers = Object.keys(csvData?.[0] || {});
-    const csvContent = [
-      headers?.join(','),
-      ...csvData?.map(row => headers?.map(header => `"${row?.[header]}"`)?.join(','))
-    ]?.join('\n');
+  //ENCABEZADO AZUL
+  doc.setFillColor(10, 74, 138);
+  doc.rect(0, 0, doc.internal.pageSize.getWidth(), 40, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text("REPORTE DE ÓRDENES DE TRABAJO", doc.internal.pageSize.getWidth() / 2, 25, {
+    align: "center",
+  });
 
-    // Create and download file
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link?.setAttribute('href', url);
-    link?.setAttribute('download', `ordenes_trabajo_${new Date()?.toISOString()?.split('T')?.[0]}.csv`);
-    document.body?.appendChild(link);
-    link?.click();
-    document.body?.removeChild(link);
-  };
+  //FECHA DE GENERACIÓN
+  const fechaActual = new Date().toLocaleDateString("es-MX", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(255, 255, 255);
+  doc.text(`Generado el ${fechaActual}`, doc.internal.pageSize.getWidth() - 120, 25);
+
+  //SECCIÓN DATOS GENERALES
+  let startY = 60;
+  doc.setTextColor(gray);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("Resumen General", doc.internal.pageSize.getWidth() / 2, startY, { align: "center" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+
+  //Totales de resumen
+  const totalOrdenes = filteredOrders.length;
+  const completadas = filteredOrders.filter((o) => o.estado === "Completada" || o.status === "Completada").length;
+  const pendientes = filteredOrders.filter((o) => o.estado === "Pendiente" || o.status === "Pendiente").length;
+  const enProceso = filteredOrders.filter((o) => o.estado === "En Proceso" || o.status === "En Proceso").length;
+
+startY += 20;
+
+// Construimos el texto completo
+const resumenTexto = `Total de Órdenes: ${totalOrdenes}   |   Completadas: ${completadas}   |   Pendientes: ${pendientes}   |   En Proceso: ${enProceso}`;
+doc.text(resumenTexto, doc.internal.pageSize.getWidth() / 2, startY, { align: "center" });
+
+
+  //ORDENAR POR PRIORIDAD (Alta → Media → Baja → Crítico)
+  const prioridadOrden = ["Alta", "Media", "Baja", "Crítico"];
+  const sortedOrders = [...filteredOrders].sort((a, b) => {
+    const prioridadA = prioridadOrden.indexOf((a.prioridad || a.priority || "").trim());
+    const prioridadB = prioridadOrden.indexOf((b.prioridad || b.priority || "").trim());
+    return (prioridadA === -1 ? 99 : prioridadA) - (prioridadB === -1 ? 99 : prioridadB);
+  });
+
+  //TABLA DETALLADA
+  const tableColumn = [
+    "N° Orden",
+    "Técnico Asignado",
+    "Prioridad",
+    "Estado",
+    "Fecha Límite",
+    "Cliente",
+    "Tipo Proyecto",
+    "Notas",
+  ];
+
+  const tableRows = sortedOrders.map((order) => [
+    order?.ordenTrabajo || order?.orderNumber || "—",
+    order?.tecnicoAsignado?.nombre || order?.assignedTechnician || "Sin técnico",
+    order?.prioridad || order?.priority || "—",
+    order?.estado || order?.status || "—",
+    order?.fechaLimite || order?.dueDate || "—",
+    order?.cliente?.empresa || order?.cliente?.nombre || order?.clientName || "Sin cliente",
+    order?.tipo || order?.projectName || "—",
+    order?.notasAdicionales || order?.notes || "—",
+  ]);
+
+  doc.autoTable({
+    startY: startY + 25,
+    head: [tableColumn],
+    body: tableRows,
+    theme: "grid",
+    styles: { fontSize: 9, cellPadding: 5 },
+    headStyles: {
+      fillColor: [10, 74, 138],
+      textColor: 255,
+      halign: "center",
+      fontStyle: "bold",
+    },
+    bodyStyles: { textColor: [50, 50, 50] },
+    alternateRowStyles: { fillColor: [245, 245, 245] },
+    margin: { left: 30, right: 30 },
+  });
+
+  //GUARDAR PDF
+  doc.save(`reporte_ordenes_trabajo_${new Date().toISOString().split("T")[0]}.pdf`);
+};
+
+
+
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -361,10 +506,8 @@ const WorkOrderProcessing = () => {
           isMenuOpen={mobileMenuOpen}
         />
       </div>
-      {/* Main Content */}
-      <div className={`transition-all duration-300 ${
-        sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'
-      } lg:pt-0 pt-16`}>
+
+      <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'}`}>
         <div className="p-6">
           {/* Header Section */}
           <div className="mb-6">
@@ -393,14 +536,18 @@ const WorkOrderProcessing = () => {
                 >
                   Nueva Requisición
                 </Button>
-                <Button
-                  variant="default"
-                  iconName="Download"
-                  iconSize={16}
-                  onClick={handleExportData}
-                >
-                  Exportar
-                </Button>
+                <div className="flex justify-end p-4">
+ <Button
+  variant="default"
+  iconName="Download"
+  iconSize={16}
+  onClick={handleExportData} 
+>
+  Exportar
+</Button>
+</div>
+
+
               </div>
             </div>
           </div>

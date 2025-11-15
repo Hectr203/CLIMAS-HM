@@ -12,16 +12,16 @@ const Header = ({ onMenuToggle, isMenuOpen = false }) => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const navigationItems = [
-    { label: 'Dashboard', path: '/main-dashboard', icon: 'LayoutDashboard' },
-    { label: 'Projects', path: '/project-management', icon: 'FolderOpen' },
-    { label: 'Work Orders', path: '/work-order-processing', icon: 'ClipboardList' },
-    { label: 'Clients', path: '/client-management', icon: 'Users' },
-    { label: 'Financial', path: '/financial-management', icon: 'DollarSign' }
+    { label: 'Dashboard', path: '/dashboard', icon: 'LayoutDashboard' },
+    { label: 'Projects', path: '/proyectos', icon: 'FolderOpen' },
+    { label: 'Work Orders', path: '/operaciones', icon: 'ClipboardList' },
+    { label: 'Clients', path: '/clientes', icon: 'Users' },
+    { label: 'Financial', path: '/finanzas', icon: 'DollarSign' }
   ];
 
   const secondaryItems = [
-    { label: 'Personnel', path: '/personnel-management', icon: 'UserCheck' },
-    { label: 'Inventory', path: '/inventory-management', icon: 'Package' }
+    { label: 'Personnel', path: '/personal', icon: 'UserCheck' },
+    { label: 'Inventory', path: '/inventario', icon: 'Package' }
   ];
 
   const handleNavigation = (path) => {
@@ -49,6 +49,9 @@ const Header = ({ onMenuToggle, isMenuOpen = false }) => {
       }, 1200);
     }
   };
+
+  // Ocultar Header temporalmente
+  return null;
 
   return (
     <header className="fixed top-0 left-0 right-0 bg-card border-b border-border z-1000">

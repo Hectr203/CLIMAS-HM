@@ -7,22 +7,34 @@ const Breadcrumb = ({ customItems = null }) => {
   const location = useLocation();
 
   const pathMapping = {
-    '/main-dashboard': { label: 'Panel', icon: 'LayoutDashboard' },
-    '/project-management': { label: 'Gestión de proyectos', icon: 'FolderOpen' },
-    '/work-order-processing': { label: 'Procesamiento de órdenes de trabajo', icon: 'ClipboardList' },
-    '/financial-management': { label: 'Gestión Financiera', icon: 'DollarSign' },
-    '/client-management': { label: 'Gestión de Clientes', icon: 'Users' },
-    '/personnel-management': { label: 'Gestión de personal', icon: 'UserCheck' },
-    '/inventory-management': { label: 'Gestión de inventario', icon: 'Package' }
+    '/dashboard': { label: 'Panel', icon: 'LayoutDashboard' },
+    '/proyectos': { label: 'Gestión de proyectos', icon: 'FolderOpen' },
+    '/operaciones': { label: 'Procesamiento de órdenes de trabajo', icon: 'ClipboardList' },
+    '/finanzas': { label: 'Gestión Financiera', icon: 'DollarSign' },
+    '/clientes': { label: 'Gestión de Clientes', icon: 'Users' },
+    '/personal': { label: 'Gestión de personal', icon: 'UserCheck' },
+    '/inventario': { label: 'Gestión de inventario', icon: 'Package' },
+    '/usuarios': { label: 'Gestión de Usuarios', icon: 'Users' },
+    '/oportunidades': { label: 'Oportunidades de Venta', icon: 'TrendingUp' },
+    '/constructor-cotizaciones': { label: 'Creación de Cotizaciones', icon: 'FileText' },
+    '/cotizaciones': { label: 'Centro de Desarrollo de Cotizaciones', icon: 'FileEdit' },
+    '/monitoreo-ventas': { label: 'Monitoreo de Ejecución de Ventas', icon: 'BarChart' },
+    '/centro-operaciones-taller': { label: 'Centro de Operaciones de Taller', icon: 'Wrench' },
+    '/operaciones-taller': { label: 'Gestión de Operaciones de Taller', icon: 'Settings' },
+    '/flujo-proyecto': { label: 'Gestión de Flujo de Trabajo', icon: 'GitBranch' },
+    '/documentacion-proyectos': { label: 'Centro de Documentación', icon: 'FolderOpen' },
+    '/visor-galeria': { label: 'Galería de Proyectos', icon: 'Image' },
+    '/galeria-proyecto': { label: 'Detalles de Galería', icon: 'Images' },
+    '/abonos': { label: 'Gestión de Abonos', icon: 'CreditCard' }
   };
 
   const generateBreadcrumbs = () => {
     if (customItems) return customItems;
 
     const pathSegments = location?.pathname?.split('/')?.filter(segment => segment);
-    const breadcrumbs = [{ label: 'Dashboard', path: '/main-dashboard', icon: 'Home' }];
+    const breadcrumbs = [{ label: 'Dashboard', path: '/dashboard', icon: 'Home' }];
 
-    if (location?.pathname !== '/main-dashboard') {
+    if (location?.pathname !== '/dashboard') {
       const currentPath = location?.pathname;
       const currentPage = pathMapping?.[currentPath];
       

@@ -1,18 +1,73 @@
-import React, { useState } from 'react';
-        import Icon from '../../../components/AppIcon';
-        import Button from '../../../components/ui/Button';
-        import Input from '../../../components/ui/Input';
+import React, { useState, useEffect } from 'react';
+import useQuotation from '../../../hooks/useQuotation';
+import Icon from '../../../components/AppIcon';
+import Button from '../../../components/ui/Button';
+import Input from '../../../components/ui/Input';
+import { useNotification } from '../../../context/NotificationContext';
 
-        const QuotationBuilder = ({ quotation, onUpdate, onAddRevision }) => {
-          const [formData, setFormData] = useState(quotation?.quotationData || {
-            scope: '',
-            assumptions: [],
-            timeline: '',
-            conditions: '',
-            warranty: '',
-            totalAmount: 0,
-            validity: '30 días'
+const QuotationBuilder = ({ cotizacion, onUpdate, onAddRevision }) => {
+  const { crearConstructor, getConstructorByCotizacionId } = useQuotation();
+  const notification = useNotification();
+          const [formData, setFormData] = useState({
+            scope: cotizacion?.quotationData?.scope || '',
+            assumptions: cotizacion?.quotationData?.assumptions || [],
+            timeline: cotizacion?.quotationData?.timeline || '',
+            conditions: cotizacion?.quotationData?.conditions || '',
+            warranty: cotizacion?.quotationData?.warranty || '',
+            totalAmount: cotizacion?.quotationData?.totalAmount || 0,
+            validity: cotizacion?.quotationData?.validity || '30 días'
           });
+          const [loading, setLoading] = useState(false);
+          const [error, setError] = useState('');
+          // Cargar datos del constructor existente si hay
+          useEffect(() => {
+            async function fetchConstructor() {
+              // Limpiar el formulario al cambiar de cotización
+              setFormData({
+                scope: '',
+                assumptions: [],
+                timeline: '',
+                conditions: '',
+                warranty: '',
+                totalAmount: 0,
+                validity: '30 días'
+              });
+              if (!cotizacion?.id) return;
+              setLoading(true);
+              setError('');
+              try {
+                const existing = await getConstructorByCotizacionId(cotizacion.id);
+                // Solo mostramos en consola si existe
+                if (existing) {
+                  // console.log eliminado
+                  setFormData({
+                    scope: existing.alcance || '',
+                    assumptions: existing.supuestos || [],
+                    timeline: existing.tiempo_ejecucion || '',
+                    conditions: existing.condiciones_pago || '',
+                    warranty: existing.garantia || '',
+                    totalAmount: existing.monto_total || 0,
+                    validity: existing.vigencia || '30 días',
+                  });
+                } else {
+                  setFormData({
+                    scope: cotizacion?.quotationData?.scope || '',
+                    assumptions: cotizacion?.quotationData?.assumptions || [],
+                    timeline: cotizacion?.quotationData?.timeline || '',
+                    conditions: cotizacion?.quotationData?.conditions || '',
+                    warranty: cotizacion?.quotationData?.warranty || '',
+                    totalAmount: cotizacion?.quotationData?.totalAmount || 0,
+                    validity: cotizacion?.quotationData?.validity || '30 días'
+                  });
+                }
+              } catch (err) {
+                setError('Error al cargar constructor');
+              } finally {
+                setLoading(false);
+              }
+            }
+            fetchConstructor();
+          }, [cotizacion?.id]);
 
           const [newAssumption, setNewAssumption] = useState('');
           const [hasChanges, setHasChanges] = useState(false);
@@ -36,26 +91,68 @@ import React, { useState } from 'react';
             setHasChanges(true);
           };
 
-          const handleSave = () => {
-            onUpdate?.({ quotationData: formData });
-            setHasChanges(false);
-          };
+  const handleSave = async () => {
+    onUpdate?.({ quotationData: formData });
+    const payload = {
+      Constructor: {
+        cotizacionId: cotizacion?.id,
+        Folio: cotizacion?.folio || cotizacion?.id,
+        alcance: formData?.scope,
+        condiciones_pago: formData?.conditions,
+        supuestos: formData?.assumptions,
+        garantia: formData?.warranty,
+        monto_total: formData?.totalAmount,
+        tiempo_ejecucion: formData?.timeline,
+        vigencia: formData?.validity
+      }
+    };
+    try {
+      await crearConstructor(payload);
+      notification.showSuccess('guardado');
+    } catch (err) {
+      notification.showError('Error al guardar el constructor');
+    }
+    setHasChanges(false);
+  };
 
           const handleCreateRevision = () => {
             const revision = {
               changes: "Actualización de alcance y condiciones",
-              author: quotation?.assignedTo || "Usuario Actual"
+              author: cotizacion?.assignedTo || "Usuario Actual"
             };
             onAddRevision?.(revision);
             setHasChanges(false);
+          };
+
+          const handleSaveConstructor = async () => {
+            const payload = {
+              Constructor: {
+                cotizacionId: cotizacion?.id,
+                Folio: cotizacion?.id,
+                alcance: formData?.scope,
+                condiciones_pago: formData?.conditions,
+                supuestos: formData?.assumptions,
+                garantia: formData?.warranty,
+                monto_total: formData?.totalAmount,
+                tiempo_ejecucion: formData?.timeline,
+                vigencia: formData?.validity
+              }
+            };
+            try {
+              const res = await crearConstructor(payload);
+              // console.log eliminado
+              alert('Constructor guardado exitosamente');
+            } catch (err) {
+              alert('Error al guardar el constructor');
+            }
           };
 
           return (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl font-semibold">{quotation?.projectName}</h3>
-                  <p className="text-muted-foreground">{quotation?.clientName} - {quotation?.id}</p>
+                  <h3 className="text-xl font-semibold">{cotizacion?.projectName}</h3>
+                  <p className="text-muted-foreground">{cotizacion?.clientName} - {cotizacion?.folio}</p>
                 </div>
                 <div className="flex items-center space-x-2">
                   {hasChanges && (
@@ -63,15 +160,16 @@ import React, { useState } from 'react';
                       Cambios sin guardar
                     </span>
                   )}
-                  <Button
-                    variant="outline"
-                    onClick={handleSave}
+                  {/* Botón gris superior para guardar */}
+                  <button
+                    className="text-muted-foreground flex items-center space-x-1"
+                    style={{ background: 'none', border: 'none', cursor: hasChanges ? 'pointer' : 'not-allowed', fontSize: '16px', padding: 0 }}
+                    onClick={hasChanges ? handleSave : undefined}
                     disabled={!hasChanges}
-                    iconName="Save"
-                    iconPosition="left"
                   >
-                    Guardar
-                  </Button>
+                    <Icon name="Save" size={20} />
+                    <span>Guardar</span>
+                  </button>
                 </div>
               </div>
 
@@ -231,10 +329,11 @@ import React, { useState } from 'react';
                 <div className="flex items-center space-x-2">
                   <Icon name="Info" size={16} className="text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">
-                    Última actualización: {quotation?.lastModified}
+                     Última actualización: {cotizacion?.lastModified}
                   </span>
                 </div>
                 <div className="flex space-x-2">
+                  {/* Botón comentado: Crear Revisión (se dejó comentado para posible uso futuro)
                   <Button
                     variant="outline"
                     onClick={handleCreateRevision}
@@ -243,13 +342,18 @@ import React, { useState } from 'react';
                   >
                     Crear Revisión
                   </Button>
+                  */}
+
+                  {/* Botón comentado: Enviar a Revisión (se dejó comentado para posible uso futuro)
                   <Button
-                    onClick={() => console.log('Submit for internal review')}
+                    // console.log eliminado
                     iconName="Users"
                     iconPosition="left"
                   >
                     Enviar a Revisión
                   </Button>
+                  */}
+                  {/* Eliminar el botón azul de Guardar aquí */}
                 </div>
               </div>
             </div>

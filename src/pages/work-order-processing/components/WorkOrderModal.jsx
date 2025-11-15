@@ -1,55 +1,166 @@
-import React, { useState, useEffect } from 'react';
-import Icon from '../../../components/AppIcon';
-import Button from '../../../components/ui/Button';
-import Input from '../../../components/ui/Input';
-import Select from '../../../components/ui/Select';
-import { Checkbox } from '../../../components/ui/Checkbox';
+import React, { useState, useEffect } from "react";
+import Icon from "../../../components/AppIcon";
+import Button from "../../../components/ui/Button";
+import Input from "../../../components/ui/Input";
+import Select from "../../../components/ui/Select";
+import { Checkbox } from "../../../components/ui/Checkbox";
+import useOperac from "../../../hooks/useOperac";
+import useClient from "../../../hooks/useClient";
+import usePerson from "../../../hooks/usePerson";
+import useProyecto from "../../../hooks/useProyect";
 
-const WorkOrderModal = ({ isOpen, onClose, workOrder, onSave }) => {
+
+const WorkOrderModal = ({ isOpen, onClose, workOrder, mode = "edit", onSaveSuccess }) => {
+  const { createWorkOrder, updateWorkOrder } = useOperac();
+  const { getProyectos } = useProyecto();
+  const [clientProjects, setClientProjects] = useState([]);
+
+  const { clients, getClients, loading: loadingClients, error: errorClients } = useClient();
+  const { getPersonsByDepartment, departmentPersons, loading: loadingPersons } = usePerson();
+
+  const isViewMode = mode === "view";
+
   const [formData, setFormData] = useState({
-    assignedTechnician: '',
-    priority: 'Media',
-    status: 'Pendiente',
-    dueDate: '',
-    notes: '',
+    orderNumber: "",
+    assignedTechnician: { id: "", nombre: "" },
+    priority: "Media",
+    status: "Pendiente",
+    dueDate: "",
+    workDescription: "",
+    additionalNotes: "",
     requiredPPE: [],
-    medicalRequirements: false
+    medicalRequirements: false,
+    client: { id: "", nombre: "", contacto: "", email: "", telefono: "" },
+    type: "",
+    projectName: "", 
   });
 
-  // Update formData when workOrder prop changes
+  const [assignClient, setAssignClient] = useState(false);
+
+  //Carga de clientes y técnicos
   useEffect(() => {
+    if (isOpen) {
+      getClients();
+      getPersonsByDepartment("Taller,Mantenimiento");
+    }
+  }, [isOpen]);
+
+  //Carga de proyectos según cliente seleccionado
+  useEffect(() => {
+    const fetchProjectsByClient = async () => {
+      if (!formData.client.id) {
+        setClientProjects([]);
+        return;
+      }
+
+      try {
+        const allProjects = await getProyectos({ force: true });
+        const filtered = allProjects.filter(
+          (p) =>
+            p.cliente?.id === formData.client.id ||
+            p.cliente?._id === formData.client.id
+        );
+        setClientProjects(filtered);
+      } catch (error) {
+        console.error("Error al obtener proyectos del cliente:", error);
+        setClientProjects([]);
+      }
+    };
+
+    fetchProjectsByClient();
+  }, [formData.client.id]);
+
+  //Cuando se edita o visualiza una orden existente
+  useEffect(() => {
+  const loadWorkOrderData = async () => {
     if (workOrder) {
       setFormData({
-        assignedTechnician: workOrder?.assignedTechnician || '',
-        priority: workOrder?.priority || 'Media',
-        status: workOrder?.status || 'Pendiente',
-        dueDate: workOrder?.dueDate || '',
-        notes: workOrder?.notes || '',
-        requiredPPE: workOrder?.requiredPPE || [],
-        medicalRequirements: workOrder?.medicalRequirements || false
+        orderNumber: workOrder.ordenTrabajo || "",
+        assignedTechnician: {
+          id: workOrder.tecnicoAsignado?.id || "",
+          nombre: workOrder.tecnicoAsignado?.nombre || "",
+        },
+        priority: workOrder.prioridad || "Media",
+        status: workOrder.estado || "Pendiente",
+        dueDate: workOrder.fechaLimite || "",
+        workDescription: workOrder.descripcion || "",
+        additionalNotes: workOrder.notasAdicionales || "",
+        requiredPPE: [
+          ...(workOrder.cascoSeguridad ? ["Casco de Seguridad"] : []),
+          ...(workOrder.gafasProteccion ? ["Gafas de Protección"] : []),
+          ...(workOrder.guantesTrabajo ? ["Guantes de Trabajo"] : []),
+          ...(workOrder.calzadoSeguridad ? ["Calzado de Seguridad"] : []),
+          ...(workOrder.arnesSeguridad ? ["Arnés de Seguridad"] : []),
+          ...(workOrder.respiradorN95 ? ["Respirador N95"] : []),
+          ...(workOrder.chalecoReflectivo ? ["Chaleco Reflectivo"] : []),
+        ],
+        medicalRequirements: workOrder.requiereEstudiosMedicosActualizados || false,
+        client: {
+          id: workOrder.cliente?.id || "",
+          nombre:
+            workOrder.cliente?.nombre ||
+            workOrder.cliente?.empresa ||
+            workOrder.cliente?.companyName ||
+            "",
+          contacto: workOrder.cliente?.contacto || "",
+          email: workOrder.cliente?.email || "",
+          telefono: workOrder.cliente?.telefono || "",
+        },
+        type: workOrder.tipo || "",
+        projectName: workOrder.proyecto?.id || workOrder.proyecto?._id || "",
       });
-    } else {
-      // Reset form for new order
-      setFormData({
-        assignedTechnician: '',
-        priority: 'Media',
-        status: 'Pendiente',
-        dueDate: '',
-        notes: '',
-        requiredPPE: [],
-        medicalRequirements: false
-      });
+
+      setAssignClient(!!workOrder.cliente?.id);
+
+      //Carga los proyectos del cliente al editar
+      if (workOrder.cliente?.id) {
+        try {
+          const allProjects = await getProyectos({ force: true });
+          const filtered = allProjects.filter(
+            (p) =>
+              p.cliente?.id === workOrder.cliente.id ||
+              p.cliente?._id === workOrder.cliente.id
+          );
+          setClientProjects(filtered);
+        } catch (error) {
+          console.error("Error al cargar proyectos del cliente:", error);
+          setClientProjects([]);
+        }
+      }
     }
-  }, [workOrder, isOpen]);
+  };
 
-  const technicianOptions = [
-    { value: 'Carlos Mendoza', label: 'Carlos Mendoza - Técnico Senior' },
-    { value: 'Ana García', label: 'Ana García - Especialista HVAC' },
-    { value: 'Roberto Silva', label: 'Roberto Silva - Técnico Junior' },
-    { value: 'María López', label: 'María López - Supervisora' },
-    { value: 'Diego Ramírez', label: 'Diego Ramírez - Técnico Senior' }
-  ];
+  loadWorkOrderData();
+}, [workOrder, isOpen]);
 
+
+// Agrega esto después
+useEffect(() => {
+  if (workOrder?.cliente?.id && clients.length > 0) {
+    const selected = clients.find(
+      (c) => c.id === workOrder.cliente.id || c._id === workOrder.cliente.id
+    );
+
+    if (selected) {
+      setFormData((prev) => ({
+        ...prev,
+        client: {
+          id: selected.id || selected._id,
+          nombre:
+            selected.companyName || selected.empresa || selected.nombre || "",
+          contacto: selected.contacto || "",
+          email: selected.email || "",
+          telefono: selected.telefono || "",
+        },
+      }));
+      setAssignClient(true);
+    }
+  }
+}, [clients, workOrder]);
+
+
+
+  // Opciones
   const priorityOptions = [
     { value: 'Crítica', label: 'Crítica' },
     { value: 'Alta', label: 'Alta' },
@@ -75,6 +186,7 @@ const WorkOrderModal = ({ isOpen, onClose, workOrder, onSave }) => {
     'Chaleco Reflectivo'
   ];
 
+  //Handlers
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
@@ -91,9 +203,61 @@ const WorkOrderModal = ({ isOpen, onClose, workOrder, onSave }) => {
     }));
   };
 
-  const handleSave = () => {
-    onSave({ ...workOrder, ...formData });
-    onClose();
+  const handleSave = async () => {
+    const payload = {
+      ordenTrabajo: formData.orderNumber,
+      prioridad: formData.priority,
+      estado: formData.status,
+      fechaLimite: formData.dueDate,
+      descripcion: formData.workDescription,
+      notasAdicionales: formData.additionalNotes,
+      cascoSeguridad: formData.requiredPPE.includes("Casco de Seguridad"),
+      gafasProteccion: formData.requiredPPE.includes("Gafas de Protección"),
+      guantesTrabajo: formData.requiredPPE.includes("Guantes de Trabajo"),
+      calzadoSeguridad: formData.requiredPPE.includes("Calzado de Seguridad"),
+      arnesSeguridad: formData.requiredPPE.includes("Arnés de Seguridad"),
+      respiradorN95: formData.requiredPPE.includes("Respirador N95"),
+      chalecoReflectivo: formData.requiredPPE.includes("Chaleco Reflectivo"),
+      requiereEstudiosMedicosActualizados: formData.medicalRequirements,
+      tipo: formData.type,
+    };
+
+    if (assignClient && formData.client.id) {
+      payload.cliente = {
+        id: formData.client.id,
+        nombre: formData.client.nombre,
+      };
+    }
+
+    if (formData.projectName) {
+  payload.proyectoNombre =
+    clientProjects.find(
+      (p) => p.id === formData.projectName || p._id === formData.projectName
+    )?.nombre || formData.projectName;
+}
+
+
+
+    if (formData.assignedTechnician.id) {
+      payload.tecnicoAsignado = {
+        id: formData.assignedTechnician.id,
+        nombre: formData.assignedTechnician.nombre,
+      };
+    }
+
+    try {
+      let savedOrder;
+      if (workOrder?.id) {
+        savedOrder = await updateWorkOrder(workOrder.id, payload);
+      } else {
+        savedOrder = await createWorkOrder(payload);
+      }
+
+      onClose();
+      onSaveSuccess?.(savedOrder || { ...payload, id: workOrder?.id || Date.now() });
+    } catch (error) {
+      console.error("Error al guardar:", error);
+    }
   };
 
   if (!isOpen) return null;
@@ -188,28 +352,169 @@ const WorkOrderModal = ({ isOpen, onClose, workOrder, onSave }) => {
 
           <div className="bg-muted/30 rounded-lg p-4">
             <Checkbox
-              label="Requiere Estudios Médicos Actualizados"
-              description="El técnico asignado debe tener estudios médicos vigentes"
-              checked={formData?.medicalRequirements}
-              onChange={(e) => handleInputChange('medicalRequirements', e?.target?.checked)}
+              label="Requiere Estudios Médicos"
+              checked={formData.medicalRequirements}
+              onChange={(e) => handleInputChange("medicalRequirements", e.target.checked)}
+              disabled={isViewMode}
             />
-          </div>
 
-          {workOrder && (
-            <div className="bg-muted/30 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-foreground mb-2">Información del Proyecto</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Cliente:</span>
-                  <span className="text-foreground ml-2">{workOrder?.clientName}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Tipo:</span>
-                  <span className="text-foreground ml-2">{workOrder?.type}</span>
-                </div>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  {/* Cliente con checkbox a la izquierda */}
+  <div>
+    <div className="flex items-center gap-2 mb-2">
+      {/* Checkbox primero */}
+      <Checkbox
+        checked={assignClient}
+        onChange={(e) => setAssignClient(e.target.checked)}
+        disabled={isViewMode}
+        label="" // sin texto
+      />
+      <label className="text-sm font-medium text-foreground">Cliente</label>
+    </div>
+
+    {assignClient && (
+      <Select
+  value={formData.client.id}
+  onChange={(value) => {
+    const selected = clients.find(
+      (c) => c.id === value || c._id === value
+    );
+    handleInputChange("client", {
+      id: value,
+      nombre:
+        selected?.companyName ||
+        selected?.empresa ||
+        selected?.nombre ||
+        "",
+      contacto: selected?.contacto || "",
+      email: selected?.email || "",
+      telefono: selected?.telefono || "",
+    });
+  }}
+  options={
+    Array.isArray(clients)
+      ? clients.map((c) => ({
+          value: c.id || c._id,
+          label:
+            c.companyName ||
+            c.empresa ||
+            c.nombre ||
+            "Sin nombre",
+        }))
+      : []
+  }
+  placeholder={
+    loadingClients
+      ? "Cargando clientes..."
+      : clients.length === 0
+      ? "No hay clientes registrados"
+      : "Selecciona un cliente"
+  }
+  loading={loadingClients}
+  disabled={isViewMode}
+  error={errorClients ? "Error al cargar clientes" : ""}
+/>
+
+    )}
+{assignClient && formData.client.id && (
+  <div className="mt-4">
+    {/*Tarjeta del cliente (sin cambios) */}
+    <div className="relative flex flex-col items-start p-4 border border-blue-200 rounded-lg shadow-sm hover:shadow-md transition-all max-w-full overflow-hidden">
+      {/* Línea lateral decorativa */}
+      <div className="absolute left-0 top-0 h-full w-1 bg-blue-400 rounded-l-lg"></div>
+
+      {/* Encabezado con ícono */}
+      <div className="flex items-center justify-between w-full mb-3">
+        <div className="flex items-center gap-3">
+          <div className="flex-shrink-0 bg-blue-100 p-2 rounded-md">
+            <Icon name="Building2" className="text-blue-600 w-5 h-5" />
+          </div>
+          <h4 className="text-base font-semibold text-gray-900">
+            {formData.client.nombre || "Cliente sin nombre"}
+          </h4>
+        </div>
+
+        {/* Botón copiar */}
+        <button
+          onClick={() => {
+            const datos = `
+Cliente: ${formData.client.nombre || "No especificado"}
+Contacto: ${formData.client.contacto || "No especificado"}
+Teléfono: ${formData.client.telefono || "No especificado"}
+Email: ${formData.client.email || "No especificado"}
+`;
+            navigator.clipboard.writeText(datos);
+          }}
+          className="text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded-md shadow-sm transition-all"
+        >
+          Copiar
+        </button>
+      </div>
+
+      {/* Información del cliente */}
+      <div className="flex flex-col gap-2 text-xs text-gray-700 pl-1">
+        <div className="flex items-center gap-2">
+          <Icon name="User" className="w-4 h-4 text-gray-500" />
+          <span className="font-semibold text-gray-700">Contacto:</span>
+          <span className="truncate">{formData.client.contacto || "No especificado"}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Icon name="Phone" className="w-4 h-4 text-gray-500" />
+          <span className="font-semibold text-gray-700">Teléfono:</span>
+          <span className="truncate">{formData.client.telefono || "No especificado"}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Icon name="Mail" className="w-4 h-4 text-gray-500" />
+          <span className="font-semibold text-gray-700">Email:</span>
+          <span className="truncate">{formData.client.email || "No especificado"}</span>
+        </div>
+      </div>
+    </div>
+
+    {/*Select de Proyecto — abajo y fuera del recuadro */}
+    <div className="mt-4">
+      <Select
+  label="Nombre del Proyecto"
+  value={formData.projectName || ""}
+  onChange={(value) => handleInputChange("projectName", value)}
+  options={
+    clientProjects.length > 0
+      ? clientProjects.map((p) => ({
+          value: p.id || p._id,
+          label: p.nombre || "Sin nombre",
+        }))
+      : []
+  }
+  placeholder={
+    formData.client.id
+      ? clientProjects.length > 0
+        ? "Selecciona un proyecto"
+        : "Este cliente no tiene proyectos"
+      : "Selecciona un cliente primero"
+  }
+  disabled={isViewMode || !formData.client.id}
+/>
+
+    </div>
+  </div>
+)}
+  </div>
+              {/* Tipo */}
+              <Select
+                label="Tipo"
+                value={formData.type}
+                onChange={(value) => handleInputChange("type", value)}
+                options={[
+                  { value: "Instalación", label: "Instalación" },
+                  { value: "Mantenimiento Preventivo", label: "Mantenimiento Preventivo" },
+                  { value: "Mantenimiento Correctivo", label: "Mantenimiento Correctivo" },
+                  { value: "Inspección", label: "Inspección" },
+                ]}
+                placeholder="Selecciona un tipo de servicio"
+                disabled={isViewMode}
+              />
             </div>
-          )}
+          </div>
         </div>
 
         <div className="flex items-center justify-end space-x-3 p-6 border-t border-border">

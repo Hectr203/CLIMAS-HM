@@ -1,381 +1,583 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback, } from 'react';
 import Button from '../../../components/ui/Button';
 import Icon from '../../../components/AppIcon';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import proyectoService from 'services/proyectoService';
 import clientService from 'services/clientService';
-import usePerson from 'hooks/usePerson'; // ⬅️ personal real
+import usePerson from 'hooks/usePerson';
+import { useErrorHandler, useNotifications } from 'context/NotificationContext';
+import { useEstados, useMunicipios } from '../../../hooks/useEstado';
 
+/* ===================== ESTADOS (STATUS DEL PROYECTO) ===================== */
+const estadoOptionsBackend = [
+  { value: 'planificación', label: 'Planificación' },
+  { value: 'en proceso',    label: 'En Progreso' },
+  { value: 'en pausa',      label: 'En Pausa' },
+  { value: 'en revisión',   label: 'En Revisión' },
+  { value: 'completado',    label: 'Completado' },
+  { value: 'cancelado',     label: 'Cancelado' },
+];
+const ALLOWED_ESTADOS = estadoOptionsBackend.map((o) => o.value);
+
+const UI_ESTADO_KEY = 'proyectos_ui_estado_v1';
+const uiEstadoCache = {
+  _read() {
+    try {
+      return JSON.parse(localStorage.getItem(UI_ESTADO_KEY)) || {};
+    } catch {
+      return {};
+    }
+  },
+  get(id) {
+    if (!id) return null;
+    const m = this._read();
+    return m[id] || null;
+  },
+  set(id, estado) {
+    if (!id) return;
+    const m = this._read();
+    if (estado) m[id] = estado;
+    else delete m[id];
+    localStorage.setItem(UI_ESTADO_KEY, JSON.stringify(m));
+  },
+};
+
+/* ===================== CATÁLOGOS ===================== */
+const departmentOptions = [
+  { value: 'Ingeniería', label: 'Ingeniería' },
+  { value: 'Mantenimiento', label: 'Mantenimiento' },
+  { value: 'Operaciones', label: 'Operaciones' },
+];
 const priorityOptions = [
-  { value: 'low', label: 'Baja' },
-  { value: 'medium', label: 'Media' },
-  { value: 'high', label: 'Alta' },
-  { value: 'urgent', label: 'Urgente' },
+  { value: 'Baja', label: 'Baja' },
+  { value: 'Media', label: 'Media' },
+  { value: 'Alta', label: 'Alta' },
+  { value: 'Urgente', label: 'Urgente' },
 ];
 
-const mapPriorityToEs = (v) => {
-  const m = { low: 'Baja', medium: 'Media', high: 'Alta', urgent: 'Urgente' };
-  return m[(v || '').toString().toLowerCase()] || v || '';
+/* ===== Helpers numéricos / formateo ===== */
+const toNumberOrUndef = (v) => {
+  if (v === '' || v == null) return undefined;
+  const n =
+    typeof v === 'number'
+      ? v
+      : parseFloat(String(v).replace(/[^\d.-]/g, ''));
+  return Number.isFinite(n) ? n : undefined;
 };
 
-// ---------- Utils ----------
-const toNum = (v) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-};
-
-// Formatear con comas (2 decimales visibles en input)
 const formatWithCommas = (v, decimals = 2) => {
-  if (v == null || v === '') return '';
-  const clean = String(v).replace(/[^\d.-]/g, '');
-  const num = parseFloat(clean);
-  if (isNaN(num)) return '';
-  const options = Number.isInteger(num)
+  const n = toNumberOrUndef(v);
+  if (n == null) return '';
+  const opts = Number.isInteger(n)
     ? { minimumFractionDigits: 0, maximumFractionDigits: 0 }
     : { minimumFractionDigits: decimals, maximumFractionDigits: decimals };
-  return num.toLocaleString('es-MX', options);
+  return n.toLocaleString('es-MX', opts);
 };
 
-// Remover comas/símbolos -> número
-const unformatNumber = (v) => {
-  if (v === '' || v === null || v === undefined) return 0;
-  const clean = String(v).replace(/[^\d.-]/g, '');
-  const n = parseFloat(clean);
-  return isNaN(n) ? 0 : n;
-};
+const asStr = (v, fallback = '') => (v == null ? fallback : String(v));
+const asArr = (v) =>
+  Array.isArray(v) ? v : v == null ? [] : [String(v)];
+const rateSafe = (rate) =>
+  Number.isFinite(Number(rate)) ? Number(rate) : 0;
 
-const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
+/* ===================== COMPONENTE ===================== */
+const EditProjectModal = ({ isOpen = false, onClose, onSubmit, project }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
-  const [loadingProject, setLoadingProject] = useState(false);
   const [serverProject, setServerProject] = useState(null);
 
-  // Personal real
   const { persons, getPersons } = usePerson();
-
-  // Clientes reales
   const [clientOptions, setClientOptions] = useState([]);
-  const [loadingClients, setLoadingClients] = useState(false);
 
-  // === NUEVO: controles USD para Equipos ===
+  const { handleError, handleSuccess } = useErrorHandler();
+  const { showError } = useNotifications();
+
   const [isEquipmentInUSD, setIsEquipmentInUSD] = useState(false);
-  const [exchangeRate, setExchangeRate] = useState(18); // MXN por USD
-  const [uiEquipmentUSD, setUiEquipmentUSD] = useState(''); // valor visual USD
+  const [exchangeRate, setExchangeRate] = useState(18);
+  const [uiEquipmentUSD, setUiEquipmentUSD] = useState('');
+  const [loadingFx, setLoadingFx] = useState(false);
+  const [fxError, setFxError] = useState(null);
 
-  // 1) Traer clientes
+  /* ============= ESTADOS/MUNICIPIOS (UBICACIÓN) ============= */
+  const { estados, loading: loadingEstados, error: errorEstados } = useEstados();
+  const [selectedEstadoCode, setSelectedEstadoCode] = useState('');
+  const {
+    municipios,
+    loading: loadingMunicipios,
+    error: errorMunicipios,
+  } = useMunicipios(selectedEstadoCode || '');
+
+  /* ============= CARGA DE CLIENTES ============= */
   useEffect(() => {
     if (!isOpen) return;
     let mounted = true;
     (async () => {
       try {
-        setLoadingClients(true);
         const resp = await clientService.getClients();
-        const list = Array.isArray(resp?.data) ? resp.data : Array.isArray(resp) ? resp : [];
+        const list = Array.isArray(resp?.data)
+          ? resp.data
+          : Array.isArray(resp)
+          ? resp
+          : [];
         const opts = list.map((c) => ({
           value: c.id,
-          label: c.empresa || c.contacto || '—',
+          label: c.empresa || c.nombre || c.contacto || '—',
         }));
         if (mounted) setClientOptions(opts);
       } catch (e) {
-        console.error('Error cargando clientes:', e);
-      } finally {
-        if (mounted) setLoadingClients(false);
+        handleError(e, 'Error cargando clientes');
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
+  }, [isOpen, handleError]);
+
+  /* ============= CARGA DE PERSONAL (solo 1 vez) ============= */
+  const fetchedPersonsRef = useRef(false);
+  useEffect(() => {
+    if (!isOpen) return;
+    if (fetchedPersonsRef.current) return;
+    fetchedPersonsRef.current = true;
+    (async () => {
+      try {
+        await getPersons();
+      } catch (e) {
+        handleError(e, 'Error cargando empleados');
+      }
+    })();
+    return () => {
+      fetchedPersonsRef.current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  // 2) Traer proyecto por ID
+  /* ============= CARGA DEL PROYECTO COMPLETO ============= */
   useEffect(() => {
     if (!isOpen || !project?.id) return;
     let mounted = true;
     (async () => {
       try {
-        setLoadingProject(true);
         const resp = await proyectoService.getProyectoById(project.id);
-        const doc = resp?.data && typeof resp.data === 'object' ? resp.data : resp;
-        if (mounted) setServerProject(doc || null);
+        const doc = resp?.data ?? resp;
+        if (mounted) setServerProject(doc || project);
       } catch (e) {
-        console.error('Error obteniendo proyecto por ID:', e);
+        handleError(e, 'Error cargando proyecto');
         if (mounted) setServerProject(project || null);
-      } finally {
-        if (mounted) setLoadingProject(false);
       }
     })();
-    return () => { mounted = false; };
-  }, [isOpen, project?.id]);
+    return () => {
+      mounted = false;
+    };
+  }, [isOpen, project?.id, handleError, project]);
 
-  // 2.5) Cargar personal
-  useEffect(() => {
-    if (!isOpen) return;
-    getPersons().catch((e) => console.error('Error cargando empleados:', e));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
-
-  // 3) Normalizador desde backend
-  const normalizedFromDoc = useMemo(() => {
+  /* ============= NORMALIZACIÓN DEL PROYECTO PARA EL FORM ============= */
+  const normalized = useMemo(() => {
     const doc = serverProject || project || {};
     const p = doc.presupuesto || {};
-    const b = doc.budgetBreakdown || {};
+    const cron = doc.cronograma || {};
+    const id = doc.id || project?.id;
 
-    const manoObra   = p.manoObra     ?? b.labor          ?? 0;
-    const piezas     = p.piezas       ?? b.parts          ?? 0;
-    const equipos    = p.equipos      ?? b.equipment      ?? 0; // almacenado en MXN
-    const materiales = p.materiales   ?? b.materials      ?? 0;
-    const transporte = p.transporte   ?? b.transportation ?? 0;
-    const otros      = p.otros        ?? b.other          ?? 0;
+    // ubicacion puede venir:
+    // 1) objeto { estado, municipio, direccion }
+    // 2) string simple
+    // 3) string JSON
+    let rawUbicacion = doc.ubicacion;
+    if (typeof rawUbicacion === 'string') {
+      const trimmed = rawUbicacion.trim();
+      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (parsed && typeof parsed === 'object') {
+            rawUbicacion = parsed;
+          }
+        } catch {
+          // ignorar, se usa como string normal abajo
+        }
+      }
+    }
+
+    let ubicacion = {
+      estado: '',
+      municipio: '',
+      direccion: '',
+    };
+
+    if (rawUbicacion && typeof rawUbicacion === 'object') {
+      ubicacion = {
+        estado:
+          rawUbicacion.estado ||
+          rawUbicacion.estadoCode ||
+          '',
+        municipio:
+          rawUbicacion.municipio ||
+          rawUbicacion.municipioNombre ||
+          '',
+        direccion:
+          rawUbicacion.direccion ||
+          rawUbicacion.dirección ||
+          rawUbicacion.direccionCompleta ||
+          '',
+      };
+    } else if (typeof rawUbicacion === 'string') {
+      ubicacion = {
+        estado: '',
+        municipio: '',
+        direccion: rawUbicacion || '',
+      };
+    }
+
+    const cachedEstado = uiEstadoCache.get(id);
+    const estadoUi = cachedEstado || (doc.estado || 'planificación');
 
     return {
-      name: doc?.nombreProyecto ?? doc?.name ?? '',
-      code: doc?.codigo ?? doc?.code ?? '',
-      type: doc?.tipoProyecto ?? doc?.type ?? '',
-      client: doc?.cliente?.id || '',
-      department: doc?.departamento ?? doc?.department ?? '',
-      priority: '',
-      budgetBreakdown: {
-        labor:          toNum(manoObra),
-        parts:          toNum(piezas),
-        equipment:      toNum(equipos), // MXN
-        materials:      toNum(materiales),
-        transportation: toNum(transporte),
-        other:          toNum(otros),
+      id,
+      codigo: doc.codigo || '',
+      tipoProyecto: doc.tipoProyecto || '',
+      clienteId: doc?.cliente?.id ?? '',
+      clienteNombre:
+        doc?.cliente?.nombre || doc?.cliente?.empresa || '',
+      nombre: doc.nombre || doc.nombreProyecto || '',
+      departamento: doc.departamento || '',
+      prioridad: doc.prioridad || '',
+      estado: estadoUi,
+      ubicacion,
+      descripcion: doc.descripcion || '',
+      cronograma: {
+        fechaInicio: cron?.fechaInicio || '',
+        fechaFin: cron?.fechaFin || '',
       },
-      location: doc?.ubicacion ?? doc?.location ?? '',
-      startDate: doc?.cronograma?.fechaInicio ?? doc?.startDate ?? '',
-      endDate:   doc?.cronograma?.fechaFin    ?? doc?.endDate   ?? '',
-      assignedPersonnel: Array.isArray(doc?.personalAsignado)
+      personalAsignado: Array.isArray(doc?.personalAsignado)
         ? doc.personalAsignado
-        : (doc?.assignedPersonnel || []),
-      description: doc?.descripcion ?? doc?.description ?? '',
-      _raw: doc,
+        : [],
+      presupuesto: {
+        manoObra: toNumberOrUndef(p.manoObra),
+        piezas: toNumberOrUndef(p.piezas),
+        equipos: toNumberOrUndef(p.equipos),
+        equipoDolares: toNumberOrUndef(p.equipoDolares),
+        materiales: toNumberOrUndef(p.materiales),
+        transporte: toNumberOrUndef(p.transporte),
+        otros: toNumberOrUndef(p.otros),
+        _metaEquipos: {
+          capturadoEn: p?._metaEquipos?.capturadoEn || 'MXN',
+        },
+      },
     };
   }, [serverProject, project]);
 
-  const [formData, setFormData] = useState(normalizedFromDoc);
+  /* ============= STATE DEL FORM (CONTROLADO) ============= */
+  const [formData, setFormData] = useState(normalized);
   useEffect(() => {
-    if (isOpen) setFormData(normalizedFromDoc);
-  }, [normalizedFromDoc, isOpen]);
+    if (isOpen) {
+      setFormData(normalized);
+      setSelectedEstadoCode(normalized?.ubicacion?.estado || '');
+    }
+  }, [normalized, isOpen]);
 
-  // Inicializar UI USD si el backend trae meta de equipos
+  /* ============= FX / TIPO DE CAMBIO USD↔MXN ============= */
+  const fetchUsdMxnRate = useCallback(async () => {
+    try {
+      setFxError(null);
+      setLoadingFx(true);
+
+      const apiResp = await proyectoService.getCurrencyRates({
+        base: 'USD',
+        currencies: ['MXN'],
+      });
+
+      const mxnInfo = apiResp?.data?.MXN;
+      const rate = Number(mxnInfo?.value || 0);
+
+      if (rate > 0) {
+        setExchangeRate(rate);
+        return rate;
+      } else {
+        const msg = 'No llegó una tasa válida.';
+        setFxError(msg);
+        showError(msg);
+        return null;
+      }
+    } catch (e) {
+      const msg = e?.message || 'Error llamando currencyapi';
+      setFxError(msg);
+      handleError(e, 'Tipo de cambio');
+      return null;
+    } finally {
+      setLoadingFx(false);
+    }
+  }, [handleError, showError]);
+
   useEffect(() => {
     if (!isOpen) return;
-    const doc = (serverProject || project || {});
-    const meta = doc?.presupuesto?._metaEquipos;
-    if (meta?.capturadoEn === 'USD') {
-      const rate = Number(meta?.tipoCambio) || exchangeRate || 18;
+    const cap = formData?.presupuesto?._metaEquipos?.capturadoEn;
+    if (cap === 'USD') {
       setIsEquipmentInUSD(true);
-      setExchangeRate(rate);
-      const valUSD = Number(meta?.valorUSD) || 0;
-      if (valUSD) setUiEquipmentUSD(formatWithCommas(valUSD, 2));
-      else {
-        // Si no viene valorUSD, lo calculamos desde MXN
-        const mxn = Number(doc?.presupuesto?.equipos ?? doc?.budgetBreakdown?.equipment ?? 0);
-        const usd = rate ? mxn / rate : 0;
-        setUiEquipmentUSD(formatWithCommas(usd, 2));
-      }
     } else {
       setIsEquipmentInUSD(false);
       setUiEquipmentUSD('');
-      // Mantén exchangeRate como esté (quizá el usuario lo quiere setear)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, serverProject, project]);
+  }, [isOpen, formData?.presupuesto?._metaEquipos?.capturadoEn]);
 
-  const handleInputChange = (key, value) => {
-    setFormData((s) => ({ ...s, [key]: value }));
-    if (errors[key]) setErrors((e) => ({ ...e, [key]: undefined }));
+  useEffect(() => {
+    if (!isEquipmentInUSD) return;
+    const mxn = toNumberOrUndef(formData?.presupuesto?.equipos) ?? 0;
+    const rate = rateSafe(exchangeRate);
+    const usd = rate ? mxn / rate : 0;
+    setUiEquipmentUSD(usd ? formatWithCommas(usd, 2) : '0.00');
+  }, [isEquipmentInUSD, exchangeRate, formData?.presupuesto?.equipos]);
+
+  /* ============= OPTIONS DE PERSONAL PARA EL MULTISELECT ============= */
+  const personnelOptions = useMemo(() => {
+    const fromPersons = Array.isArray(persons)
+      ? persons.map((p) => {
+          const nombre =
+            p?.nombreCompleto ||
+            [p?.nombre, p?.apellidoPaterno, p?.apellidoMaterno]
+              .filter(Boolean)
+              .join(' ') ||
+            p?.nombre ||
+            p?.name ||
+            '—';
+          const puesto = p?.puesto || p?.rol || p?.cargo;
+          const etiqueta = puesto ? `${nombre} — ${puesto}` : nombre;
+          return { value: etiqueta, label: etiqueta };
+        })
+      : [];
+
+    const existing = Array.isArray(formData?.personalAsignado)
+      ? formData.personalAsignado.map((s) => ({
+          value: s,
+          label: s,
+        }))
+      : [];
+
+    const seen = new Set();
+    return [...existing, ...fromPersons].filter((o) =>
+      seen.has(o.value) ? false : (seen.add(o.value), true)
+    );
+  }, [persons, formData?.personalAsignado]);
+
+  /* ============= TOTAL MXN DEL PRESUPUESTO MOSTRADO ============= */
+  const totalMXN = useMemo(() => {
+    const b = formData?.presupuesto || {};
+    const sum = (...vals) =>
+      vals.reduce(
+        (acc, v) => acc + (toNumberOrUndef(v) ?? 0),
+        0
+      );
+    return sum(
+      b.manoObra,
+      b.piezas,
+      b.equipos,
+      b.materiales,
+      b.transporte,
+      b.otros
+    );
+  }, [formData]);
+
+  /* ============= HANDLERS DEL FORM ============= */
+  const handle = (k, v) => {
+    setFormData((s) => ({ ...s, [k]: v }));
+    if (errors[k]) {
+      setErrors((e) => ({ ...e, [k]: undefined }));
+    }
   };
 
-  // Manejar partidas numéricas; para "equipment" considerar USD toggle
-  const handleBudgetChange = (key, rawValueOrNumber) => {
-    const cleaned = typeof rawValueOrNumber === 'number'
-      ? rawValueOrNumber
-      : unformatNumber(rawValueOrNumber);
-
-    if (key === 'equipment' && isEquipmentInUSD) {
-      // rawValue es USD; guardamos equipment en MXN
-      setUiEquipmentUSD(typeof rawValueOrNumber === 'number'
-        ? formatWithCommas(rawValueOrNumber, 2)
-        : rawValueOrNumber);
-      const mxn = cleaned * (Number(exchangeRate) || 0);
-      setFormData((s) => ({
-        ...s,
-        budgetBreakdown: { ...s.budgetBreakdown, equipment: mxn },
-      }));
-      return;
-    }
-
+  const handleUbicacion = (field, value) => {
     setFormData((s) => ({
       ...s,
-      budgetBreakdown: { ...s.budgetBreakdown, [key]: cleaned },
+      ubicacion: {
+        ...(s.ubicacion || { estado: '', municipio: '', direccion: '' }),
+        [field]: value,
+      },
+    }));
+    const errorKey =
+      field === 'estado'
+        ? 'ubicacionEstado'
+        : field === 'municipio'
+        ? 'ubicacionMunicipio'
+        : 'ubicacionDireccion';
+    if (errors[errorKey]) {
+      setErrors((e) => ({ ...e, [errorKey]: undefined }));
+    }
+  };
+
+  const handleP = (k, raw) => {
+    const n =
+      raw === '' || raw == null ? undefined : toNumberOrUndef(raw);
+    setFormData((s) => ({
+      ...s,
+      presupuesto: { ...s.presupuesto, [k]: n },
     }));
   };
 
-  const toggleEquipmentUSD = (checked) => {
+  const toggleUSD = (checked) => {
     setIsEquipmentInUSD(checked);
-    if (checked) {
-      // Pasar MXN actual a USD visual
-      const currentMXN = Number(formData?.budgetBreakdown?.equipment || 0);
-      const usd = (Number(exchangeRate) || 0) ? currentMXN / Number(exchangeRate) : 0;
-      setUiEquipmentUSD(usd ? formatWithCommas(usd, 2) : '');
-    } else {
+    setFormData((s) => ({
+      ...s,
+      presupuesto: {
+        ...s.presupuesto,
+        _metaEquipos: {
+          capturadoEn: checked ? 'USD' : 'MXN',
+        },
+      },
+    }));
+
+    if (!checked) {
       setUiEquipmentUSD('');
-      // Estado ya guarda MXN, no hay que convertir nada
     }
   };
 
-  const handleExchangeRateChange = (raw) => {
-    const rate = unformatNumber(raw);
-    setExchangeRate(rate);
-    if (isEquipmentInUSD) {
-      const usd = unformatNumber(uiEquipmentUSD);
-      const mxn = usd * (rate || 0);
-      setFormData((s) => ({
-        ...s,
-        budgetBreakdown: { ...s.budgetBreakdown, equipment: mxn },
-      }));
-    }
-  };
-
+  /* ============= VALIDACIÓN ============= */
   const validate = () => {
     const e = {};
-    if (!formData.name) e.name = 'Requerido';
-    if (!formData.type) e.type = 'Requerido';
-    if (!formData.department) e.department = 'Requerido';
-    if (!formData.location) e.location = 'Requerido';
-    if (!formData.startDate) e.startDate = 'Requerido';
-    if (!formData.endDate) e.endDate = 'Requerido';
-    if (formData.startDate && formData.endDate && new Date(formData.endDate) < new Date(formData.startDate)) {
-      e.endDate = 'La fecha de fin no puede ser anterior al inicio';
-    }
-    if (isEquipmentInUSD && !(exchangeRate > 0)) {
-      e.exchangeRate = 'Indique un tipo de cambio válido';
-    }
+    if (!formData.nombre) e.nombre = 'Requerido';
+    if (!formData.departamento)
+      e.departamento = 'Requerido';
+
+    const ub = formData.ubicacion || {};
+    if (!ub.estado) e.ubicacionEstado = 'Requerido';
+    if (!ub.municipio) e.ubicacionMunicipio = 'Requerido';
+    if (!ub.direccion) e.ubicacionDireccion = 'Requerido';
+
+    if (!ALLOWED_ESTADOS.includes(formData.estado))
+      e.estado = 'Estado inválido';
+    if (isEquipmentInUSD && !(exchangeRate > 0))
+      e.exchangeRate = 'Tipo de cambio inválido';
+
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  // Opciones de personal
-  const personnelOptionsFinal = useMemo(() => {
-    const existingAssigned = Array.isArray(serverProject?.personalAsignado)
-      ? serverProject.personalAsignado
-      : Array.isArray(project?.personalAsignado)
-        ? project.personalAsignado
-        : [];
+  /* ============= ARMAR PAYLOAD PARA updateProyecto ============= */
+  const buildPayloadForUpdate = () => {
+    const p = formData.presupuesto || {};
+    const pres = {};
 
-    const fromPersons = Array.isArray(persons)
-      ? persons
-          .map((p) => {
-            const nombre =
-              p?.nombreCompleto ||
-              [p?.nombre, p?.apellidoPaterno, p?.apellidoMaterno].filter(Boolean).join(' ') ||
-              p?.nombre ||
-              p?.name ||
-              '—';
-            const puesto = p?.puesto || p?.rol || p?.cargo;
-            const etiqueta = puesto ? `${nombre} — ${puesto}` : nombre;
-            return etiqueta || null;
-          })
-          .filter(Boolean)
-      : [];
-
-    const merged = [...existingAssigned, ...fromPersons];
-    const seen = new Set();
-    const dedupStrings = merged.filter((s) => {
-      if (seen.has(s)) return false;
-      seen.add(s);
-      return true;
+    [
+      'manoObra',
+      'piezas',
+      'equipos',
+      'equipoDolares',
+      'materiales',
+      'transporte',
+      'otros',
+    ].forEach((k) => {
+      const val = toNumberOrUndef(p[k]);
+      if (val != null) pres[k] = val;
     });
 
-    return dedupStrings.map((s) => ({ value: s, label: s }));
-  }, [persons, serverProject, project]);
+    pres._metaEquipos = {
+      capturadoEn: isEquipmentInUSD ? 'USD' : 'MXN',
+    };
 
-  // 4) Payload ES
-  const buildPayloadES = () => {
-    const base = formData?._raw || serverProject || project || {};
+    if (isEquipmentInUSD) {
+      const mxn = toNumberOrUndef(p.equipos) ?? 0;
+      const rate = rateSafe(exchangeRate);
+      const usd = rate ? mxn / rate : undefined;
+      if (usd != null) pres.equipoDolares = usd;
+    }
 
-    const selectedClient = clientOptions.find((o) => o.value === formData.client);
-    const clienteId = formData.client || base?.cliente?.id || '';
-    const clienteNombre = selectedClient?.label || base?.cliente?.nombre || '';
-
-    const manoObra   = Number(formData?.budgetBreakdown?.labor) || 0;
-    const piezas     = Number(formData?.budgetBreakdown?.parts) || 0;
-    const equipos    = Number(formData?.budgetBreakdown?.equipment) || 0; // MXN
-    const materiales = Number(formData?.budgetBreakdown?.materials) || 0;
-    const transporte = Number(formData?.budgetBreakdown?.transportation) || 0;
-    const otros      = Number(formData?.budgetBreakdown?.other) || 0;
-    const total      = manoObra + piezas + equipos + materiales + transporte + otros;
-
-    const metaEquipos = isEquipmentInUSD
-      ? { capturadoEn: 'USD', tipoCambio: Number(exchangeRate || 0), valorUSD: unformatNumber(uiEquipmentUSD) }
-      : (base?.presupuesto?._metaEquipos ?? { capturadoEn: 'MXN' });
+    const ub = formData.ubicacion || {};
 
     return {
-      codigo: formData.code ?? base?.codigo ?? base?.code ?? '',
-      nombreProyecto: formData.name || base?.nombreProyecto || '',
-      tipoProyecto: formData.type || base?.tipoProyecto || '',
-      cliente: { id: clienteId, nombre: clienteNombre },
-      departamento: formData.department || base?.departamento || '',
-      prioridad: formData.priority ? mapPriorityToEs(formData.priority) : (base?.prioridad ?? ''),
-      ubicacion: formData.location || base?.ubicacion || '',
-      descripcion: formData.description || base?.descripcion || '',
-      personalAsignado: Array.isArray(formData.assignedPersonnel) && formData.assignedPersonnel.length
-        ? formData.assignedPersonnel
-        : (base?.personalAsignado || []),
-      cronograma: {
-        fechaInicio: formData.startDate || base?.cronograma?.fechaInicio || '',
-        fechaFin: formData.endDate || base?.cronograma?.fechaFin || '',
+      nombre: formData.nombre,
+      departamento: formData.departamento,
+      prioridad: formData.prioridad,
+      ubicacion: {
+        estado: ub.estado || '',
+        municipio: ub.municipio || '',
+        direccion: ub.direccion || '',
       },
-      presupuesto: { manoObra, piezas, equipos, materiales, transporte, otros, total, _metaEquipos: metaEquipos },
-      totalPresupuesto: total,
-      createdAt: base?.createdAt,
-      updatedAt: new Date().toISOString(),
-      id: base?.id,
+      descripcion: formData.descripcion,
+      personalAsignado: Array.isArray(
+        formData.personalAsignado
+      )
+        ? formData.personalAsignado
+        : [],
+      estado: formData.estado,
+      presupuesto: pres,
     };
   };
 
+  /* ============= SUBMIT ============= */
   const handleSubmit = async (e) => {
     e?.preventDefault();
     if (!validate()) return;
     setIsSubmitting(true);
     try {
-      const payload = buildPayloadES();
-      await proyectoService.updateProyecto((serverProject || project)?.id, payload);
-      onSubmit && onSubmit(payload);
+      const payload = buildPayloadForUpdate();
+      await proyectoService.updateProyecto(
+        formData.id,
+        payload
+      );
+
+      uiEstadoCache.set(formData.id, formData.estado);
+
+      if (onSubmit) {
+        // Deja que el padre decida si muestra mensaje de éxito
+        onSubmit({
+          id: formData.id,
+          ...payload,
+          _uiEstado: formData.estado,
+        });
+      } else {
+        // Solo mostramos el mensaje aquí si no hay onSubmit
+        handleSuccess('update', 'Proyecto');
+      }
+
       onClose && onClose();
     } catch (err) {
       console.error('Error actualizando proyecto:', err);
-      const msg = err?.response?.data?.error || err?.message || 'Error desconocido';
-      alert('No se pudo actualizar el proyecto. Error: ' + msg);
+      handleError(err, 'Error actualizando proyecto');
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  /* ============= LABEL DEL CLIENTE ============= */
+  const b = formData.presupuesto || {};
+  const clientLabel = useMemo(() => {
+    if (!formData.clienteId) return '—';
+    const found = clientOptions.find(
+      (o) => o.value === formData.clienteId
+    );
+    return (
+      found?.label ||
+      formData.clienteNombre ||
+      formData.clienteId
+    );
+  }, [clientOptions, formData.clienteId, formData.clienteNombre]);
+
   if (!isOpen) return null;
 
-  const b = formData.budgetBreakdown || {};
-  const totalCalc =
-    (Number(b.labor) || 0) +
-    (Number(b.parts) || 0) +
-    (Number(b.equipment) || 0) +
-    (Number(b.materials) || 0) +
-    (Number(b.transportation) || 0) +
-    (Number(b.other) || 0);
+  const ub = formData.ubicacion || {
+    estado: '',
+    municipio: '',
+    direccion: '',
+  };
 
+  /* ===================== RENDER ===================== */
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-1050 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-1050 p-4">
       <div className="bg-card border border-border rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border">
           <div>
-            <h2 className="text-xl font-semibold text-foreground">Editar Proyecto</h2>
+            <h2 className="text-xl font-semibold text-foreground">
+              Editar Proyecto
+            </h2>
             <p className="text-sm text-muted-foreground">
-              {loadingProject ? 'Cargando datos…' : 'Actualice la información del proyecto'}
+              Actualice la información permitida
             </p>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
             <Icon name="X" size={20} />
           </Button>
         </div>
@@ -385,106 +587,249 @@ const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Información Básica */}
             <div className="md:col-span-2">
-              <h3 className="text-lg font-medium text-foreground mb-4">Información Básica</h3>
+              <h3 className="text-lg font-medium text-foreground mb-4">
+                Información Básica
+              </h3>
             </div>
 
             <Input
-              label="Nombre del Proyecto"
+              label="Código (solo lectura)"
+              value={asStr(formData?.codigo, '—')}
+              onChange={() => {}}
+              disabled
+            />
+
+            <Input
+              label="Tipo de Proyecto (solo lectura)"
+              value={asStr(formData?.tipoProyecto, '—')}
+              onChange={() => {}}
+              disabled
+            />
+
+            <Input
+              label="Cliente (solo lectura)"
+              value={asStr(clientLabel, '—')}
+              onChange={() => {}}
+              disabled
+            />
+
+            <Input
+              label="Nombre"
               type="text"
               placeholder="Ej: Instalación HVAC Edificio Central"
-              value={formData?.name}
-              onChange={(e) => handleInputChange('name', e?.target?.value)}
-              error={errors?.name}
-              required
-            />
-
-            <Input
-              label="Código del Proyecto"
-              type="text"
-              placeholder="Ej: PROJ-2024-001"
-              value={formData?.code}
-              onChange={(e) => handleInputChange('code', e?.target?.value)}
-              error={errors?.code}
-              description="Se generará automáticamente si se deja vacío"
-            />
-
-            <Input
-              label="Tipo de Proyecto"
-              type="text"
-              placeholder="Ej: Mantenimiento Preventivo"
-              value={formData?.type}
-              onChange={(e) => handleInputChange('type', e?.target?.value)}
-              error={errors?.type}
+              value={asStr(formData?.nombre)}
+              onChange={(e) =>
+                handle('nombre', e.target.value)
+              }
+              error={errors?.nombre}
               required
             />
 
             <Select
-              label="Cliente"
-              options={clientOptions}
-              value={formData?.client}
-              onChange={(value) => handleInputChange('client', value)}
-              searchable
-              loading={loadingClients}
-              placeholder="Seleccione un cliente"
-            />
-
-            <Input
               label="Departamento Responsable"
-              type="text"
-              placeholder="Ej: Mantenimiento"
-              value={formData?.department}
-              onChange={(e) => handleInputChange('department', e?.target?.value)}
-              error={errors?.department}
+              options={departmentOptions}
+              value={asStr(formData?.departamento)}
+              onChange={(value) =>
+                handle('departamento', value)
+              }
+              error={errors?.departamento}
               required
             />
 
             <Select
               label="Prioridad"
               options={priorityOptions}
-              value={formData?.priority}
-              onChange={(value) => handleInputChange('priority', value)}
-              placeholder="Seleccione prioridad"
+              value={asStr(formData?.prioridad)}
+              onChange={(value) =>
+                handle('prioridad', value)
+              }
+              error={errors?.prioridad}
+              required
             />
+
+            <Select
+              label="Estado"
+              options={estadoOptionsBackend}
+              value={asStr(formData?.estado)}
+              onChange={(value) =>
+                handle('estado', value)
+              }
+              error={errors?.estado}
+              required
+            />
+
+            {/* Ubicación */}
+            <div className="md:col-span-2 mt-2">
+              <h3 className="text-lg font-medium text-foreground mb-2">
+                Ubicación del Proyecto
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Seleccione estado y municipio, luego escriba la dirección completa del sitio.
+              </p>
+            </div>
+
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4 items-center">
+              <div className="flex flex-col justify-end h-full">
+                <Select
+                  label={
+                    <>
+                      Estado <span className="text-destructive">*</span>
+                    </>
+                  }
+                  value={ub.estado}
+                  onChange={(value) => {
+                    handleUbicacion('estado', value);
+                    handleUbicacion('municipio', '');
+                    setSelectedEstadoCode(value || '');
+                  }}
+                  options={
+                    estados
+                      ? [
+                          { value: '', label: 'Selecciona un estado' },
+                          ...estados.map((e) => ({
+                            value: e.code,
+                            label: e.name,
+                          })),
+                        ]
+                      : []
+                  }
+                  loading={loadingEstados}
+                  error={errors?.ubicacionEstado}
+                  required
+                  disabled={loadingEstados || !!errorEstados}
+                  placeholder={
+                    loadingEstados ? 'Cargando estados...' : 'Selecciona un estado'
+                  }
+                  searchable
+                  className="h-12 md:h-14 w-full text-base"
+                />
+              </div>
+
+              <div className="flex flex-col justify-end h-full">
+                <Select
+                  label={
+                    <>
+                      Municipio <span className="text-destructive">*</span>
+                    </>
+                  }
+                  value={ub.municipio}
+                  onChange={(value) =>
+                    handleUbicacion('municipio', value)
+                  }
+                  options={
+                    ub.estado === ''
+                      ? [{ value: '', label: 'Selecciona un estado primero' }]
+                      : loadingMunicipios
+                      ? [{ value: '', label: 'Cargando municipios...' }]
+                      : errorMunicipios
+                      ? [{ value: '', label: 'Error al cargar municipios' }]
+                      : [
+                          { value: '', label: 'Selecciona un municipio' },
+                          ...(municipios
+                            ? Object.values(municipios.municipios || {}).map(
+                                (m) => ({
+                                  value: m,
+                                  label: m,
+                                })
+                              )
+                            : []),
+                        ]
+                  }
+                  loading={loadingMunicipios}
+                  error={errors?.ubicacionMunicipio}
+                  required
+                  disabled={
+                    ub.estado === '' ||
+                    loadingMunicipios ||
+                    !!errorMunicipios
+                  }
+                  placeholder={
+                    ub.estado === ''
+                      ? 'Selecciona un estado primero'
+                      : loadingMunicipios
+                      ? 'Cargando municipios...'
+                      : 'Selecciona un municipio'
+                  }
+                  searchable
+                  className="h-12 md:h-14 w-full text-base"
+                />
+              </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <Input
+                label="Dirección"
+                required
+                value={ub.direccion}
+                onChange={(e) =>
+                  handleUbicacion('direccion', e?.target?.value)
+                }
+                error={errors?.ubicacionDireccion}
+                placeholder="Dirección completa"
+                className="h-12 md:h-14 w-full text-base"
+              />
+            </div>
+
+            {/* Descripción */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Descripción del Proyecto
+              </label>
+              <textarea
+                rows={4}
+                placeholder="Describa los objetivos, alcance y detalles importantes del proyecto..."
+                value={asStr(formData?.descripcion)}
+                onChange={(e) =>
+                  handle('descripcion', e.target.value)
+                }
+                className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+              />
+            </div>
 
             {/* Desglose de Presupuesto */}
             <div className="md:col-span-2 mt-6">
-              <h3 className="text-lg font-medium text-foreground mb-4">Desglose de Presupuesto</h3>
-              {errors?.budget && (
-                <p className="text-sm text-destructive mb-4">{errors?.budget}</p>
-              )}
+              <h3 className="text-lg font-medium text-foreground mb-4">
+                Desglose de Presupuesto
+              </h3>
             </div>
 
-            {/* Mano de obra */}
             <Input
               label="Mano de Obra (MXN)"
               type="text"
-              placeholder="0.00"
-              value={formatWithCommas(formData?.budgetBreakdown?.labor)}
-              onChange={(e) => handleBudgetChange('labor', e?.target?.value)}
               inputMode="decimal"
+              placeholder="0.00"
+              value={formatWithCommas(b?.manoObra)}
+              onChange={(e) =>
+                handleP('manoObra', e?.target?.value)
+              }
             />
 
-            {/* Piezas */}
             <Input
               label="Piezas (MXN)"
               type="text"
-              placeholder="0.00"
-              value={formatWithCommas(formData?.budgetBreakdown?.parts)}
-              onChange={(e) => handleBudgetChange('parts', e?.target?.value)}
               inputMode="decimal"
+              placeholder="0.00"
+              value={formatWithCommas(b?.piezas)}
+              onChange={(e) =>
+                handleP('piezas', e?.target?.value)
+              }
             />
 
-            {/* ===== Equipos con toggle USD ===== */}
+            {/* Equipos con toggle USD */}
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-foreground">
-                  Equipos ({isEquipmentInUSD ? 'USD (se convierte a MXN)' : 'MXN'})
+                  {isEquipmentInUSD
+                    ? 'Equipos (USD se convierte a MXN)'
+                    : 'Equipos (MXN)'}
                 </label>
                 <label className="inline-flex items-center gap-2 text-sm text-foreground cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={isEquipmentInUSD}
-                    onChange={(e) => toggleEquipmentUSD(e.target.checked)}
+                    onChange={(e) =>
+                      toggleUSD(e.target.checked)
+                    }
                     className="h-4 w-4 accent-primary cursor-pointer"
                   />
                   Precio en dólares
@@ -494,68 +839,102 @@ const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
               <input
                 type="text"
                 inputMode="decimal"
-                placeholder={isEquipmentInUSD ? '0.00 USD' : '0.00 MXN'}
+                placeholder={
+                  isEquipmentInUSD ? '0.00 USD' : '0.00 MXN'
+                }
                 value={
                   isEquipmentInUSD
                     ? uiEquipmentUSD
-                    : formatWithCommas(formData?.budgetBreakdown?.equipment)
+                    : formatWithCommas(b?.equipos)
                 }
-                onChange={(e) => handleBudgetChange('equipment', e?.target?.value)}
-                className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                onChange={(e) =>
+                  isEquipmentInUSD
+                    ? undefined
+                    : handleP('equipos', e?.target?.value)
+                }
+                readOnly={isEquipmentInUSD}
+                className={`w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent ${
+                  isEquipmentInUSD
+                    ? 'bg-muted cursor-not-allowed'
+                    : ''
+                }`}
               />
 
               {isEquipmentInUSD && (
-                <div className="flex items-center gap-3">
-                  <div className="flex-1">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex-1 min-w-[220px]">
                     <Input
                       label="Tipo de cambio (MXN / USD)"
                       type="text"
                       inputMode="decimal"
-                      placeholder="Ej: 18.00"
                       value={formatWithCommas(exchangeRate, 4)}
-                      onChange={(e) => handleExchangeRateChange(e?.target?.value)}
-                      error={errors?.exchangeRate}
+                      onChange={() => {}}
+                      readOnly
+                      disabled
                     />
                   </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={fetchUsdMxnRate}
+                    loading={loadingFx}
+                    iconName="RefreshCcw"
+                    iconPosition="left"
+                  >
+                    {loadingFx ? 'Actualizando…' : 'Actualizar tipo de cambio'}
+                  </Button>
+
                   <div className="text-sm text-muted-foreground whitespace-nowrap">
-                    Guardado en MXN: <span className="font-semibold">${formatWithCommas(formData?.budgetBreakdown?.equipment, 2)}</span>
+                    Guardado en MXN:{' '}
+                    <span className="font-semibold">
+                      ${formatWithCommas(b?.equipos, 2)}
+                    </span>
                   </div>
+
+                  {fxError && (
+                    <div className="text-xs text-destructive">
+                      {fxError}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-            {/* ===== Fin Equipos ===== */}
 
-            {/* Materiales */}
             <Input
               label="Materiales (MXN)"
               type="text"
-              placeholder="0.00"
-              value={formatWithCommas(formData?.budgetBreakdown?.materials)}
-              onChange={(e) => handleBudgetChange('materials', e?.target?.value)}
               inputMode="decimal"
+              placeholder="0.00"
+              value={formatWithCommas(b?.materiales)}
+              onChange={(e) =>
+                handleP('materiales', e?.target?.value)
+              }
             />
 
-            {/* Transporte */}
             <Input
               label="Transporte (MXN)"
               type="text"
-              placeholder="0.00"
-              value={formatWithCommas(formData?.budgetBreakdown?.transportation)}
-              onChange={(e) => handleBudgetChange('transportation', e?.target?.value)}
               inputMode="decimal"
+              placeholder="0.00"
+              value={formatWithCommas(b?.transporte)}
+              onChange={(e) =>
+                handleP('transporte', e?.target?.value)
+              }
             />
 
-            {/* Otros */}
             <Input
               label="Otros Gastos (MXN)"
               type="text"
-              placeholder="0.00"
-              value={formatWithCommas(formData?.budgetBreakdown?.other)}
-              onChange={(e) => handleBudgetChange('other', e?.target?.value)}
               inputMode="decimal"
+              placeholder="0.00"
+              value={formatWithCommas(b?.otros)}
+              onChange={(e) =>
+                handleP('otros', e?.target?.value)
+              }
             />
 
-            {/* Total del Presupuesto */}
+            {/* Total */}
             <div className="md:col-span-2">
               <div className="bg-muted p-4 rounded-lg">
                 <div className="flex justify-between items-center">
@@ -563,106 +942,81 @@ const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
                     Total del Presupuesto (MXN):
                   </span>
                   <span className="text-lg font-semibold text-primary">
-                    {`$${(Number(formData?.budgetBreakdown?.labor || 0)
-                      + Number(formData?.budgetBreakdown?.parts || 0)
-                      + Number(formData?.budgetBreakdown?.equipment || 0)
-                      + Number(formData?.budgetBreakdown?.materials || 0)
-                      + Number(formData?.budgetBreakdown?.transportation || 0)
-                      + Number(formData?.budgetBreakdown?.other || 0))
-                      .toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN`}
+                    ${formatWithCommas(totalMXN, 2)} MXN
                   </span>
                 </div>
-                {/* Si quieres ver equivalente del total en USD cuando el toggle está activo */}
-                {isEquipmentInUSD && exchangeRate > 0 && (
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    Equivalente aproximado del total en USD (solo equipos convertidos):{' '}
-                    <span className="font-medium">
-                      ${(
-                        (Number(formData?.budgetBreakdown?.labor || 0)
-                        + Number(formData?.budgetBreakdown?.parts || 0)
-                        + Number(formData?.budgetBreakdown?.materials || 0)
-                        + Number(formData?.budgetBreakdown?.transportation || 0)
-                        + Number(formData?.budgetBreakdown?.other || 0)) / (exchangeRate || 1)
-                        + unformatNumber(uiEquipmentUSD || 0) // equipos ya está en USD visual
-                      ).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                )}
               </div>
             </div>
 
-            {/* Ubicación */}
-            <Input
-              label="Ubicación"
-              type="text"
-              placeholder="Ej: Ciudad de México, CDMX"
-              value={formData?.location}
-              onChange={(e) => handleInputChange('location', e?.target?.value)}
-              error={errors?.location}
-              required
-            />
-
-            {/* Cronograma */}
+            {/* Cronograma (solo lectura) */}
             <div className="md:col-span-2 mt-6">
-              <h3 className="text-lg font-medium text-foreground mb-4">Cronograma</h3>
+              <h3 className="text-lg font-medium text-foreground mb-4">
+                Cronograma
+              </h3>
             </div>
 
             <Input
-              label="Fecha de Inicio"
+              label="Fecha de Inicio (solo lectura)"
               type="date"
-              value={formData?.startDate}
-              onChange={(e) => handleInputChange('startDate', e?.target?.value)}
-              error={errors?.startDate}
-              required
+              value={asStr(
+                formData?.cronograma?.fechaInicio,
+                ''
+              )}
+              onChange={() => {}}
+              disabled
             />
-
             <Input
-              label="Fecha de Finalización"
+              label="Fecha de Finalización (solo lectura)"
               type="date"
-              value={formData?.endDate}
-              onChange={(e) => handleInputChange('endDate', e?.target?.value)}
-              error={errors?.endDate}
-              required
+              value={asStr(
+                formData?.cronograma?.fechaFin,
+                ''
+              )}
+              onChange={() => {}}
+              disabled
             />
 
-            {/* Personal */}
+            {/* Asignación de Personal */}
             <div className="md:col-span-2 mt-6">
-              <h3 className="text-lg font-medium text-foreground mb-4">Asignación de Personal</h3>
+              <h3 className="text-lg font-medium text-foreground mb-4">
+                Asignación de Personal
+              </h3>
             </div>
 
             <div className="md:col-span-2">
               <Select
                 label="Personal Asignado"
-                options={personnelOptionsFinal}
-                value={formData?.assignedPersonnel}
-                onChange={(value) => handleInputChange('assignedPersonnel', value)}
+                options={personnelOptions}
+                value={asArr(formData?.personalAsignado).map(String)}
+                onChange={(value) =>
+                  handle(
+                    'personalAsignado',
+                    asArr(value).map(String)
+                  )
+                }
                 multiple
                 searchable
                 description="Seleccione el personal que trabajará en este proyecto"
               />
             </div>
-
-            {/* Descripción */}
-            <div className="md:col-span-2 mt-6">
-              <label className="block text-sm font-medium text-foreground mb-2">
-                Descripción del Proyecto
-              </label>
-              <textarea
-                rows={4}
-                placeholder="Describa los objetivos, alcance y detalles importantes del proyecto..."
-                value={formData?.description}
-                onChange={(e) => handleInputChange('description', e?.target?.value)}
-                className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
-              />
-            </div>
           </div>
 
           {/* Acciones */}
-          <div className="flex items-center justify-end space-x-4 mt-8 pt-6 border-t border-border">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+          <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-border">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
               Cancelar
             </Button>
-            <Button type="submit" loading={isSubmitting} iconName="Save" iconPosition="left">
+            <Button
+              type="submit"
+              loading={isSubmitting}
+              iconName="Save"
+              iconPosition="left"
+            >
               {isSubmitting ? 'Guardando...' : 'Guardar Cambios'}
             </Button>
           </div>

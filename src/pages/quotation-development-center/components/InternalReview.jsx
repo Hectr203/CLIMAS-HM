@@ -1,16 +1,109 @@
 import React, { useState } from 'react';
+import { useNotifications } from '../../../context/NotificationContext';
+import useQuotation from '../../../hooks/useQuotation';
         import Icon from '../../../components/AppIcon';
         import Button from '../../../components/ui/Button';
         import Input from '../../../components/ui/Input';
 
         const InternalReview = ({ quotation, onSubmitReview }) => {
+          const { showSuccess, showError } = useNotifications();
+          const { upsertRevision } = useQuotation();
+          
+          // ✅ Función para verificar si un área tiene datos válidos
+          const areaTieneDatos = (area) => {
+            if (!area || typeof area !== 'object') return false;
+            
+            // Tiene comentarios con contenido
+            const tieneComentarios = area.comentarios && 
+                                    typeof area.comentarios === 'string' && 
+                                    area.comentarios.trim().length > 0;
+            
+            // Está marcado como revisado
+            const estaRevisado = area.revisado === true;
+            
+            // Tiene revisor asignado
+            const tieneRevisor = area.revisor && 
+                                typeof area.revisor === 'string' && 
+                                area.revisor.trim().length > 0;
+            
+            // Es válida si tiene comentarios O está revisado O tiene revisor
+            return tieneComentarios || estaRevisado || tieneRevisor;
+          };
+          
+          // ✅ Función para filtrar solo áreas con datos reales
+          const filtrarAreasConDatos = (areasRevision) => {
+            const areasFiltradas = {};
+            
+            Object.entries(areasRevision || {}).forEach(([key, value]) => {
+              if (areaTieneDatos(value)) {
+                areasFiltradas[key] = value;
+              }
+            });
+            
+            return areasFiltradas;
+          };
+          
+          // Función para enviar la revisión al backend
+          const sendRevisionToBackend = async (reviewData) => {
+            try {
+              const fechaHoy = new Date().toISOString().split('T')[0];
+              
+              // Mapeo de nombres de áreas
+              const areaMap = {
+                preciosYCostos: 'Precios y Costos',
+                alcanceYSupuestos: 'Alcance y Supuestos',
+                cronograma: 'Cronograma',
+                aspectosTecnicos: 'Aspectos Técnicos'
+              };
+              
+              // ✅ FILTRAR áreas antes de construir el payload
+              const areasFiltradas = filtrarAreasConDatos(reviewData?.areasRevision);
+              
+              // Verificar si hay comentarios generales con contenido
+              const tieneComentariosGenerales = overallComments && 
+                                               typeof overallComments === 'string' && 
+                                               overallComments.trim().length > 0;
+              
+              // ✅ Si no hay datos válidos para enviar, mostrar error
+              if (Object.keys(areasFiltradas).length === 0 && !tieneComentariosGenerales) {
+                showError('Debes completar al menos un área de revisión o agregar comentarios generales');
+                return;
+              }
+              
+              // Construir el objeto de revisión solo con áreas que tienen datos
+              const areasRevision = {};
+              Object.entries(areasFiltradas).forEach(([key, value]) => {
+                const areaName = areaMap[key] || key;
+                areasRevision[areaName] = {
+                  [fechaHoy]: {
+                    revisor: value?.revisor?.trim() || '',
+                    revisado: value?.revisado || false,
+                    comentarios: value?.comentarios?.trim() || '',
+                    fecha: fechaHoy
+                  }
+                };
+              });
+              
+              const revisionPayload = {
+                idCotizacion: quotation?.id,
+                areasRevision,
+                comentariosGenerales: tieneComentariosGenerales ? overallComments.trim() : undefined
+              };
+              
+              await upsertRevision(revisionPayload);
+              showSuccess('Revisión enviada correctamente');
+            } catch (err) {
+              showError('Error al enviar la revisión');
+              console.error('Error:', err);
+            }
+          };
           const [reviewData, setReviewData] = useState(quotation?.internalReview || {
             status: 'pending',
-            reviewAreas: {
-              pricing: { reviewed: false, reviewer: '', comments: '' },
-              scope: { reviewed: false, reviewer: '', comments: '' },
-              timeline: { reviewed: false, reviewer: '', comments: '' },
-              technical: { reviewed: false, reviewer: '', comments: '' }
+            areasRevision: {
+              preciosYCostos: { revisado: false, revisor: '', comentarios: '' },
+              alcanceYSupuestos: { revisado: false, revisor: '', comentarios: '' },
+              cronograma: { revisado: false, revisor: '', comentarios: '' },
+              aspectosTecnicos: { revisado: false, revisor: '', comentarios: '' }
             }
           });
 
@@ -18,25 +111,25 @@ import React, { useState } from 'react';
 
           const reviewAreas = [
             { 
-              key: 'pricing', 
+              key: 'preciosYCostos', 
               name: 'Precios y Costos', 
               icon: 'DollarSign',
               description: 'Revisión de precios competitivos y márgenes'
             },
             { 
-              key: 'scope', 
+              key: 'alcanceYSupuestos', 
               name: 'Alcance y Supuestos', 
               icon: 'FileText',
               description: 'Validación del alcance definido y supuestos'
             },
             { 
-              key: 'timeline', 
+              key: 'cronograma', 
               name: 'Cronograma', 
               icon: 'Calendar',
               description: 'Evaluación de tiempos de ejecución'
             },
             { 
-              key: 'technical', 
+              key: 'aspectosTecnicos', 
               name: 'Aspectos Técnicos', 
               icon: 'Settings',
               description: 'Revisión de solución técnica propuesta'
@@ -46,10 +139,10 @@ import React, { useState } from 'react';
           const handleAreaChange = (area, field, value) => {
             setReviewData(prev => ({
               ...prev,
-              reviewAreas: {
-                ...prev?.reviewAreas,
+              areasRevision: {
+                ...prev?.areasRevision,
                 [area]: {
-                  ...prev?.reviewAreas?.[area],
+                  ...prev?.areasRevision?.[area],
                   [field]: value
                 }
               }
@@ -63,18 +156,16 @@ import React, { useState } from 'react';
               submittedDate: new Date()?.toISOString()?.split('T')?.[0],
               submittedBy: quotation?.assignedTo
             };
-
             onSubmitReview?.(updatedReview);
+            sendRevisionToBackend(updatedReview);
           };
 
           const handleApproveReview = () => {
-            const allAreasReviewed = Object.values(reviewData?.reviewAreas)?.every(area => area?.reviewed);
-            
+            const allAreasReviewed = Object.values(reviewData?.areasRevision)?.every(area => area?.revisado);
             if (!allAreasReviewed) {
               alert('Todas las áreas deben ser revisadas antes de la aprobación');
               return;
             }
-
             const approvedReview = {
               ...reviewData,
               status: 'approved',
@@ -82,8 +173,8 @@ import React, { useState } from 'react';
               approvedBy: 'Ventas/Martín', // This would come from current user
               overallComments
             };
-
             onSubmitReview?.(approvedReview);
+            sendRevisionToBackend(approvedReview);
           };
 
           const getStatusColor = (status) => {
@@ -97,8 +188,8 @@ import React, { useState } from 'react';
           };
 
           const getCompletionPercentage = () => {
-            const totalAreas = Object.keys(reviewData?.reviewAreas)?.length;
-            const reviewedAreas = Object.values(reviewData?.reviewAreas)?.filter(area => area?.reviewed)?.length;
+            const totalAreas = Object.keys(reviewData?.areasRevision)?.length;
+            const reviewedAreas = Object.values(reviewData?.areasRevision)?.filter(area => area?.revisado)?.length;
             return Math.round((reviewedAreas / totalAreas) * 100);
           };
 
@@ -142,7 +233,7 @@ import React, { useState } from 'react';
                       {/* Area Icon and Info */}
                       <div className="flex-shrink-0">
                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                          reviewData?.reviewAreas?.[area?.key]?.reviewed 
+                          reviewData?.areasRevision?.[area?.key]?.revisado 
                             ? 'bg-green-100 text-green-600' :'bg-muted text-muted-foreground'
                         }`}>
                           <Icon name={area?.icon} size={20} />
@@ -154,7 +245,7 @@ import React, { useState } from 'react';
                         <div>
                           <div className="flex items-center space-x-2">
                             <h5 className="font-medium">{area?.name}</h5>
-                            {reviewData?.reviewAreas?.[area?.key]?.reviewed && (
+                            {reviewData?.areasRevision?.[area?.key]?.revisado && (
                               <Icon name="CheckCircle" size={16} className="text-green-600" />
                             )}
                           </div>
@@ -166,8 +257,8 @@ import React, { useState } from 'react';
                           <div>
                             <label className="text-sm font-medium mb-1 block">Revisor</label>
                             <Input
-                              value={reviewData?.reviewAreas?.[area?.key]?.reviewer}
-                              onChange={(e) => handleAreaChange(area?.key, 'reviewer', e?.target?.value)}
+                              value={reviewData?.areasRevision?.[area?.key]?.revisor}
+                              onChange={(e) => handleAreaChange(area?.key, 'revisor', e?.target?.value)}
                               placeholder="Nombre del revisor"
                               size="sm"
                             />
@@ -177,8 +268,8 @@ import React, { useState } from 'react';
                               <input
                                 type="checkbox"
                                 id={`reviewed-${area?.key}`}
-                                checked={reviewData?.reviewAreas?.[area?.key]?.reviewed}
-                                onChange={(e) => handleAreaChange(area?.key, 'reviewed', e?.target?.checked)}
+                                checked={reviewData?.areasRevision?.[area?.key]?.revisado}
+                                onChange={(e) => handleAreaChange(area?.key, 'revisado', e?.target?.checked)}
                                 className="rounded border-border"
                               />
                               <label htmlFor={`reviewed-${area?.key}`} className="text-sm">
@@ -192,8 +283,8 @@ import React, { useState } from 'react';
                         <div>
                           <label className="text-sm font-medium mb-1 block">Comentarios</label>
                           <textarea
-                            value={reviewData?.reviewAreas?.[area?.key]?.comments}
-                            onChange={(e) => handleAreaChange(area?.key, 'comments', e?.target?.value)}
+                            value={reviewData?.areasRevision?.[area?.key]?.comentarios}
+                            onChange={(e) => handleAreaChange(area?.key, 'comentarios', e?.target?.value)}
                             placeholder="Comentarios y observaciones..."
                             rows={2}
                             className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background resize-none"

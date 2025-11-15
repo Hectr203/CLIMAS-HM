@@ -4,6 +4,7 @@ import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
 import Sidebar from '../../components/ui/Sidebar';
 import Header from '../../components/ui/Header';
+import Breadcrumb from '../../components/ui/Breadcrumb';
 import ImageGallery from './components/ImageGallery';
 import FilterToolbar from './components/FilterToolbar';
 import ImageLightbox from './components/ImageLightbox';
@@ -357,9 +358,9 @@ const ProjectGalleryViewer = () => {
     return (
       <div className="min-h-screen bg-background flex">
         <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
-        <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
+        <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'}`}>
           <Header onMenuToggle={() => setHeaderMenuOpen(!headerMenuOpen)} isMenuOpen={headerMenuOpen} />
-          <div className="pt-16 flex items-center justify-center h-96">
+          <div className="flex items-center justify-center h-96">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
               <p className="text-muted-foreground">Cargando galería del proyecto...</p>
@@ -374,11 +375,16 @@ const ProjectGalleryViewer = () => {
     <div className="min-h-screen bg-background flex">
       <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
       
-      <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
+      <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'}`}>
         <Header onMenuToggle={() => setHeaderMenuOpen(!headerMenuOpen)} isMenuOpen={headerMenuOpen} />
         
-        <div className="pt-16">
-          <div className="container mx-auto px-4 py-6">
+        <div className="">
+          <div className="container mx-auto px-4 py-8">
+            {/* Breadcrumb */}
+            <div className="mb-6">
+              <Breadcrumb />
+            </div>
+
             {/* Header with Navigation */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center space-x-4">
@@ -387,7 +393,7 @@ const ProjectGalleryViewer = () => {
                   size="sm"
                   iconName="ArrowLeft"
                   iconPosition="left"
-                  onClick={() => navigate('/project-management')}
+                  onClick={() => navigate('/proyectos')}
                 >
                   Volver a Proyectos
                 </Button>

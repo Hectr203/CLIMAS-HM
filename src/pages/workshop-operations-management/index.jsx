@@ -1,166 +1,151 @@
 import React, { useState, useEffect } from 'react';
-        import Icon from '../../components/AppIcon';
-        import Button from '../../components/ui/Button';
-        import Sidebar from '../../components/ui/Sidebar';
-        import Breadcrumb from '../../components/ui/Breadcrumb';
-        import WorkflowBoard from './components/WorkflowBoard';
-        import WorkflowControls from './components/WorkflowControls';
-        import MaterialReceptionPanel from './components/MaterialReceptionPanel';
-        import SafetyChecklistPanel from './components/SafetyChecklistPanel';
-        import AttendancePanel from './components/AttendancePanel';
-        import QualityControlPanel from './components/QualityControlPanel';
-        import ChangeOrderPanel from './components/ChangeOrderPanel';
+import Icon from '../../components/AppIcon';
+import Button from '../../components/ui/Button';
+import Sidebar from '../../components/ui/Sidebar';
+import Breadcrumb from '../../components/ui/Breadcrumb';
+import WorkflowBoard from './components/WorkflowBoard';
+import useOperacAlt from '../../hooks/useOperacAlt';
+import WorkflowControls from './components/WorkflowControls';
+import MaterialReceptionPanel from './components/MaterialReceptionPanel';
+import SafetyChecklistPanel from './components/SafetyChecklistPanel';
+import AttendancePanel from './components/AttendancePanel';
+import QualityControlPanel from './components/QualityControlPanel';
+import ChangeOrderPanel from './components/ChangeOrderPanel';
 
-        const WorkshopOperationsManagement = () => {
-          const [workOrders, setWorkOrders] = useState([]);
-          const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-          const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-          const [activePanel, setActivePanel] = useState('workflow');
-          const [selectedOrder, setSelectedOrder] = useState(null);
-          const [isLoading, setIsLoading] = useState(true);
-          const [currentShift, setCurrentShift] = useState('morning');
+const WorkshopOperationsManagement = () => {
+  const [workOrders, setWorkOrders] = useState([]);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activePanel, setActivePanel] = useState('workflow');
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [panelMissingByOrder, setPanelMissingByOrder] = useState({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentShift, setCurrentShift] = useState('morning');
+  const { oportunities, getOportunities, updateWorkOrder: updateWorkOrderRemote, deleteWorkOrder: deleteWorkOrderRemote } = useOperacAlt();
 
-          // Mock workshop work orders data
-          const mockWorkOrders = [
-            {
-              id: 'WO-2024-101',
-              projectRef: 'PROJ-2024-001',
-              clientName: 'ABC Corporation',
-              status: 'material-reception',
-              statusLabel: 'Recepción Material',
-              priority: 'high',
-              priorityLabel: 'Alta',
-              assignedTechnicians: [
-                { name: 'Carlos Martínez', role: 'Técnico Senior' },
-                { name: 'Ana Rodríguez', role: 'Especialista' }
-              ],
-              materials: {
-                received: 8,
-                total: 10,
-                status: 'partial',
-                issues: ['Falta ducto de 12"', 'Rejilla dañada']
-              },
-              progress: 15,
-              estimatedCompletion: '2024-04-15',
-              safetyChecklistCompleted: false,
-              qualityControlStatus: 'pending',
-              changeOrders: []
-            },
-            {
-              id: 'WO-2024-102',
-              projectRef: 'PROJ-2024-001',
-              clientName: 'ABC Corporation',
-              status: 'safety-checklist',
-              statusLabel: 'Lista Seguridad',
-              priority: 'high',
-              priorityLabel: 'Alta',
-              assignedTechnicians: [
-                { name: 'Luis García', role: 'Supervisor' }
-              ],
-              materials: {
-                received: 10,
-                total: 10,
-                status: 'complete',
-                issues: []
-              },
-              progress: 25,
-              estimatedCompletion: '2024-04-18',
-              safetyChecklistCompleted: false,
-              qualityControlStatus: 'pending',
-              changeOrders: []
-            },
-            {
-              id: 'WO-2024-103',
-              projectRef: 'PROJ-2024-002',
-              clientName: 'XYZ Industries',
-              status: 'manufacturing',
-              statusLabel: 'Fabricación',
-              priority: 'medium',
-              priorityLabel: 'Media',
-              assignedTechnicians: [
-                { name: 'María López', role: 'Fabricador' },
-                { name: 'José Hernández', role: 'Asistente' }
-              ],
-              materials: {
-                received: 15,
-                total: 15,
-                status: 'complete',
-                issues: []
-              },
-              progress: 65,
-              estimatedCompletion: '2024-04-20',
-              safetyChecklistCompleted: true,
-              qualityControlStatus: 'in-progress',
-              changeOrders: [
-                { id: 1, description: 'Modificar dimensiones según ingeniería', date: '2024-04-10' }
-              ]
-            },
-            {
-              id: 'WO-2024-104',
-              projectRef: 'PROJ-2024-003',
-              clientName: 'Green Energy México',
-              status: 'quality-control',
-              statusLabel: 'Control Calidad',
-              priority: 'urgent',
-              priorityLabel: 'Urgente',
-              assignedTechnicians: [
-                { name: 'Roberto Silva', role: 'Inspector' },
-                { name: 'Carmen Díaz', role: 'Técnico QC' }
-              ],
-              materials: {
-                received: 20,
-                total: 20,
-                status: 'complete',
-                issues: []
-              },
-              progress: 85,
-              estimatedCompletion: '2024-04-12',
-              safetyChecklistCompleted: true,
-              qualityControlStatus: 'review',
-              changeOrders: []
-            },
-            {
-              id: 'WO-2024-105',
-              projectRef: 'PROJ-2024-004',
-              clientName: 'Tech Solutions SA',
-              status: 'ready-shipment',
-              statusLabel: 'Listo Envío',
-              priority: 'high',
-              priorityLabel: 'Alta',
-              assignedTechnicians: [
-                { name: 'Fernando Ruiz', role: 'Coordinador' }
-              ],
-              materials: {
-                received: 12,
-                total: 12,
-                status: 'complete',
-                issues: []
-              },
-              progress: 100,
-              estimatedCompletion: '2024-04-11',
-              safetyChecklistCompleted: true,
-              qualityControlStatus: 'approved',
-              changeOrders: []
-            }
-          ];
+  useEffect(() => {
+    const loadWorkOrders = async () => {
+      setIsLoading(true);
+      try {
+        const data = await getOportunities();
+        setWorkOrders(Array.isArray(data) ? data : []);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-          useEffect(() => {
-            const loadWorkOrders = async () => {
-              setIsLoading(true);
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              setWorkOrders(mockWorkOrders);
-              setIsLoading(false);
-            };
+    loadWorkOrders();
+  }, []);
 
-            loadWorkOrders();
-          }, []);
+  const handleOrderStatusChange = (orderId, newStatus, payload = {}) => {
+    if (payload && payload.hidden) {
+      try {
+        const matched = (workOrders || []).find(order => {
+          if (!order) return false;
+          const candidates = [order?.id, order?.ordenTrabajo, order?.folio, order?.raw?.id, order?.raw?.ordenTrabajo, order?.raw?.folio];
+          return candidates.some(c => c !== undefined && c !== null && String(c) === String(orderId));
+        });
 
-          const handleOrderStatusChange = (orderId, newStatus) => {
-            setWorkOrders(prev => prev?.map(order => 
-              order?.id === orderId 
-                ? { ...order, status: newStatus, statusLabel: getStatusLabel(newStatus) }
-                : order
-            ));
+        const backendId = matched?.id || matched?.ordenTrabajo || matched?.folio || null;
+
+        if (backendId && deleteWorkOrderRemote) {
+          const doRemoteDelete = () => {
+            return deleteWorkOrderRemote(backendId).then((success) => {
+              if (success) {
+                setWorkOrders(prev => {
+                  const list = prev || [];
+                  return list.filter(order => {
+                    if (!order) return false;
+                    const candidates = [order?.id, order?.ordenTrabajo, order?.folio, order?.raw?.id, order?.raw?.ordenTrabajo, order?.raw?.folio];
+                    return !candidates.some(c => c !== undefined && c !== null && String(c) === String(orderId));
+                  });
+                });
+              }
+              return success;
+            }).catch(() => {
+              return false;
+            });
+          };
+
+          if (backendId && updateWorkOrderRemote) {
+            updateWorkOrderRemote(backendId, { estadoProgreso: 100, completed: true })
+              .then(() => doRemoteDelete())
+              .catch(() => doRemoteDelete());
+          } else {
+            doRemoteDelete();
+          }
+        } else {
+        }
+      } catch (e) {
+       //ignora los errores
+      }
+
+      return;
+    }
+
+    setWorkOrders(prev => (prev || []).map(order => {
+      if (!order) return order;
+      const candidates = [order?.id, order?.ordenTrabajo, order?.folio, order?.raw?.id, order?.raw?.ordenTrabajo, order?.raw?.folio];
+      const matches = candidates.some(c => c !== undefined && c !== null && String(c) === String(orderId));
+      if (!matches) return order;
+      return {
+        ...order,
+        status: newStatus,
+        statusLabel: getStatusLabel(newStatus),
+        ...(payload.estadoProgreso !== undefined ? { estadoProgreso: payload.estadoProgreso } : {}),
+        ...(payload.completed ? { completed: true } : {})
+      };
+    }));
+    try {
+      const matched = (workOrders || []).find(order => {
+        if (!order) return false;
+        const candidates = [order?.id, order?.ordenTrabajo, order?.folio, order?.raw?.id, order?.raw?.ordenTrabajo, order?.raw?.folio];
+        return candidates.some(c => c !== undefined && c !== null && String(c) === String(orderId));
+      });
+      const backendId = matched?.id || matched?.ordenTrabajo || matched?.folio || null;
+      if (backendId && updateWorkOrderRemote) {
+        // send the payload + status so backend can update progress/status
+        const remotePayload = { ...(payload || {}), status: newStatus };
+        updateWorkOrderRemote(backendId, remotePayload).catch(() => {
+          // already handled inside hook (notifications)
+        });
+      } else {
+        // no backend id or updateWorkOrderRemote available for this order
+      }
+    } catch (e) {
+      // error while attempting remote update
+    }
+  };
+
+          // Force-remove helper (used by debug control) - removes matching order by id/ordenTrabajo/folio or by JSON substring
+          const handleForceRemove = (orderId) => {
+            if (!orderId) return;
+            setWorkOrders(prev => {
+              const list = prev || [];
+              // attempt exact-field removal first
+              const directMatches = list.filter(order => {
+                if (!order) return false;
+                const candidates = [order?.id, order?.ordenTrabajo, order?.folio, order?.raw?.id, order?.raw?.ordenTrabajo, order?.raw?.folio];
+                return candidates.some(c => c !== undefined && c !== null && String(c) === String(orderId));
+              });
+              if (directMatches.length > 0) {
+                return list.filter(order => {
+                  if (!order) return false;
+                  const candidates = [order?.id, order?.ordenTrabajo, order?.folio, order?.raw?.id, order?.raw?.ordenTrabajo, order?.raw?.folio];
+                  return !candidates.some(c => c !== undefined && c !== null && String(c) === String(orderId));
+                });
+              }
+
+              // fallback: remove by JSON substring
+              try {
+                const needle = String(orderId);
+                return list.filter(order => {
+                  try { return !JSON.stringify(order).includes(needle); } catch (e) { return true; }
+                });
+              } catch (e) {
+                return list;
+              }
+            });
           };
 
           const getStatusLabel = (status) => {
@@ -174,6 +159,80 @@ import React, { useState, useEffect } from 'react';
             return statusLabels?.[status] || status;
           };
 
+          // map various backend status/estado strings to canonical column ids
+          const mapToColumnId = (val) => {
+            if (!val) return '';
+            const v = String(val).toLowerCase().trim();
+            if (['material-reception','recepcion material','recepción material','recepción_material','recepción','pendiente','pendiente por revisar','new','nuevo'].includes(v)) return 'material-reception';
+            if (['safety-checklist','lista seguridad','seguridad','safety','checklist seguridad'].includes(v)) return 'safety-checklist';
+            if (['manufacturing','fabricación','fabricacion','en progreso','progreso','producción','produccion','en pausa','pausa','pausado'].includes(v)) return 'manufacturing';
+            if (['quality-control','control calidad','calidad','qc','quality','revisión'].includes(v)) return 'quality-control';
+            if (['ready-shipment','listo envío','listo envio','envío','envio','enviado','completada','completado','listo'].includes(v)) return 'ready-shipment';
+            // fallback: if it's already a canonical id
+            if (['material-reception','safety-checklist','manufacturing','quality-control','ready-shipment'].includes(v)) return v;
+            return '';
+          };
+
+          const columns = ['material-reception','safety-checklist','manufacturing','quality-control','ready-shipment'];
+
+          const getPreviousColumn = (current) => {
+            const idx = columns.indexOf(current);
+            if (idx <= 0) return columns[0];
+            return columns[idx - 1];
+          };
+
+          const computeProgressForColumn = (col) => {
+            const idx = columns.indexOf(col);
+            if (idx < 0) return 0;
+            return Math.round((idx / (columns.length - 1)) * 100);
+          };
+
+          // allow parent to revert an order to previous status and restore progress
+          const handleRevertStatus = (orderRef) => {
+            setWorkOrders(prev => (prev || []).map(order => {
+              if (!order) return order;
+              // build candidate values for the existing order
+              const orderCandidates = [order?.id, order?.ordenTrabajo, order?.folio, order?.raw?.id, order?.raw?.ordenTrabajo, order?.raw?.folio].filter(Boolean).map(String);
+
+              // build candidate values from the provided reference (could be a string id or the selected object)
+              let refCandidates = [];
+              try {
+                if (orderRef && typeof orderRef === 'object') {
+                  refCandidates = [orderRef?.id, orderRef?.ordenTrabajo, orderRef?.folio, orderRef?.raw?.id, orderRef?.raw?.ordenTrabajo, orderRef?.raw?.folio].filter(Boolean).map(String);
+                } else {
+                  refCandidates = [String(orderRef)];
+                }
+              } catch (e) {
+                refCandidates = [String(orderRef || '')];
+              }
+
+              const matches = orderCandidates.some(oc => refCandidates.some(rc => rc === oc));
+
+              // fallback: if no exact match, allow substring match against serialized orderRef when it's a string
+              if (!matches) {
+                try {
+                  const needle = typeof orderRef === 'string' ? orderRef : JSON.stringify(orderRef || '');
+                  if (needle && JSON.stringify(order).includes(needle)) {
+                    // consider this a match
+                  } else return order;
+                } catch (e) {
+                  return order;
+                }
+              }
+
+              const current = mapToColumnId(order?.status || order?.estado || '');
+              const prevCol = getPreviousColumn(current || columns[0]);
+              const restoredProgress = computeProgressForColumn(prevCol);
+              return {
+                ...order,
+                status: prevCol,
+                statusLabel: getStatusLabel(prevCol),
+                estadoProgreso: restoredProgress,
+                progress: restoredProgress
+              };
+            }));
+          };
+
           const handleMaterialReception = (orderId, receptionData) => {
             setWorkOrders(prev => prev?.map(order => 
               order?.id === orderId 
@@ -185,22 +244,48 @@ import React, { useState, useEffect } from 'react';
                       status: receptionData?.status,
                       issues: receptionData?.issues
                     },
+                    recepcionMateriales: receptionData?.recepcionMateriales || null,
                     status: receptionData?.status === 'complete' ? 'safety-checklist' : 'material-reception'
                   }
                 : order
             ));
           };
 
-          const handleSafetyChecklist = (orderId, completed) => {
+          const handleSafetyChecklist = (orderId, payload) => {
+            // payload can be a boolean (completed) or an object { completed: bool, missingPPE: [] }
+            const completed = typeof payload === 'boolean' ? payload : !!(payload && payload.completed);
+            const missingPPE = (payload && Array.isArray(payload.missingPPE)) ? payload.missingPPE : [];
             setWorkOrders(prev => prev?.map(order => 
               order?.id === orderId 
                 ? { 
                     ...order, 
                     safetyChecklistCompleted: completed,
+                    safetyChecklistMissing: missingPPE,
                     status: completed ? 'manufacturing' : 'safety-checklist'
                   }
                 : order
             ));
+            try {
+              const matched = (workOrders || []).find(order => {
+                if (!order) return false;
+                const candidates = [order?.id, order?.ordenTrabajo, order?.folio, order?.raw?.id, order?.raw?.ordenTrabajo, order?.raw?.folio];
+                return candidates.some(c => c !== undefined && c !== null && String(c) === String(orderId));
+              });
+              const backendId = matched?.id || matched?.ordenTrabajo || matched?.folio || null;
+              if (backendId && updateWorkOrderRemote) {
+                // Compose remote payload - include completed and missingPPE under flexible keys
+                const remotePayload = {
+                  safetyChecklistCompleted: completed,
+                  safetyChecklistMissing: missingPPE,
+                  completed: completed
+                };
+                updateWorkOrderRemote(backendId, remotePayload).catch(() => {
+                  // failure to persist remotely is non-fatal; local state remains authoritative until next sync
+                });
+              }
+            } catch (e) {
+              // ignore errors
+            }
           };
 
           const handleQualityControl = (orderId, qcData) => {
@@ -243,8 +328,8 @@ import React, { useState, useEffect } from 'react';
             return (
               <div className="min-h-screen bg-background flex">
                 <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
-                <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-60'}`}>
-                  <div className="pt-16 flex items-center justify-center h-96">
+                <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'}`}>
+                  <div className="flex items-center justify-center h-96">
                     <div className="text-center">
                       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
                       <p className="text-muted-foreground">Cargando proyectos...</p>
@@ -273,15 +358,18 @@ import React, { useState, useEffect } from 'react';
                   </div>
                 </div>
               </div>
+              <React.StrictMode>
+                {null}
+              </React.StrictMode>
 
               <div className={`transition-all duration-300 ${
                 sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'
-              } lg:pt-0 pt-16`}>
+              } lg:pt-0`}>
                 <div className="container mx-auto px-4 py-8">
                   {/* Breadcrumb */}
                   <div className="mb-6">
                     <Breadcrumb customItems={[
-                      { label: 'Dashboard', path: '/main-dashboard', icon: 'Home' },
+                      { label: 'Dashboard', path: '/dashboard', icon: 'Home' },
                       { label: 'Gestión Operativa - Área de Taller', path: '/workshop-operations-management', icon: 'Wrench', current: true }
                     ]} />
                   </div>
@@ -334,7 +422,7 @@ import React, { useState, useEffect } from 'react';
                       <Icon name="Package" className="text-blue-500" size={20} />
                       <span className="font-medium">Recepción</span>
                     </div>
-                    <div className="text-2xl font-bold">{workOrders?.filter(o => o?.status === 'material-reception')?.length}</div>
+                    <div className="text-2xl font-bold">{workOrders?.filter(o => mapToColumnId(o?.status || o?.estado) === 'material-reception')?.length}</div>
                     <div className="text-sm text-muted-foreground">Órdenes</div>
                   </div>
                   
@@ -343,7 +431,7 @@ import React, { useState, useEffect } from 'react';
                       <Icon name="Shield" className="text-orange-500" size={20} />
                       <span className="font-medium">Seguridad</span>
                     </div>
-                    <div className="text-2xl font-bold">{workOrders?.filter(o => o?.status === 'safety-checklist')?.length}</div>
+                    <div className="text-2xl font-bold">{workOrders?.filter(o => mapToColumnId(o?.status || o?.estado) === 'safety-checklist')?.length}</div>
                     <div className="text-sm text-muted-foreground">Listas</div>
                   </div>
 
@@ -352,7 +440,7 @@ import React, { useState, useEffect } from 'react';
                       <Icon name="Wrench" className="text-purple-500" size={20} />
                       <span className="font-medium">Fabricación</span>
                     </div>
-                    <div className="text-2xl font-bold">{workOrders?.filter(o => o?.status === 'manufacturing')?.length}</div>
+                    <div className="text-2xl font-bold">{workOrders?.filter(o => mapToColumnId(o?.status || o?.estado) === 'manufacturing')?.length}</div>
                     <div className="text-sm text-muted-foreground">En Proceso</div>
                   </div>
 
@@ -361,7 +449,7 @@ import React, { useState, useEffect } from 'react';
                       <Icon name="CheckCircle" className="text-green-500" size={20} />
                       <span className="font-medium">Calidad</span>
                     </div>
-                    <div className="text-2xl font-bold">{workOrders?.filter(o => o?.status === 'quality-control')?.length}</div>
+                    <div className="text-2xl font-bold">{workOrders?.filter(o => mapToColumnId(o?.status || o?.estado) === 'quality-control')?.length}</div>
                     <div className="text-sm text-muted-foreground">Revisión</div>
                   </div>
 
@@ -370,7 +458,7 @@ import React, { useState, useEffect } from 'react';
                       <Icon name="Truck" className="text-teal-500" size={20} />
                       <span className="font-medium">Envío</span>
                     </div>
-                    <div className="text-2xl font-bold">{workOrders?.filter(o => o?.status === 'ready-shipment')?.length}</div>
+                    <div className="text-2xl font-bold">{workOrders?.filter(o => mapToColumnId(o?.status || o?.estado) === 'ready-shipment')?.length}</div>
                     <div className="text-sm text-muted-foreground">Listos</div>
                   </div>
                 </div>
@@ -390,63 +478,59 @@ import React, { useState, useEffect } from 'react';
                     {activePanel === 'materials' && (
                       <MaterialReceptionPanel
                         workOrders={workOrders?.filter(o => o?.status === 'material-reception')}
+                        selectedOrder={selectedOrder}
                         onMaterialReception={handleMaterialReception}
                       />
                     )}
 
-                    {activePanel === 'safety' && (
-                      <SafetyChecklistPanel
-                        workOrders={workOrders?.filter(o => o?.status === 'safety-checklist')}
-                        onSafetyComplete={handleSafetyChecklist}
-                      />
-                    )}
+                    {activePanel === 'safety' && (() => {
+                      const hasPPEFields = (o) => {
+                        if (!o) return false;
+                        const keys = ['cascoSeguridad','gafasProteccion','guantesTrabajo','calzadoSeguridad','arnesSeguridad','respiradorN95','chalecoReflectivo','requiereEstudiosMedicosActualizados','safetyChecklistMissing'];
+                        for (const k of keys) {
+                          if (o[k] !== undefined) return true;
+                          if (o.raw && o.raw[k] !== undefined) return true;
+                        }
+                        return false;
+                      };
+
+                      const safetyOrders = (workOrders || []).filter(o => mapToColumnId(o?.status || o?.estado) === 'safety-checklist' || hasPPEFields(o));
+
+                      return (
+                        <SafetyChecklistPanel
+                          workOrders={safetyOrders}
+                          selectedOrder={selectedOrder}
+                          onSafetyComplete={handleSafetyChecklist}
+                          onLocalMissingChange={(orderId, missingArray) => {
+                            try {
+                              const key = String(orderId || (selectedOrder?.id || selectedOrder?.ordenTrabajo || ''));
+                              setPanelMissingByOrder(prev => ({ ...prev, [key]: Array.isArray(missingArray) ? missingArray : [] }));
+                            } catch (e) {}
+                          }}
+                        />
+                      );
+                    })()}
                   </div>
 
                   {/* Secondary Controls Panel */}
                   <div className="space-y-6">
-                    <WorkflowControls
-                      selectedOrder={selectedOrder}
-                      currentShift={currentShift}
-                      totalOrders={workOrders?.length}
-                    />
-
-                    {/* Quick Actions */}
-                    <div className="bg-card border rounded-lg p-4">
-                      <h3 className="font-medium mb-4">Acciones Rápidas</h3>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setActivePanel('attendance')}
-                          iconName="Clock"
-                        >
-                          Asistencia
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setActivePanel('quality')}
-                          iconName="CheckCircle"
-                        >
-                          Calidad
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setActivePanel('changes')}
-                          iconName="Edit"
-                        >
-                          Cambios
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          iconName="Camera"
-                        >
-                          Evidencias
-                        </Button>
-                      </div>
-                    </div>
+                    {(() => {
+                      const cols = ['material-reception','safety-checklist','manufacturing','quality-control','ready-shipment'];
+                      const totalActive = cols.reduce((acc, col) => acc + (workOrders?.filter(o => mapToColumnId(o?.status || o?.estado) === col)?.length || 0), 0);
+                      return (
+                        <WorkflowControls
+                          selectedOrder={selectedOrder}
+                          currentShift={currentShift}
+                          totalOrders={totalActive}
+                          workOrdersIds={(workOrders || []).map(o => o?.id || o?.ordenTrabajo || o?.folio)}
+                          workOrders={workOrders}
+                          onForceRemove={handleForceRemove}
+                          onRevertStatus={handleRevertStatus}
+                          onSafetyComplete={handleSafetyChecklist}
+                          localMissingByOrder={panelMissingByOrder}
+                        />
+                      );
+                    })()}
 
                     {/* Secondary Panels */}
                     {activePanel === 'attendance' && (
@@ -468,7 +552,15 @@ import React, { useState, useEffect } from 'react';
                     )}
                   </div>
                 </div>
-
+                {/* Log workOrders on change to help debugging Finalizar */}
+                {/* Remove this effect after verification */}
+                {(() => {
+                  try {
+                    // eslint-disable-next-line no-console
+                    console.debug('[Workshop] workOrders count:', workOrders?.length, 'ids:', (workOrders || []).map(o => o?.id || o?.ordenTrabajo || o?.folio));
+                  } catch (e) {}
+                  return null;
+                })()}
                 {/* Empty State */}
                 {workOrders?.length === 0 && !isLoading && (
                   <div className="text-center py-12">

@@ -3,10 +3,14 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import Icon from '../../../components/AppIcon';
+import useInventory from '../../../hooks/useInventory';
 
 const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
+  const { createArticulo, loading } = useInventory();
+  
   const [formData, setFormData] = useState({
     itemCode: '',
+    name: '',
     description: '',
     specifications: '',
     category: '',
@@ -14,7 +18,6 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
     unitCost: '',
     reorderPoint: '',
     currentStock: '',
-    location: 'Almacén Principal',
     supplierName: '',
     supplierContact: '',
     notes: ''
@@ -47,16 +50,6 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
     'juego'
   ];
 
-  const locations = [
-    'Almacén Principal',
-    'Almacén Secundario',
-    'Taller',
-    'Oficina',
-    'Vehículo 1',
-    'Vehículo 2',
-    'Bodega Externa'
-  ];
-
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
@@ -76,6 +69,9 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
 
     if (!formData?.itemCode?.trim()) {
       newErrors.itemCode = 'El código de artículo es requerido';
+    }
+    if (!formData?.name?.trim()) {
+      newErrors.name = 'El nombre del artículo es requerido';
     }
     if (!formData?.description?.trim()) {
       newErrors.description = 'La descripción es requerida';
@@ -110,36 +106,59 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
     setIsSubmitting(true);
     
     try {
-      // Generate a unique ID and create the new item
-      const newItem = {
-        id: Date.now(),
-        itemCode: formData?.itemCode?.toUpperCase(),
-        description: formData?.description,
-        specifications: formData?.specifications || 'Sin especificaciones',
-        category: formData?.category,
-        currentStock: parseInt(formData?.currentStock),
-        reservedStock: 0,
-        reorderPoint: parseInt(formData?.reorderPoint),
-        unit: formData?.unit,
-        supplier: {
-          name: formData?.supplierName,
-          contact: formData?.supplierContact || 'Sin contacto'
-        },
-        location: formData?.location,
-        lastUpdated: new Date(),
-        unitCost: parseFloat(formData?.unitCost),
-        notes: formData?.notes
+      // Crear el payload según la estructura del backend
+      const payload = {
+        codigoArticulo: formData?.itemCode?.trim(),
+        nombre: formData?.name?.trim(),
+        descripcion: formData?.description?.trim(),
+        especificaciones: formData?.specifications?.trim() || '',
+        categoria: formData?.category,
+        unidad: formData?.unit,
+        costoUnitario: parseFloat(formData?.unitCost),
+        puntoReorden: parseInt(formData?.reorderPoint),
+        stockActual: parseInt(formData?.currentStock),
+        ubicacion: 'Almacén Principal', // Siempre será Almacén Principal
+        nombreProveedor: formData?.supplierName?.trim(),
+        contactoProveedor: formData?.supplierContact?.trim() || '',
+        notas: formData?.notes?.trim() || ''
       };
 
-      // Call the parent function to add the item
-      await onAddItem(newItem);
+      // Llamar al servicio para crear el artículo
+      const nuevoArticulo = await createArticulo(payload);
+
+      // Transformar la respuesta del backend al formato esperado por el componente
+      const itemForTable = {
+        id: nuevoArticulo.id,
+        itemCode: nuevoArticulo.codigoArticulo,
+        name: nuevoArticulo.nombre || '',
+        description: nuevoArticulo.descripcion,
+        specifications: nuevoArticulo.especificaciones,
+        category: nuevoArticulo.categoria,
+        currentStock: nuevoArticulo.stockActual,
+        reservedStock: nuevoArticulo.stockReservado || 0,
+        reorderPoint: nuevoArticulo.puntoReorden,
+        unit: nuevoArticulo.unidad,
+        supplier: {
+          name: nuevoArticulo.proveedor?.nombre || nuevoArticulo.nombreProveedor,
+          contact: nuevoArticulo.proveedor?.contacto || nuevoArticulo.contactoProveedor
+        },
+        location: nuevoArticulo.ubicacion,
+        lastUpdated: new Date(nuevoArticulo.fechaActualizacion || nuevoArticulo.fechaCreacion),
+        unitCost: nuevoArticulo.costoUnitario,
+        notes: nuevoArticulo.notas
+      };
+
+      // Llamar a la función del componente padre para actualizar la tabla
+      if (onAddItem) {
+        await onAddItem(itemForTable);
+      }
       
       // Reset form and close modal
       handleReset();
       onClose();
     } catch (error) {
-      console.error('Error adding new item:', error);
-      setErrors({ submit: 'Error al agregar el artículo. Intente nuevamente.' });
+      console.error('Error creating article:', error);
+      setErrors({ submit: 'Error al crear el artículo. Intente nuevamente.' });
     } finally {
       setIsSubmitting(false);
     }
@@ -148,6 +167,7 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
   const handleReset = () => {
     setFormData({
       itemCode: '',
+      name: '',
       description: '',
       specifications: '',
       category: '',
@@ -155,7 +175,6 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
       unitCost: '',
       reorderPoint: '',
       currentStock: '',
-      location: 'Almacén Principal',
       supplierName: '',
       supplierContact: '',
       notes: ''
@@ -172,9 +191,9 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-background rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+      <div className="bg-background rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
         {/* Modal Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border">
+        <div className="flex items-center justify-between p-6 border-b border-border flex-shrink-0">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
               <Icon name="Package" size={20} className="text-primary" />
@@ -198,7 +217,7 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+        <div className="p-6 overflow-y-auto flex-1 min-h-0">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Basic Information */}
             <div className="space-y-4">
@@ -227,16 +246,36 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
 
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
-                    Categoría *
+                    Nombre *
                   </label>
-                  <Select
-                    value={formData?.category}
-                    onChange={(value) => handleInputChange('category', value)}
-                    options={categories?.map(cat => ({ value: cat, label: cat }))}
-                    placeholder="Seleccionar categoría"
-                    error={errors?.category}
+                  <Input
+                    type="text"
+                    value={formData?.name}
+                    onChange={(e) => handleInputChange('name', e?.target?.value)}
+                    placeholder="Nombre del artículo"
+                    error={errors?.name}
                     disabled={isSubmitting}
                   />
+                  {errors?.name && (
+                    <p className="text-sm text-destructive mt-1">{errors?.name}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Categoría *
+                  </label>
+                  <select
+                    value={formData?.category}
+                    onChange={(e) => handleInputChange('category', e.target.value)}
+                    disabled={isSubmitting}
+                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  >
+                    <option value="">Seleccionar categoría</option>
+                    {categories?.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
                   {errors?.category && (
                     <p className="text-sm text-destructive mt-1">{errors?.category}</p>
                   )}
@@ -322,12 +361,16 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
                   <label className="block text-sm font-medium text-foreground mb-2">
                     Unidad
                   </label>
-                  <Select
+                  <select
                     value={formData?.unit}
-                    onChange={(value) => handleInputChange('unit', value)}
-                    options={units?.map(unit => ({ value: unit, label: unit }))}
+                    onChange={(e) => handleInputChange('unit', e.target.value)}
                     disabled={isSubmitting}
-                  />
+                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  >
+                    {units?.map(unit => (
+                      <option key={unit} value={unit}>{unit}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -353,11 +396,11 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
                   <label className="block text-sm font-medium text-foreground mb-2">
                     Ubicación
                   </label>
-                  <Select
-                    value={formData?.location}
-                    onChange={(value) => handleInputChange('location', value)}
-                    options={locations?.map(loc => ({ value: loc, label: loc }))}
-                    disabled={isSubmitting}
+                  <Input
+                    type="text"
+                    value="Almacén Principal"
+                    disabled={true}
+                    className="bg-muted cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -438,24 +481,24 @@ const NewItemModal = ({ isOpen, onClose, onAddItem }) => {
         </div>
 
         {/* Modal Footer */}
-        <div className="flex items-center justify-end space-x-3 p-6 border-t border-border">
+        <div className="flex items-center justify-end space-x-3 p-6 border-t border-border flex-shrink-0 bg-background">
           <Button
             type="button"
             variant="outline"
             onClick={handleClose}
-            disabled={isSubmitting}
+            disabled={isSubmitting || loading}
           >
             Cancelar
           </Button>
           <Button
             type="submit"
             onClick={handleSubmit}
-            disabled={isSubmitting}
-            iconName={isSubmitting ? "Loader" : "Plus"}
+            disabled={isSubmitting || loading}
+            iconName={(isSubmitting || loading) ? "Loader" : "Plus"}
             iconSize={16}
-            className={isSubmitting ? "animate-spin" : ""}
+            className={(isSubmitting || loading) ? "animate-spin" : ""}
           >
-            {isSubmitting ? 'Agregando...' : 'Agregar Artículo'}
+            {(isSubmitting || loading) ? 'Creando Artículo...' : 'Crear Artículo'}
           </Button>
         </div>
       </div>

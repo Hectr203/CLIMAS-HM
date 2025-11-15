@@ -1,7 +1,8 @@
 import React from 'react';
 import Icon from '../../../components/AppIcon';
+import Button from '../../../components/ui/Button';
 
-const InventoryStats = ({ stats }) => {
+const InventoryStats = ({ stats, items, onAddItem, onUpdateStock, onGenerateReport }) => {
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('es-MX', {
       style: 'currency',
@@ -97,7 +98,8 @@ const InventoryStats = ({ stats }) => {
         ))}
       </div>
       {/* Category Distribution */}
-      <div className="bg-card rounded-lg border border-border p-6">
+      {/* TODO: Habilitar más adelante cuando se implemente completamente */}
+      {/* <div className="bg-card rounded-lg border border-border p-6">
         <div className="flex items-center space-x-3 mb-6">
           <Icon name="PieChart" size={20} className="text-primary" />
           <h3 className="text-lg font-semibold text-foreground">Distribución por Categoría</h3>
@@ -133,7 +135,8 @@ const InventoryStats = ({ stats }) => {
             </div>
           ))}
         </div>
-      </div>
+      </div> */}
+      
       {/* Quick Actions */}
       <div className="bg-card rounded-lg border border-border p-6">
         <div className="flex items-center space-x-3 mb-6">
@@ -142,29 +145,48 @@ const InventoryStats = ({ stats }) => {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="flex items-center space-x-3 p-4 bg-muted/50 rounded-lg">
+          <Button
+            variant="default"
+            onClick={onAddItem}
+            className="flex items-center space-x-3 p-4 bg-muted/50 rounded-lg w-full hover:bg-muted/80"
+          >
             <Icon name="Plus" size={20} className="text-primary" />
-            <div>
+            <div className="text-left">
               <div className="font-medium text-sm text-foreground">Agregar Artículo</div>
               <div className="text-xs text-muted-foreground">Registrar nuevo producto</div>
             </div>
-          </div>
+          </Button>
           
-          <div className="flex items-center space-x-3 p-4 bg-muted/50 rounded-lg">
+          <Button
+            variant="default"
+            onClick={() => {
+              const firstItem = items?.[0];
+              if (firstItem && onUpdateStock) {
+                onUpdateStock(firstItem);
+              }
+            }}
+            disabled={!items || items.length === 0}
+            className="flex items-center space-x-3 p-4 bg-muted/50 rounded-lg w-full hover:bg-muted/80"
+          >
             <Icon name="RefreshCw" size={20} className="text-success" />
-            <div>
+            <div className="text-left">
               <div className="font-medium text-sm text-foreground">Actualizar Stock</div>
               <div className="text-xs text-muted-foreground">Ajustar inventario</div>
             </div>
-          </div>
+          </Button>
           
-          <div className="flex items-center space-x-3 p-4 bg-muted/50 rounded-lg">
+          <Button
+            variant="default"
+            onClick={onGenerateReport}
+            disabled={!items || items.length === 0}
+            className="flex items-center space-x-3 p-4 bg-muted/50 rounded-lg w-full hover:bg-muted/80"
+          >
             <Icon name="FileText" size={20} className="text-warning" />
-            <div>
+            <div className="text-left">
               <div className="font-medium text-sm text-foreground">Generar Reporte</div>
               <div className="text-xs text-muted-foreground">Exportar datos</div>
             </div>
-          </div>
+          </Button>
         </div>
       </div>
     </div>

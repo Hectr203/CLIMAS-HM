@@ -66,9 +66,6 @@ import React from 'react';
                     {opportunity?.stageDuration} días
                   </span>
                 </div>
-                <div className="text-xs font-medium text-foreground">
-                  ID: {opportunity?.id}
-                </div>
               </div>
 
               {opportunity?.workOrderGenerated && (

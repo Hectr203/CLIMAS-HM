@@ -158,15 +158,91 @@ const PersonnelManagement = () => {
   };
 
   const handleExportData = () => {
-    console.log('Exporting personnel data...');
+    if (!filteredPersonnel || filteredPersonnel.length === 0) {
+      alert('No hay datos para exportar');
+      return;
+    }
+
+    // Preparar los datos para exportar con TODOS los campos disponibles
+    const dataToExport = filteredPersonnel.map(emp => {
+      // Extraer datos de objetos anidados
+      const medicalStudies = Array.isArray(emp.examenesMedicos) && emp.examenesMedicos[0] 
+        ? emp.examenesMedicos[0] 
+        : emp.medicalStudies || {};
+      
+      const ppe = Array.isArray(emp.equipos) && emp.equipos[0]
+        ? emp.equipos[0]
+        : emp.ppe || {};
+      
+      const emergencyContact = Array.isArray(emp.contactoEmergencia) && emp.contactoEmergencia[0]
+        ? emp.contactoEmergencia[0]
+        : emp.emergencyContact || {};
+
+      return {
+        'Nombre Completo': emp.nombreCompleto || '',
+        'ID Empleado': emp.empleadoId || '',
+        'Departamento': emp.departamento || '',
+        'Puesto': emp.puesto || '',
+        'Estado': emp.estado || '',
+        'Estudios Médicos': medicalStudies.status || (emp.estado === 'Activo' ? 'Completo' : 'Pendiente'),
+        'EPP': emp.estado === 'Activo' ? 'Completo' : 'Pendiente',
+        'Fecha de Ingreso': emp.fechaIngreso || '',
+        'Email': emp.email || '',
+        'Teléfono': emp.telefono || '',
+        'Dirección': emp.direccion || '',
+        'Fecha de Nacimiento': emp.fechaNacimiento || '',
+        'NSS': emp.nss || '',
+        'CURP': emp.curp || '',
+        'RFC': emp.rfc || '',
+        'Último Examen Médico': medicalStudies.lastExam || '',
+        'Próximo Examen Médico': medicalStudies.nextExam || '',
+        'Casco': ppe.helmet ? 'Sí' : 'No',
+        'Chaleco': ppe.vest ? 'Sí' : 'No',
+        'Botas': ppe.boots ? 'Sí' : 'No',
+        'Guantes': ppe.gloves ? 'Sí' : 'No',
+        'Lentes': ppe.glasses ? 'Sí' : 'No',
+        'Mascarilla': ppe.mask ? 'Sí' : 'No',
+        'Contacto de Emergencia': emergencyContact.name || '',
+        'Teléfono de Emergencia': emergencyContact.phone || '',
+        'Relación con Contacto': emergencyContact.relationship || ''
+      };
+    });
+
+    // Convertir a CSV
+    const headers = Object.keys(dataToExport[0]);
+    const csvContent = [
+      headers.join(','),
+      ...dataToExport.map(row => 
+        headers.map(header => {
+          const value = row[header];
+          // Escapar comillas y envolver en comillas si contiene comas
+          const escaped = String(value).replace(/"/g, '""');
+          return `"${escaped}"`;
+        }).join(',')
+      )
+    ].join('\n');
+
+    // Crear el archivo y descargarlo
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    const fecha = new Date().toISOString().split('T')[0];
+    link.setAttribute('href', url);
+    link.setAttribute('download', `personal_${fecha}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleViewComplianceDetails = (type) => {
-    console.log('Viewing compliance details for:', type);
+  // console.log eliminado
   };
 
   const handleScheduleTraining = () => {
-    console.log('Scheduling training...');
+  // console.log eliminado
   };
 
   const handleSidebarToggle = () => {
@@ -250,7 +326,7 @@ const PersonnelManagement = () => {
       <div
         className={`transition-all duration-300 ${
           sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'
-        } lg:pt-0 pt-16`}
+        } lg:pt-0`}
       >
         <div className="p-6">
           {/* Breadcrumb */}
@@ -279,7 +355,8 @@ const PersonnelManagement = () => {
                 >
                   Personal
                 </Button>
-                <Button
+                {/* TODO: Habilitar cuando se implemente cumplimiento */}
+                {/* <Button
                   variant={activeView === 'compliance' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setActiveView('compliance')}
@@ -288,7 +365,7 @@ const PersonnelManagement = () => {
                   iconSize={16}
                 >
                   Cumplimiento
-                </Button>
+                </Button> */}
               </div>
 
               <Button

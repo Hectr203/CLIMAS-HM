@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import useClient from '../../hooks/useClient';
+import useCommunication from '../../hooks/useCommunication';
 import Header from '../../components/ui/Header';
 import Sidebar from '../../components/ui/Sidebar';
 import Breadcrumb from '../../components/ui/Breadcrumb';
@@ -9,7 +10,7 @@ import Button from '../../components/ui/Button';
 import ClientCard from './components/ClientCard';
 import ClientTable from './components/ClientTable';
 import ClientFilters from './components/ClientFilters';
-import CommunicationTimeline from './components/CommunicationTimeline';
+import ClientCommunicationPanel from './components/ClientCommunicationPanel';
 import DocumentStatus from './components/DocumentStatus';
 import ContractAlerts from './components/ContractAlerts';
 import NewClientModal from './components/NewClientModal';
@@ -21,7 +22,53 @@ const ClientManagement = () => {
   const [selectedClient, setSelectedClient] = useState(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showNewClientModal, setShowNewClientModal] = useState(false);
+  const [clientCommunications, setClientCommunications] = useState([]);
+  
   const { clients, getClients, createClient, editClient, loading, error } = useClient();
+  const { 
+    createCommunication, 
+    getComunicacionesByCliente, 
+    loading: loadingComm 
+  } = useCommunication();
+
+  // Cálculo de clientes activos (case-insensitive para 'estado')
+  // Cálculo de total clientes del mes anterior
+  const getPreviousMonthClients = (clientsArr) => {
+    if (!Array.isArray(clientsArr)) return 0;
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    return clientsArr.filter(c => {
+      const createdAt = c?.createdAt ? new Date(c.createdAt) : null;
+      return createdAt && createdAt < firstDayOfMonth;
+    }).length;
+  };
+  const getActiveClients = (clientsArr) => {
+    if (!Array.isArray(clientsArr)) return 0;
+    return clientsArr.filter(c => {
+      const estado = (c?.estado || c?.status || '').toString().toLowerCase();
+      return estado === 'activo';
+    }).length;
+  };
+
+  // Cálculo de clientes activos del mes anterior
+  const getPreviousMonthActiveClients = (clientsArr) => {
+    if (!Array.isArray(clientsArr)) return 0;
+    const now = new Date();
+    // Primer día del mes actual
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    return clientsArr.filter(c => {
+      const estado = (c?.estado || c?.status || '').toString().toLowerCase();
+      const createdAt = c?.createdAt ? new Date(c.createdAt) : null;
+      return estado === 'activo' && createdAt && createdAt < firstDayOfMonth;
+    }).length;
+  };
+
+  // Cálculo de variación porcentual
+  const getMonthlyVariation = (current, previous) => {
+    if (typeof previous !== 'number' || previous === 0) return '+0%';
+    const percent = ((current - previous) / previous) * 100;
+    return `${percent > 0 ? '+' : ''}${percent.toFixed(0)}%`;
+  };
 
   useEffect(() => {
     getClients();
@@ -165,49 +212,62 @@ const ClientManagement = () => {
 
     // Filtro de búsqueda (empresa, contacto, email)
     if (filters?.search) {
-      const search = filters.search.toLowerCase();
-      filtered = filtered?.filter(client =>
-        client?.empresa?.toLowerCase()?.includes(search) ||
-        client?.contacto?.toLowerCase()?.includes(search) ||
-        client?.email?.toLowerCase()?.includes(search)
-      );
+      const search = filters.search.trim().toLowerCase();
+      filtered = filtered?.filter(client => {
+        const empresa = (client?.empresa || client?.companyName || '').toString().toLowerCase();
+        const contacto = (client?.contacto || client?.contactPerson || '').toString().toLowerCase();
+        const email = (client?.email || '').toString().toLowerCase();
+        return empresa.includes(search) || contacto.includes(search) || email.includes(search);
+      });
     }
 
     // Industria
     if (filters?.industry) {
-      filtered = filtered?.filter(client => client?.industria === filters?.industry);
+      const industry = filters.industry.trim().toLowerCase();
+      filtered = filtered?.filter(client => (client?.industria || client?.industry || '').toString().toLowerCase() === industry);
     }
 
     // Estado
     if (filters?.status) {
-      filtered = filtered?.filter(client => client?.estado === filters?.status);
+      const estado = filters.status.trim().toLowerCase();
+      filtered = filtered?.filter(client => (client?.estado || client?.status || '').toString().toLowerCase() === estado);
     }
 
     // Relación
     if (filters?.relationshipHealth) {
-      filtered = filtered?.filter(client => client?.relacion === filters?.relationshipHealth);
+      const relacion = filters.relationshipHealth.trim().toLowerCase();
+      filtered = filtered?.filter(client => (client?.relacion || client?.relationshipHealth || '').toString().toLowerCase() === relacion);
     }
 
     // Ubicación
     if (filters?.location) {
-      filtered = filtered?.filter(client => client?.ubicacionEmpre === filters?.location || client?.ubicacion?.ciudad === filters?.location);
+      const location = filters.location.trim().toLowerCase();
+      filtered = filtered?.filter(client => {
+        const estadoEmpresa = (client?.ubicacionEmpre?.estado || '').toString().toLowerCase();
+        const municipioEmpresa = (client?.ubicacionEmpre?.municipio || '').toString().toLowerCase();
+        const estadoDireccion = (client?.ubicacion?.estado || '').toString().toLowerCase();
+        const municipioDireccion = (client?.ubicacion?.municipio || '').toString().toLowerCase();
+        return estadoEmpresa.includes(location) || 
+               municipioEmpresa.includes(location) || 
+               estadoDireccion.includes(location) || 
+               municipioDireccion.includes(location);
+      });
     }
 
     // RFC
     if (filters?.rfc) {
-      filtered = filtered?.filter(client =>
-        client?.rfc?.toLowerCase()?.includes(filters?.rfc?.toLowerCase())
-      );
+      const rfc = filters.rfc.trim().toLowerCase();
+      filtered = filtered?.filter(client => (client?.rfc || '').toString().toLowerCase().includes(rfc));
     }
 
     // Proyectos mínimos
     if (filters?.minProjects) {
-      filtered = filtered?.filter(client => (parseInt(client?.totalProjects) || 0) >= parseInt(filters?.minProjects));
+      filtered = filtered?.filter(client => (parseInt(client?.totalProjects || client?.proyectos || 0) || 0) >= parseInt(filters?.minProjects));
     }
 
     // Valor mínimo
     if (filters?.minValue) {
-      filtered = filtered?.filter(client => (parseInt(client?.totalValue) || 0) >= parseInt(filters?.minValue));
+      filtered = filtered?.filter(client => (parseInt(client?.totalValue || client?.valor || 0) || 0) >= parseInt(filters?.minValue));
     }
 
     setFilteredClients(filtered);
@@ -231,57 +291,103 @@ const ClientManagement = () => {
   };
 
   const handleExportClients = () => {
-    const headers = [
-      'Empresa',
-      'Contacto', 
-      'Email',
-      'Teléfono',
-      'Industria',
-      'Ubicación',
-      'Estado',
-      'Salud Relación',
-      'RFC',
-      'Cliente Desde',
-      'Total Proyectos',
-      'Contratos Activos',
-      'Valor Total'
-    ];
-
-    const csvContent = [
-      headers?.join(','),
-      ...filteredClients?.map(client => [
-        `"${client?.companyName}"`,
-        `"${client?.contactPerson}"`,
-        client?.email,
-        `"${client?.phone}"`,
-        client?.industry,
-        `"${client?.location}"`,
-        client?.status,
-        client?.relationshipHealth,
-        client?.rfc,
-        client?.clientSince,
-        client?.totalProjects,
-        client?.activeContracts,
-        client?.totalValue
-      ]?.join(','))
-    ]?.join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    if (link?.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      link?.setAttribute('href', url);
-      link?.setAttribute('download', `clientes_${new Date()?.toISOString()?.split('T')?.[0]}.csv`);
-      link.style.visibility = 'hidden';
-      document.body?.appendChild(link);
-      link?.click();
-      document.body?.removeChild(link);
+    if (!filteredClients || filteredClients.length === 0) {
+      alert('No hay datos para exportar');
+      return;
     }
+
+    // Preparar los datos para exportar (sin Cliente Desde, Total Proyectos, Contratos Activos, Valor Total)
+    const dataToExport = filteredClients.map(client => {
+      // Extraer contactos adicionales si existen
+      const contactosAdicionales = Array.isArray(client.contactos) && client.contactos.length > 1
+        ? client.contactos.slice(1).map((c, idx) => `${c.contacto} (${c.email}, ${c.telefono})`).join(' | ')
+        : '';
+
+      return {
+        'Empresa': client.companyName || client.empresa || '',
+        'RFC': client.rfc || '',
+        'Contacto Principal': client.contactPerson || client.contacto || '',
+        'Email Principal': client.email || '',
+        'Teléfono Principal': client.phone || client.telefono || '',
+        'Contactos Adicionales': contactosAdicionales,
+        'Industria': client.industry || client.industria || '',
+        'Ubicación Empresa - Estado': client.ubicacionEmpre?.estado || '',
+        'Ubicación Empresa - Municipio': client.ubicacionEmpre?.municipio || '',
+        'URL Ubicación Empresa': client.ubicacionUrl || '',
+        'Dirección Cliente - Estado': client.ubicacion?.estado || '',
+        'Dirección Cliente - Municipio': client.ubicacion?.municipio || '',
+        'Dirección Completa': client.ubicacion?.direccion || client.address || '',
+        'Sitio Web': client.website || client.sitioWeb || '',
+        'Estado': client.status || client.estado || '',
+        'Relación': client.relationshipHealth || client.relacion || '',
+        'Próximo Seguimiento': client.nextFollowUp || client.proximoSeguimiento || '',
+        'Notas': client.notes || client.notas || ''
+      };
+    });
+
+    // Convertir a CSV
+    const headers = Object.keys(dataToExport[0]);
+    const csvContent = [
+      headers.join(','),
+      ...dataToExport.map(row => 
+        headers.map(header => {
+          const value = row[header];
+          // Escapar comillas y envolver en comillas si contiene comas
+          const escaped = String(value).replace(/"/g, '""');
+          return `"${escaped}"`;
+        }).join(',')
+      )
+    ].join('\n');
+
+    // Crear el archivo y descargarlo
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    const fecha = new Date().toISOString().split('T')[0];
+    link.setAttribute('href', url);
+    link.setAttribute('download', `clientes_${fecha}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleViewDetails = (client) => {
     setSelectedClient(client);
     setShowSidebar(true);
+    // Cargar comunicaciones del cliente
+    loadClientCommunications(client.id || client._id);
+  };
+
+  // Función para cargar comunicaciones del cliente
+  const loadClientCommunications = async (clientId) => {
+    if (!clientId) return;
+    
+    try {
+      const response = await getComunicacionesByCliente(clientId);
+      if (response && response.data && response.data.comunicaciones) {
+        // Mapear los datos del backend al formato del frontend
+        const mappedComms = response.data.comunicaciones.map(comm => ({
+          id: comm.id,
+          type: comm.tipoComunicacion || comm.medioDifusion || 'email',
+          subject: comm.asunto,
+          description: comm.mensaje,
+          contactPerson: comm.creadoPor || 'Sistema',
+          date: comm.fechaCreacion,
+          hasAttachments: false,
+          urgency: comm.nivelUrgencia || 'normal',
+          status: comm.estado || 'completado'
+        }));
+        setClientCommunications(mappedComms);
+      } else {
+        setClientCommunications([]);
+      }
+    } catch (error) {
+      console.error('Error al cargar comunicaciones:', error);
+      setClientCommunications([]);
+    }
   };
 
   const [editModalState, setEditModalState] = useState({ open: false, client: null });
@@ -301,7 +407,7 @@ const ClientManagement = () => {
 
   const handleViewProjects = (client) => {
     console.log('Ver proyectos del cliente:', client);
-    window.location.href = `/project-management?client=${client?.id}`;
+    window.location.href = `/proyectos?client=${client?.id}`;
   };
 
   const handleViewContracts = (client) => {
@@ -317,8 +423,23 @@ const ClientManagement = () => {
     setShowNewClientModal(false);
   };
 
-  const handleAddCommunication = () => {
-    console.log('Agregando nueva comunicación...');
+  const handleSubmitCommunication = async (commData) => {
+    if (!selectedClient) return;
+
+    const payload = {
+      tipoComunicacion: commData.tipoComunicacion,
+      nivelUrgencia: commData.nivelUrgencia,
+      asunto: commData.asunto,
+      mensaje: commData.mensaje,
+      idCliente: selectedClient.id || selectedClient._id,
+      idOportunidad: '' // Vacío para comunicaciones directas del cliente
+    };
+
+    const response = await createCommunication(payload);
+    if (response) {
+      // Recargar comunicaciones
+      loadClientCommunications(selectedClient.id || selectedClient._id);
+    }
   };
 
   const handleViewCommunicationDetails = (communication) => {
@@ -370,7 +491,7 @@ const ClientManagement = () => {
       {/* Main Content */}
       <div className={`transition-all duration-300 ${
         sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'
-      } lg:pt-0 pt-16`}>
+      }`}>
         <div className="flex">
               {/* Main Content */}
               <div className={`flex-1 transition-all duration-300 ${showSidebar ? 'mr-96' : ''}`}>
@@ -438,6 +559,7 @@ const ClientManagement = () => {
 
               {/* Stats Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                {/* Total Clientes */}
                 <div className="bg-card border border-border rounded-lg p-6 card-shadow">
                   <div className="flex items-center justify-between">
                     <div>
@@ -450,16 +572,17 @@ const ClientManagement = () => {
                   </div>
                   <div className="mt-4 flex items-center space-x-2">
                     <Icon name="TrendingUp" size={16} className="text-success" />
-                    <span className="text-sm text-success">+12% este mes</span>
+                    <span className="text-sm text-success">{getMonthlyVariation(Array.isArray(clients) ? clients.length : 0, getPreviousMonthClients(clients))} este mes</span>
                   </div>
                 </div>
 
+                {/* Clientes Activos */}
                 <div className="bg-card border border-border rounded-lg p-6 card-shadow">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Clientes Activos</p>
                       <p className="text-2xl font-bold text-foreground">
-                        {Array.isArray(clients) ? clients.filter(c => c?.status === 'Activo').length : 0}
+                        {getActiveClients(clients)}
                       </p>
                     </div>
                     <div className="w-12 h-12 bg-success rounded-lg flex items-center justify-center">
@@ -468,7 +591,7 @@ const ClientManagement = () => {
                   </div>
                   <div className="mt-4 flex items-center space-x-2">
                     <Icon name="TrendingUp" size={16} className="text-success" />
-                    <span className="text-sm text-success">+8% este mes</span>
+                    <span className="text-sm text-success">{getMonthlyVariation(getActiveClients(clients), getPreviousMonthActiveClients(clients))} este mes</span>
                   </div>
                 </div>
 
@@ -519,13 +642,15 @@ const ClientManagement = () => {
 
               {/* Client List */}
               {viewMode === 'table' ? (
-                <ClientTable
-                  clients={filteredClients}
-                  onViewDetails={handleViewDetails}
-                  onEditClient={handleEditClient}
-                  onViewProjects={handleViewProjects}
-                  onViewContracts={handleViewContracts}
-                />
+                <div style={{overflowX: 'auto', width: '100%'}}>
+                  <ClientTable
+                    clients={filteredClients}
+                    onViewDetails={handleViewDetails}
+                    onEditClient={handleEditClient}
+                    onViewProjects={handleViewProjects}
+                    onViewContracts={handleViewContracts}
+                  />
+                </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                   {filteredClients?.map((client) => (
@@ -563,7 +688,7 @@ const ClientManagement = () => {
 
           {/* Sidebar */}
           {showSidebar && (
-            <div className="fixed right-0 top-0 h-full w-96 bg-card border-l border-border shadow-lg z-1000 overflow-y-auto">
+            <div className="fixed right-0 top-0 h-full bg-card border-l border-border shadow-lg z-1000 overflow-y-auto" style={{width: '500px', minWidth: '440px'}}>
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-lg font-semibold text-foreground">
@@ -579,12 +704,8 @@ const ClientManagement = () => {
                 </div>
 
                 <div className="space-y-6">
-                  {/* Communication Timeline */}
-                  <CommunicationTimeline
-                    communications={mockCommunications}
-                    onAddCommunication={handleAddCommunication}
-                    onViewDetails={handleViewCommunicationDetails}
-                  />
+                  {/* Communication Panel */}
+                  <ClientCommunicationPanel client={selectedClient} />
 
                   {/* Document Status */}
                   <DocumentStatus

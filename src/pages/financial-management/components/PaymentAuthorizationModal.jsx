@@ -4,7 +4,7 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 
-const PaymentAuthorizationModal = ({ isOpen, onClose, expense, onAuthorize }) => {
+const PaymentAuthorizationModal = ({ isOpen, onClose, expense, onAuthorize, onDelete }) => {
   const [authData, setAuthData] = useState({
     authorizationLevel: '',
     approverComments: '',
@@ -15,6 +15,7 @@ const PaymentAuthorizationModal = ({ isOpen, onClose, expense, onAuthorize }) =>
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const authorizationLevels = [
     { value: 'supervisor', label: 'Supervisor de Departamento' },
@@ -49,15 +50,35 @@ const PaymentAuthorizationModal = ({ isOpen, onClose, expense, onAuthorize }) =>
     setIsSubmitting(true);
 
     try {
-      await onAuthorize({
-        expenseId: expense?.id,
-        ...authData
-      });
-      onClose();
+      await onAuthorize?.({
+  id: expense?.id,
+  status: "approved", // <--- usamos inglés, como tu API
+  ...authData,
+  amount: parseFloat(expense?.amount?.replace(/[^0-9.-]+/g, "")) || 0
+});
+
+
+onClose?.();
     } catch (error) {
       console.error('Error authorizing payment:', error);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!expense?.id) return;
+    const ok = window.confirm('¿Eliminar este pago? Esta acción no se puede deshacer.');
+    if (!ok) return;
+
+    setIsDeleting(true);
+    try {
+      await onDelete?.(expense.id);
+      onClose?.();
+    } catch (err) {
+      console.error('Error eliminando pago:', err);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -90,6 +111,7 @@ const PaymentAuthorizationModal = ({ isOpen, onClose, expense, onAuthorize }) =>
             variant="ghost"
             size="icon"
             onClick={onClose}
+            disabled={isSubmitting || isDeleting}
           >
             <Icon name="X" size={20} />
           </Button>
@@ -126,33 +148,6 @@ const PaymentAuthorizationModal = ({ isOpen, onClose, expense, onAuthorize }) =>
               </div>
             </div>
           </div>
-
-          {/* Authorization Level */}
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Icon name="Shield" size={16} className="text-primary" />
-              <h3 className="font-medium text-foreground">Nivel de Autorización</h3>
-            </div>
-            
-            <div className="bg-warning/10 border border-warning/20 rounded-lg p-3">
-              <div className="flex items-center space-x-2">
-                <Icon name="AlertTriangle" size={16} className="text-warning" />
-                <span className="text-sm text-warning">
-                  Nivel mínimo requerido: {authorizationLevels?.find(l => l?.value === getRequiredAuthLevel(expense?.amount || '0'))?.label}
-                </span>
-              </div>
-            </div>
-
-            <Select
-              label="Nivel de Autorización"
-              description="Seleccione el nivel de autorización apropiado"
-              options={authorizationLevels}
-              value={authData?.authorizationLevel}
-              onChange={(value) => handleInputChange('authorizationLevel', value)}
-              required
-            />
-          </div>
-
           {/* Payment Details */}
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
@@ -215,24 +210,39 @@ const PaymentAuthorizationModal = ({ isOpen, onClose, expense, onAuthorize }) =>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center justify-end space-x-3 pt-6 border-t border-border">
+          <div className="flex items-center justify-between pt-6 border-t border-border">
+            {/* Botón eliminar */}
             <Button
               type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isSubmitting}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              variant="success"
-              loading={isSubmitting}
-              iconName="Check"
+              variant="destructive"
+              iconName="Trash2"
               iconPosition="left"
+              onClick={handleDelete}
+              disabled={isSubmitting || isDeleting}
             >
-              Autorizar Pago
+              {isDeleting ? 'Eliminando…' : 'Eliminar pago'}
             </Button>
+
+            <div className="flex items-center space-x-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                disabled={isSubmitting || isDeleting}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                variant="success"
+                loading={isSubmitting}
+                disabled={isDeleting}
+                iconName="Check"
+                iconPosition="left"
+              >
+                Autorizar Pago
+              </Button>
+            </div>
           </div>
         </form>
       </div>
@@ -241,3 +251,9 @@ const PaymentAuthorizationModal = ({ isOpen, onClose, expense, onAuthorize }) =>
 };
 
 export default PaymentAuthorizationModal;
+
+
+
+
+
+

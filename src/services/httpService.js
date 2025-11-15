@@ -34,6 +34,15 @@ class HttpService {
     this.api.interceptors.response.use(
       (response) => response,
       (error) => {
+        // Suprimir completamente 404 en comunicaciones (no es un error real)
+        if (
+          error.response?.status === 404 &&
+          error.config?.url?.includes("/comunicaciones/cliente/")
+        ) {
+          // Retornar una respuesta exitosa vacía en lugar de error
+          return { data: { data: { comunicaciones: [] } } };
+        }
+
         if (error.response?.status === 401) this.handleUnauthorized();
         return Promise.reject(this.normalizeError(error));
       }

@@ -3,6 +3,7 @@ import useTokenExpiration from "./useTokenExpiration";
 import { useNavigate } from "react-router-dom";
 import EnvConfig from "../utils/config";
 import authService from "../services/authService";
+import { jwtDecode } from "jwt-decode";
 
 // Contexto de autenticación
 const AuthContext = createContext();
@@ -21,23 +22,43 @@ export const AuthProvider = ({ children }) => {
       // Puede venir como 'userRole', 'role' o 'rol'
       const userRole = localStorage.getItem("userRole") || localStorage.getItem("role") || localStorage.getItem("rol");
       const userEmail = localStorage.getItem("userEmail");
-      if (token && (!expiresAt || now < Number(expiresAt))) {
-        const userData = {
-          token,
-          rol: userRole,
-          email: userEmail || "usuario@ejemplo.com",
-        };
-        setUser(userData);
-        setIsAuthenticated(true);
+      
+      if (token) {
+        // Verificar si el token ha expirado
+        let tokenExpired = false;
+        try {
+          const decoded = jwtDecode(token);
+          const tokenExpTime = decoded.exp * 1000;
+          tokenExpired = now >= tokenExpTime;
+        } catch (error) {
+          console.warn("Error decodificando token:", error);
+          tokenExpired = true;
+        }
+        
+        // Si el token no ha expirado o si no tenemos fecha de expiración válida
+        if (!tokenExpired && (!expiresAt || now < Number(expiresAt))) {
+          const userData = {
+            token,
+            rol: userRole,
+            email: userEmail || "usuario@ejemplo.com",
+          };
+          setUser(userData);
+          setIsAuthenticated(true);
+        } else {
+          // Token expirado, limpiar todo
+          console.log("Token expirado, limpiando localStorage");
+          localStorage.removeItem("authToken");
+          localStorage.removeItem("token");
+          localStorage.removeItem("tokenExpiresAt");
+          localStorage.removeItem("userRole");
+          localStorage.removeItem("role");
+          localStorage.removeItem("rol");
+          localStorage.removeItem("userEmail");
+          setUser(null);
+          setIsAuthenticated(false);
+        }
       } else {
-        // Si el token no existe o expiró, limpiar localStorage
-        localStorage.removeItem("authToken");
-        localStorage.removeItem("token");
-        localStorage.removeItem("tokenExpiresAt");
-        localStorage.removeItem("userRole");
-        localStorage.removeItem("role");
-        localStorage.removeItem("rol");
-        localStorage.removeItem("userEmail");
+        // No hay token
         setUser(null);
         setIsAuthenticated(false);
       }
@@ -51,19 +72,43 @@ export const AuthProvider = ({ children }) => {
     setUser((prev) => ({ ...prev, token: newToken }));
     localStorage.setItem("authToken", newToken);
     try {
-      const decoded = require('jwt-decode')(newToken);
+      const decoded = jwtDecode(newToken);
       localStorage.setItem("tokenExpiresAt", decoded.exp * 1000);
-    } catch {}
+    } catch (error) {
+      console.warn("Error al decodificar nuevo token:", error);
+    }
   });
 
   const login = async (email, password) => {
     setIsLoading(true);
     try {
+      // Verificar configuración del backend
+      console.log("Iniciando login para:", email);
+      
       const result = await authService.login(email, password);
       if (result.success) {
-  localStorage.setItem("authToken", result.token);
+        localStorage.setItem("authToken", result.token);
         localStorage.setItem("userRole", result.user.rol);
         localStorage.setItem("userEmail", result.user.email);
+        
+        // Guardar fecha de expiración del token y mostrar info de debugging
+        try {
+          const decoded = jwtDecode(result.token);
+          const tokenDurationMs = (decoded.exp - decoded.iat) * 1000;
+          const tokenDurationMin = Math.round(tokenDurationMs / 1000 / 60);
+          
+          console.log("=== TOKEN INFO ===");
+          console.log("Token emitido en:", new Date(decoded.iat * 1000).toLocaleString());
+          console.log("Token expira en:", new Date(decoded.exp * 1000).toLocaleString());
+          console.log("Duración configurada:", tokenDurationMin, "minutos");
+          console.log("Token completo:", result.token);
+          console.log("================");
+          
+          localStorage.setItem("tokenExpiresAt", decoded.exp * 1000);
+        } catch (error) {
+          console.warn("Error al decodificar token en login:", error);
+        }
+        
         setUser({ ...result.user, token: result.token });
         setIsAuthenticated(true);
         setIsLoading(false);
@@ -81,14 +126,30 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       await authService.logout();
-    } catch {}
+    } catch (error) {
+      console.warn("Error al llamar logout del backend:", error);
+    }
     finally {
-  localStorage.removeItem("authToken");
+      // Limpiar completamente todo el localStorage de autenticación
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("token");
+      localStorage.removeItem("tokenExpiresAt");
       localStorage.removeItem("userRole");
+      localStorage.removeItem("role");
+      localStorage.removeItem("rol");
       localStorage.removeItem("userEmail");
+      localStorage.removeItem("rememberMe");
+      
       setUser(null);
       setIsAuthenticated(false);
-      navigate("/login");
+      
+      // Usar navigate para ir al login y luego forzar recarga
+      navigate("/login", { replace: true });
+      
+      // Forzar recarga después de un pequeño delay
+      setTimeout(() => {
+        window.location.replace("/login");
+      }, 100);
     }
   };
 
@@ -150,7 +211,16 @@ export const AuthProvider = ({ children }) => {
     try {
       const result = await authService.refreshToken();
       if (result.success) {
-  localStorage.setItem("authToken", result.token);
+        localStorage.setItem("authToken", result.token);
+        
+        // Guardar fecha de expiración del nuevo token
+        try {
+          const decoded = jwtDecode(result.token);
+          localStorage.setItem("tokenExpiresAt", decoded.exp * 1000);
+        } catch (error) {
+          console.warn("Error al decodificar token en refresh:", error);
+        }
+        
         setUser((prevUser) => ({ ...prevUser, token: result.token }));
         return { success: true };
       } else {

@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-        import Icon from '../../../components/AppIcon';
-        import Button from '../../../components/ui/Button';
-        import Input from '../../../components/ui/Input';
+import React, { useState, useEffect, useRef } from 'react';
+import useCommunication from '../../../hooks/useCommunication';
+import useClient from '../../../hooks/useClient';
+import Icon from '../../../components/AppIcon';
+import Button from '../../../components/ui/Button';
+import Input from '../../../components/ui/Input';
 
         const ClientCommunication = ({ quotation, onAddCommunication }) => {
           const [newCommunication, setNewCommunication] = useState({
@@ -9,11 +11,26 @@ import React, { useState } from 'react';
             subject: '',
             content: '',
             urgency: 'normal',
-            hasAttachments: false,
-            attachments: []
           });
+          const { createCotizacionCommunication, getComunicacionesByCliente, getComunicacionByCotizacionId, loading } = useCommunication();
 
           const [showHistory, setShowHistory] = useState(true);
+          const [clientHistory, setClientHistory] = useState([]);
+          const historyRef = useRef(null);
+          // Mostrar historial de comunicación por cotización
+          useEffect(() => {
+            if (quotation?.id) {
+              getComunicacionByCotizacionId(quotation.id).then((res) => {
+                if (res && res.data && Array.isArray(res.data)) {
+                  setClientHistory(res.data);
+                } else {
+                  setClientHistory([]);
+                }
+              });
+            } else {
+              setClientHistory([]);
+            }
+          }, [quotation?.id]);
 
           const handleInputChange = (field, value) => {
             setNewCommunication(prev => ({ ...prev, [field]: value }));
@@ -22,14 +39,53 @@ import React, { useState } from 'react';
           const handleSendCommunication = () => {
             if (!newCommunication?.subject?.trim() || !newCommunication?.content?.trim()) return;
 
-            onAddCommunication?.(newCommunication);
-            setNewCommunication({
-              type: 'email',
-              subject: '',
-              content: '',
-              urgency: 'normal',
-              hasAttachments: false,
-              attachments: []
+            // console.log eliminado
+            const idCliente = quotation?.clientId
+              || quotation?.informacion_basica?.cliente?.find?.(c => 'id_cliente' in c)?.id_cliente
+              || '';
+            const commData = {
+              tipoComunicacion: newCommunication.type,
+              nivelUrgencia: newCommunication.urgency,
+              asunto: newCommunication.subject,
+              mensaje: newCommunication.content,
+              idCliente,
+              idCotizacion: quotation?.id,
+            };
+            // console.log eliminado
+            createCotizacionCommunication(commData).then((data) => {
+              if (data) {
+                setNewCommunication({
+                  type: 'email',
+                  subject: '',
+                  content: '',
+                  urgency: 'normal',
+                });
+                // Recargar únicamente el historial desde el backend
+                if (quotation?.id) {
+                  getComunicacionByCotizacionId(quotation.id).then((res) => {
+                    if (res && res.data && Array.isArray(res.data)) {
+                      setClientHistory(res.data);
+                      setShowHistory(true);
+                      // Hacer scroll al tope para mostrar el último mensaje (suponiendo orden descendente)
+                      setTimeout(() => {
+                        if (historyRef.current) {
+                          historyRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+                        }
+                      }, 120);
+                    }
+                  }).catch(() => {
+                    // Fallback: insertar la comunicación si la recarga falla
+                    setClientHistory(prev => [data, ...(prev || [])]);
+                    setShowHistory(true);
+                  });
+                } else {
+                  // Si no hay id de cotización, insertar localmente
+                  setClientHistory(prev => [data, ...(prev || [])]);
+                  setShowHistory(true);
+                }
+                // Callback externo si existe
+                onAddCommunication?.(data);
+              }
             });
           };
 
@@ -69,6 +125,7 @@ import React, { useState } from 'react';
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-semibold">Comunicación con Cliente</h3>
                 <div className="flex space-x-2">
+                  {/* Botón comentado: Enviar Cotización (se dejó comentado para posible uso futuro)
                   <Button
                     variant="outline"
                     onClick={handleQuotationSend}
@@ -77,6 +134,7 @@ import React, { useState } from 'react';
                   >
                     Enviar Cotización
                   </Button>
+                  */}
                   <Button
                     variant="outline"
                     onClick={() => setShowHistory(!showHistory)}
@@ -96,36 +154,38 @@ import React, { useState } from 'react';
                     <span>Historial de Comunicaciones</span>
                   </h4>
                   
-                  <div className="max-h-96 overflow-y-auto space-y-3 bg-muted/20 rounded-lg p-4">
-                    {quotation?.communications?.map((comm) => (
-                      <div key={comm?.id} className="bg-white rounded-lg p-4 border">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center space-x-2">
-                            <Icon name={getTypeIcon(comm?.type)} size={16} className="text-muted-foreground" />
-                            <span className="font-medium text-sm">{comm?.subject}</span>
-                            <span className={`px-2 py-1 text-xs rounded ${getUrgencyColor(comm?.urgency)}`}>
-                              {comm?.urgency === 'urgent' ? 'Urgente' : comm?.urgency === 'high' ? 'Alta' : 'Normal'}
-                            </span>
-                          </div>
-                          <span className="text-xs text-muted-foreground">{comm?.date}</span>
-                        </div>
-                        <p className="text-sm text-foreground leading-relaxed">{comm?.content}</p>
-                        {comm?.attachments && comm?.attachments?.length > 0 && (
-                          <div className="flex items-center space-x-2 mt-2">
-                            <Icon name="Paperclip" size={14} className="text-muted-foreground" />
-                            <div className="flex flex-wrap gap-1">
-                              {comm?.attachments?.map((attachment, index) => (
-                                <span key={index} className="text-xs bg-muted rounded px-2 py-1">
-                                  {attachment}
-                                </span>
-                              ))}
+                  <div ref={historyRef} className="max-h-96 overflow-y-auto space-y-3 bg-muted/20 rounded-lg p-4">
+                    {clientHistory.length > 0 ? (
+                      clientHistory.map((comm) => (
+                        <div key={comm.id} className="bg-white rounded-lg p-4 border">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                              <Icon 
+                                name={getTypeIcon(comm.tipoComunicacion)} 
+                                size={16} 
+                                className={`${comm.tipoComunicacion === 'whatsapp' ? 'text-green-600' : 'text-blue-600'}`} 
+                              />
+                              <span className="font-medium text-sm">{comm.asunto || 'Sin asunto'}</span>
+                              <span className={`px-2 py-1 text-xs rounded ${getUrgencyColor(comm.nivelUrgencia)}`}>
+                                {comm.nivelUrgencia === 'urgente' ? 'Urgente' : comm.nivelUrgencia === 'alta' ? 'Alta' : 'Normal'}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(parseInt(comm.id)).toLocaleString('es-MX', {
+                                  year: 'numeric',
+                                  month: '2-digit',
+                                  day: '2-digit',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>
                             </div>
                           </div>
-                        )}
-                      </div>
-                    ))}
-                    
-                    {(!quotation?.communications || quotation?.communications?.length === 0) && (
+                          <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">{comm.mensaje}</p>
+                        </div>
+                      ))
+                    ) : (
                       <div className="text-center py-8">
                         <Icon name="Inbox" size={32} className="text-muted-foreground mx-auto mb-2" />
                         <p className="text-sm text-muted-foreground">Sin comunicaciones registradas</p>
@@ -154,7 +214,7 @@ import React, { useState } from 'react';
                       >
                         <option value="email">Correo Electrónico</option>
                         <option value="whatsapp">WhatsApp</option>
-                        <option value="phone">Llamada Telefónica</option>
+                        <option value="llamada">Llamada Telefónica</option>
                       </select>
                     </div>
                     <div>
@@ -165,8 +225,8 @@ import React, { useState } from 'react';
                         className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background"
                       >
                         <option value="normal">Normal</option>
-                        <option value="high">Alta</option>
-                        <option value="urgent">Urgente</option>
+                        <option value="alta">Alta</option>
+                        <option value="urgente">Urgente</option>
                       </select>
                     </div>
                   </div>
@@ -193,19 +253,7 @@ import React, { useState } from 'react';
                     />
                   </div>
 
-                  {/* Attachments */}
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="has-attachments"
-                      checked={newCommunication?.hasAttachments}
-                      onChange={(e) => handleInputChange('hasAttachments', e?.target?.checked)}
-                      className="rounded border-border"
-                    />
-                    <label htmlFor="has-attachments" className="text-sm">
-                      Incluir anexos (cotización, cronograma, etc.)
-                    </label>
-                  </div>
+                  {/* Opción de anexos eliminada por requerimiento */}
 
                   {/* Quick Templates */}
                   <div className="space-y-2">
@@ -254,7 +302,7 @@ import React, { useState } from 'react';
                     </div>
                     <Button
                       onClick={handleSendCommunication}
-                      disabled={!newCommunication?.subject?.trim() || !newCommunication?.content?.trim()}
+                      disabled={!newCommunication?.subject?.trim() || !newCommunication?.content?.trim() || loading}
                       iconName="Send"
                       iconPosition="left"
                     >
