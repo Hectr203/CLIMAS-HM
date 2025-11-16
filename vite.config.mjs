@@ -67,7 +67,7 @@ export default defineConfig(({ mode }) => {
       allowedHosts: ['.amazonaws.com', '.builtwithrocket.new'],
       proxy: {
         '/api': {
-          target: env.VITE_API_URL?.replace('/api', '') || 'http://localhost:7071',
+          target: env.VITE_API_URL?.replace('/api', '') || 'https://qg8pqmgk-7071.usw3.devtunnels.ms/',
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api/, '/api')
         }
