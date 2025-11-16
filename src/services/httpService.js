@@ -8,8 +8,16 @@ class HttpService {
   constructor() {
     // Determinar la URL base según el entorno
     const getBaseURL = () => {
+      // Detectar si estamos en desarrollo (localhost o 127.0.0.1)
+      const isDevelopment =
+        typeof window !== 'undefined' &&
+        (window.location.hostname === 'localhost' ||
+          window.location.hostname === '127.0.0.1' ||
+          window.location.hostname === '0.0.0.0' ||
+          import.meta.env.DEV);
+
       // En desarrollo, usar el proxy de Vite
-      if (import.meta.env.DEV) {
+      if (isDevelopment) {
         return "/api";
       }
 
@@ -24,8 +32,15 @@ class HttpService {
       return "https://qg8pqmgk-7071.usw3.devtunnels.ms/api";
     };
 
+    const baseURL = getBaseURL();
+
+    // Log para debug (solo en producción)
+    if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost')) {
+      console.log('🔧 API Base URL:', baseURL);
+    }
+
     this.api = axios.create({
-      baseURL: getBaseURL(),
+      baseURL: baseURL,
       timeout: 30000,
       headers: {
         "Content-Type": "application/json",

@@ -4,10 +4,6 @@
 
 class EnvConfig {
   static get API_URL() {
-    // En desarrollo, usar localhost
-    if (import.meta.env.DEV) {
-      return import.meta.env.VITE_API_URL || "http://localhost:7071/api";
-    }
 
     // En producción, usar la variable de entorno o el túnel como fallback
     return import.meta.env.VITE_API_URL || "https://qg8pqmgk-7071.usw3.devtunnels.ms/api";
