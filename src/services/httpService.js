@@ -6,9 +6,26 @@ import axios from "axios";
  */
 class HttpService {
   constructor() {
-    // Usar el proxy de Vite — no poner localhost ni IP
+    // Determinar la URL base según el entorno
+    const getBaseURL = () => {
+      // En desarrollo, usar el proxy de Vite
+      if (import.meta.env.DEV) {
+        return "/api";
+      }
+
+      // En producción, usar la variable de entorno o el túnel como fallback
+      const apiUrl = import.meta.env.VITE_API_URL;
+      if (apiUrl) {
+        // Si la URL ya incluye /api, usarla tal cual, si no, agregarlo
+        return apiUrl.endsWith("/api") ? apiUrl : `${apiUrl}/api`;
+      }
+
+      // Fallback: URL del túnel de VS Code
+      return "https://qg8pqmgk-7071.usw3.devtunnels.ms/api";
+    };
+
     this.api = axios.create({
-      baseURL: "/api",
+      baseURL: getBaseURL(),
       timeout: 30000,
       headers: {
         "Content-Type": "application/json",
@@ -54,9 +71,11 @@ class HttpService {
   }
 
   setToken(token) {
-    token
-      ? localStorage.setItem("authToken", token)
-      : localStorage.removeItem("authToken");
+    if (token) {
+      localStorage.setItem("authToken", token);
+    } else {
+      localStorage.removeItem("authToken");
+    }
   }
 
   handleUnauthorized() {
